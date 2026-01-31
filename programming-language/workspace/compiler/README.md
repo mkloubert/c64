@@ -1,5 +1,9 @@
 # Cobra64 Compiler Documentation
 
+<p align="center">
+  <img src="cobra64_logo.png" alt="Cobra64 Logo" width="256">
+</p>
+
 A modern programming language and compiler for the Commodore 64.
 
 ## Table of Contents
