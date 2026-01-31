@@ -1,0 +1,41 @@
+# Test program for signed type edge cases
+# Tests boundary values: -128, 127, -32768, 32767
+
+def main():
+    # Sbyte boundaries
+    min_sbyte: sbyte = -128
+    max_sbyte: sbyte = 127
+
+    println(min_sbyte)
+    println(max_sbyte)
+
+    # Sword boundaries
+    min_sword: sword = -32768
+    max_sword: sword = 32767
+
+    println(min_sword)
+    println(max_sword)
+
+    # Negative zero
+    neg_zero: sbyte = -0
+    println(neg_zero)
+
+    # Comparisons at boundaries
+    if min_sbyte < max_sbyte:
+        println(1)
+
+    if max_sbyte > min_sbyte:
+        println(1)
+
+    # Negative one
+    neg_one: sbyte = -1
+    println(neg_one)
+
+    # Hex negative (two's complement representation)
+    # -1 in hex for sbyte is $FF
+    hex_neg: sbyte = -$01
+    println(hex_neg)
+
+    # Binary negative
+    bin_neg: sbyte = -%00000001
+    println(bin_neg)

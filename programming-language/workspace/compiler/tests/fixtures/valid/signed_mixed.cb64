@@ -1,0 +1,29 @@
+# Test program for mixing signed and unsigned types
+# Tests type promotion and mixed operations
+
+def main():
+    # Unsigned byte
+    u: byte = 100
+
+    # Signed byte
+    s: sbyte = -50
+
+    # Mixed comparison (should promote to signed)
+    if s < u:
+        println(1)
+    else:
+        println(0)
+
+    # Unsigned word
+    uw: word = 50000
+
+    # Signed word
+    sw: sword = -1000
+
+    # Promote byte to sword
+    promoted: sword = u
+    println(promoted)
+
+    # Promote sbyte to sword
+    promoted2: sword = s
+    println(promoted2)

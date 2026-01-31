@@ -92,9 +92,8 @@ impl<'a> Parser<'a> {
 
     /// Check if the current token matches the expected type.
     pub fn check(&self, expected: &Token) -> bool {
-        self.peek().is_some_and(|t| {
-            std::mem::discriminant(t) == std::mem::discriminant(expected)
-        })
+        self.peek()
+            .is_some_and(|t| std::mem::discriminant(t) == std::mem::discriminant(expected))
     }
 
     /// Check if the current token matches any of the expected types.
@@ -305,6 +304,14 @@ impl<'a> Parser<'a> {
                 self.advance();
                 Type::String
             }
+            Some(Token::Fixed) => {
+                self.advance();
+                Type::Fixed
+            }
+            Some(Token::Float) => {
+                self.advance();
+                Type::Float
+            }
             _ => return Err(self.error(ErrorCode::ExpectedType, "Expected type")),
         };
 
@@ -364,16 +371,19 @@ impl<'a> Parser<'a> {
             statements.push(stmt);
 
             // Consume newline after statement (unless it's a block statement)
-            if !self.check(&Token::Dedent) && !self.is_at_end() && !is_block_statement
-                && !self.match_token(&Token::Newline) {
-                    // Allow missing newline before dedent
-                    if !self.check(&Token::Dedent) {
-                        return Err(self.error(
-                            ErrorCode::ExpectedNewline,
-                            "Expected newline after statement",
-                        ));
-                    }
+            if !self.check(&Token::Dedent)
+                && !self.is_at_end()
+                && !is_block_statement
+                && !self.match_token(&Token::Newline)
+            {
+                // Allow missing newline before dedent
+                if !self.check(&Token::Dedent) {
+                    return Err(self.error(
+                        ErrorCode::ExpectedNewline,
+                        "Expected newline after statement",
+                    ));
                 }
+            }
             self.skip_newlines();
         }
 
@@ -448,6 +458,8 @@ impl<'a> Parser<'a> {
                     | Some(Token::Sword)
                     | Some(Token::Bool)
                     | Some(Token::StringType)
+                    | Some(Token::Fixed)
+                    | Some(Token::Float)
             ) {
                 let decl = self.parse_var_decl()?;
                 let span = decl.span.clone();
@@ -1097,6 +1109,7 @@ impl<'a> Parser<'a> {
 
         match token {
             Token::Integer(n) => Ok(Expr::new(ExprKind::IntegerLiteral(n), span)),
+            Token::Decimal(s) => Ok(Expr::new(ExprKind::DecimalLiteral(s), span)),
             Token::String(s) => Ok(Expr::new(ExprKind::StringLiteral(s), span)),
             Token::Char(c) => Ok(Expr::new(ExprKind::CharLiteral(c), span)),
             Token::True => Ok(Expr::new(ExprKind::BoolLiteral(true), span)),
@@ -1104,12 +1117,19 @@ impl<'a> Parser<'a> {
             Token::Identifier(name) => Ok(Expr::new(ExprKind::Identifier(name), span)),
 
             // Type cast expressions
-            Token::Byte | Token::Word | Token::Sbyte | Token::Sword => {
+            Token::Byte
+            | Token::Word
+            | Token::Sbyte
+            | Token::Sword
+            | Token::Fixed
+            | Token::Float => {
                 let target_type = match token {
                     Token::Byte => Type::Byte,
                     Token::Word => Type::Word,
                     Token::Sbyte => Type::Sbyte,
                     Token::Sword => Type::Sword,
+                    Token::Fixed => Type::Fixed,
+                    Token::Float => Type::Float,
                     _ => unreachable!(),
                 };
 
@@ -1740,6 +1760,566 @@ mod tests {
                     ..
                 }
             ));
+        } else {
+            panic!("Expected expression");
+        }
+    }
+
+    // ========================================
+    // Signed Type and Negative Literal Tests
+    // ========================================
+
+    #[test]
+    fn test_parse_sbyte_var_decl() {
+        let program = parse_source("def main():\n    x: sbyte = -100").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
+            assert_eq!(decl.name, "x");
+            assert_eq!(decl.var_type, Type::Sbyte);
+            assert!(decl.initializer.is_some());
+            // The initializer should be a unary negation of 100
+            if let Some(init) = &decl.initializer {
+                assert!(matches!(
+                    init.kind,
+                    ExprKind::UnaryOp {
+                        op: UnaryOp::Negate,
+                        ..
+                    }
+                ));
+            }
+        } else {
+            panic!("Expected var decl");
+        }
+    }
+
+    #[test]
+    fn test_parse_sword_var_decl() {
+        let program = parse_source("def main():\n    y: sword = -30000").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
+            assert_eq!(decl.name, "y");
+            assert_eq!(decl.var_type, Type::Sword);
+            assert!(decl.initializer.is_some());
+        } else {
+            panic!("Expected var decl");
+        }
+    }
+
+    #[test]
+    fn test_parse_sbyte_min_value() {
+        // -128 is the minimum value for sbyte
+        let program = parse_source("def main():\n    x: sbyte = -128").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
+            assert_eq!(decl.var_type, Type::Sbyte);
+            if let Some(init) = &decl.initializer {
+                if let ExprKind::UnaryOp { op, operand } = &init.kind {
+                    assert_eq!(*op, UnaryOp::Negate);
+                    assert!(matches!(operand.kind, ExprKind::IntegerLiteral(128)));
+                } else {
+                    panic!("Expected unary negate");
+                }
+            }
+        } else {
+            panic!("Expected var decl");
+        }
+    }
+
+    #[test]
+    fn test_parse_sword_min_value() {
+        // -32768 is the minimum value for sword
+        let program = parse_source("def main():\n    y: sword = -32768").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
+            assert_eq!(decl.var_type, Type::Sword);
+            if let Some(init) = &decl.initializer {
+                if let ExprKind::UnaryOp { op, operand } = &init.kind {
+                    assert_eq!(*op, UnaryOp::Negate);
+                    assert!(matches!(operand.kind, ExprKind::IntegerLiteral(32768)));
+                } else {
+                    panic!("Expected unary negate");
+                }
+            }
+        } else {
+            panic!("Expected var decl");
+        }
+    }
+
+    #[test]
+    fn test_parse_negative_hex_literal() {
+        // -$7F = -127
+        let program = parse_source("def main():\n    x: sbyte = -$7F").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
+            if let Some(init) = &decl.initializer {
+                if let ExprKind::UnaryOp { op, operand } = &init.kind {
+                    assert_eq!(*op, UnaryOp::Negate);
+                    assert!(matches!(operand.kind, ExprKind::IntegerLiteral(127)));
+                } else {
+                    panic!("Expected unary negate");
+                }
+            }
+        } else {
+            panic!("Expected var decl");
+        }
+    }
+
+    #[test]
+    fn test_parse_negative_binary_literal() {
+        // -%01111111 = -127
+        let program = parse_source("def main():\n    x: sbyte = -%01111111").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
+            if let Some(init) = &decl.initializer {
+                if let ExprKind::UnaryOp { op, operand } = &init.kind {
+                    assert_eq!(*op, UnaryOp::Negate);
+                    assert!(matches!(operand.kind, ExprKind::IntegerLiteral(127)));
+                } else {
+                    panic!("Expected unary negate");
+                }
+            }
+        } else {
+            panic!("Expected var decl");
+        }
+    }
+
+    #[test]
+    fn test_parse_const_negative_value() {
+        let program = parse_source("const MIN_SBYTE = -128\ndef main():\n    pass").unwrap();
+        if let TopLevelItem::Constant(decl) = &program.items[0] {
+            assert_eq!(decl.name, "MIN_SBYTE");
+            assert!(matches!(
+                decl.value.kind,
+                ExprKind::UnaryOp {
+                    op: UnaryOp::Negate,
+                    ..
+                }
+            ));
+        } else {
+            panic!("Expected constant");
+        }
+    }
+
+    #[test]
+    fn test_parse_sbyte_function_param() {
+        let program = parse_source("def process(val: sbyte):\n    pass").unwrap();
+        if let TopLevelItem::Function(func) = &program.items[0] {
+            assert_eq!(func.params.len(), 1);
+            assert_eq!(func.params[0].param_type, Type::Sbyte);
+        } else {
+            panic!("Expected function");
+        }
+    }
+
+    #[test]
+    fn test_parse_sword_function_return() {
+        let program = parse_source("def get_value() -> sword:\n    return -1").unwrap();
+        if let TopLevelItem::Function(func) = &program.items[0] {
+            assert_eq!(func.return_type, Some(Type::Sword));
+        } else {
+            panic!("Expected function");
+        }
+    }
+
+    #[test]
+    fn test_parse_sbyte_type_cast() {
+        let program = parse_source("def main():\n    sbyte(-100)").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::Expression(expr) = &main.body.statements[0].kind {
+            if let ExprKind::TypeCast {
+                target_type,
+                expr: inner,
+            } = &expr.kind
+            {
+                assert_eq!(*target_type, Type::Sbyte);
+                // Inner expression is the negated literal
+                assert!(matches!(
+                    inner.kind,
+                    ExprKind::UnaryOp {
+                        op: UnaryOp::Negate,
+                        ..
+                    }
+                ));
+            } else {
+                panic!("Expected type cast");
+            }
+        } else {
+            panic!("Expected expression");
+        }
+    }
+
+    #[test]
+    fn test_parse_negative_in_expression() {
+        let program = parse_source("def main():\n    x = 10 + -5").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::Assignment(assign) = &main.body.statements[0].kind {
+            if let ExprKind::BinaryOp { op, right, .. } = &assign.value.kind {
+                assert_eq!(*op, BinaryOp::Add);
+                // Right side should be unary negate
+                assert!(matches!(
+                    right.kind,
+                    ExprKind::UnaryOp {
+                        op: UnaryOp::Negate,
+                        ..
+                    }
+                ));
+            } else {
+                panic!("Expected binary op");
+            }
+        } else {
+            panic!("Expected assignment");
+        }
+    }
+
+    #[test]
+    fn test_parse_double_negative() {
+        // --42 should parse as negation of negation of 42
+        let program = parse_source("def main():\n    --42").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::Expression(expr) = &main.body.statements[0].kind {
+            if let ExprKind::UnaryOp { op, operand } = &expr.kind {
+                assert_eq!(*op, UnaryOp::Negate);
+                // Inner should also be a negation
+                assert!(matches!(
+                    operand.kind,
+                    ExprKind::UnaryOp {
+                        op: UnaryOp::Negate,
+                        ..
+                    }
+                ));
+            } else {
+                panic!("Expected unary negate");
+            }
+        } else {
+            panic!("Expected expression");
+        }
+    }
+
+    #[test]
+    fn test_parse_negative_zero() {
+        let program = parse_source("def main():\n    x: sbyte = -0").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
+            if let Some(init) = &decl.initializer {
+                if let ExprKind::UnaryOp { operand, .. } = &init.kind {
+                    assert!(matches!(operand.kind, ExprKind::IntegerLiteral(0)));
+                } else {
+                    panic!("Expected unary negate");
+                }
+            }
+        } else {
+            panic!("Expected var decl");
+        }
+    }
+
+    #[test]
+    fn test_parse_subtraction_vs_negative() {
+        // Ensure a - 1 is subtraction, not a followed by -1
+        let program = parse_source("def main():\n    x - 1").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::Expression(expr) = &main.body.statements[0].kind {
+            if let ExprKind::BinaryOp { op, .. } = &expr.kind {
+                assert_eq!(*op, BinaryOp::Sub);
+            } else {
+                panic!("Expected binary subtraction");
+            }
+        } else {
+            panic!("Expected expression");
+        }
+    }
+
+    // ========================================
+    // Fixed-Point and Float Type Tests
+    // ========================================
+
+    #[test]
+    fn test_parse_fixed_var_decl() {
+        let program = parse_source("def main():\n    x: fixed = 3.75").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
+            assert_eq!(decl.name, "x");
+            assert_eq!(decl.var_type, Type::Fixed);
+            assert!(decl.initializer.is_some());
+            if let Some(init) = &decl.initializer {
+                assert!(matches!(init.kind, ExprKind::DecimalLiteral(ref s) if s == "3.75"));
+            }
+        } else {
+            panic!("Expected var decl");
+        }
+    }
+
+    #[test]
+    fn test_parse_float_var_decl() {
+        let program = parse_source("def main():\n    y: float = 3.14").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
+            assert_eq!(decl.name, "y");
+            assert_eq!(decl.var_type, Type::Float);
+            assert!(decl.initializer.is_some());
+            if let Some(init) = &decl.initializer {
+                assert!(matches!(init.kind, ExprKind::DecimalLiteral(ref s) if s == "3.14"));
+            }
+        } else {
+            panic!("Expected var decl");
+        }
+    }
+
+    #[test]
+    fn test_parse_fixed_var_decl_no_init() {
+        let program = parse_source("def main():\n    x: fixed").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
+            assert_eq!(decl.name, "x");
+            assert_eq!(decl.var_type, Type::Fixed);
+            assert!(decl.initializer.is_none());
+        } else {
+            panic!("Expected var decl");
+        }
+    }
+
+    #[test]
+    fn test_parse_float_var_decl_no_init() {
+        let program = parse_source("def main():\n    y: float").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
+            assert_eq!(decl.name, "y");
+            assert_eq!(decl.var_type, Type::Float);
+            assert!(decl.initializer.is_none());
+        } else {
+            panic!("Expected var decl");
+        }
+    }
+
+    #[test]
+    fn test_parse_fixed_function_param() {
+        let program = parse_source("def scale(val: fixed):\n    pass").unwrap();
+        if let TopLevelItem::Function(func) = &program.items[0] {
+            assert_eq!(func.params.len(), 1);
+            assert_eq!(func.params[0].param_type, Type::Fixed);
+        } else {
+            panic!("Expected function");
+        }
+    }
+
+    #[test]
+    fn test_parse_float_function_param() {
+        let program = parse_source("def process(val: float):\n    pass").unwrap();
+        if let TopLevelItem::Function(func) = &program.items[0] {
+            assert_eq!(func.params.len(), 1);
+            assert_eq!(func.params[0].param_type, Type::Float);
+        } else {
+            panic!("Expected function");
+        }
+    }
+
+    #[test]
+    fn test_parse_fixed_function_return() {
+        let program = parse_source("def get_pos() -> fixed:\n    return 0.0").unwrap();
+        if let TopLevelItem::Function(func) = &program.items[0] {
+            assert_eq!(func.return_type, Some(Type::Fixed));
+        } else {
+            panic!("Expected function");
+        }
+    }
+
+    #[test]
+    fn test_parse_float_function_return() {
+        let program = parse_source("def compute() -> float:\n    return 3.14").unwrap();
+        if let TopLevelItem::Function(func) = &program.items[0] {
+            assert_eq!(func.return_type, Some(Type::Float));
+        } else {
+            panic!("Expected function");
+        }
+    }
+
+    #[test]
+    fn test_parse_decimal_literal_in_expression() {
+        let program = parse_source("def main():\n    3.14 + 2.5").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::Expression(expr) = &main.body.statements[0].kind {
+            if let ExprKind::BinaryOp { left, op, right } = &expr.kind {
+                assert_eq!(*op, BinaryOp::Add);
+                assert!(matches!(left.kind, ExprKind::DecimalLiteral(ref s) if s == "3.14"));
+                assert!(matches!(right.kind, ExprKind::DecimalLiteral(ref s) if s == "2.5"));
+            } else {
+                panic!("Expected binary op");
+            }
+        } else {
+            panic!("Expected expression statement");
+        }
+    }
+
+    #[test]
+    fn test_parse_scientific_notation() {
+        let program = parse_source("def main():\n    x: float = 1.5e3").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
+            assert_eq!(decl.var_type, Type::Float);
+            if let Some(init) = &decl.initializer {
+                assert!(matches!(init.kind, ExprKind::DecimalLiteral(ref s) if s == "1.5e3"));
+            }
+        } else {
+            panic!("Expected var decl");
+        }
+    }
+
+    #[test]
+    fn test_parse_scientific_notation_negative_exponent() {
+        let program = parse_source("def main():\n    x: float = 2.0e-5").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
+            assert_eq!(decl.var_type, Type::Float);
+            if let Some(init) = &decl.initializer {
+                assert!(matches!(init.kind, ExprKind::DecimalLiteral(ref s) if s == "2.0e-5"));
+            }
+        } else {
+            panic!("Expected var decl");
+        }
+    }
+
+    #[test]
+    fn test_parse_fixed_type_cast() {
+        let program = parse_source("def main():\n    fixed(100)").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::Expression(expr) = &main.body.statements[0].kind {
+            if let ExprKind::TypeCast { target_type, .. } = &expr.kind {
+                assert_eq!(*target_type, Type::Fixed);
+            } else {
+                panic!("Expected type cast");
+            }
+        } else {
+            panic!("Expected expression");
+        }
+    }
+
+    #[test]
+    fn test_parse_float_type_cast() {
+        let program = parse_source("def main():\n    float(42)").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::Expression(expr) = &main.body.statements[0].kind {
+            if let ExprKind::TypeCast { target_type, .. } = &expr.kind {
+                assert_eq!(*target_type, Type::Float);
+            } else {
+                panic!("Expected type cast");
+            }
+        } else {
+            panic!("Expected expression");
+        }
+    }
+
+    #[test]
+    fn test_parse_fixed_cast_from_decimal() {
+        let program = parse_source("def main():\n    fixed(3.14)").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::Expression(expr) = &main.body.statements[0].kind {
+            if let ExprKind::TypeCast {
+                target_type,
+                expr: inner,
+            } = &expr.kind
+            {
+                assert_eq!(*target_type, Type::Fixed);
+                assert!(matches!(inner.kind, ExprKind::DecimalLiteral(ref s) if s == "3.14"));
+            } else {
+                panic!("Expected type cast");
+            }
+        } else {
+            panic!("Expected expression");
+        }
+    }
+
+    #[test]
+    fn test_parse_byte_cast_from_fixed() {
+        let program = parse_source("def main():\n    x: fixed = 3.5\n    byte(x)").unwrap();
+        let main = program.main_function().unwrap();
+        // Second statement should be the type cast
+        if let StatementKind::Expression(expr) = &main.body.statements[1].kind {
+            if let ExprKind::TypeCast {
+                target_type,
+                expr: inner,
+            } = &expr.kind
+            {
+                assert_eq!(*target_type, Type::Byte);
+                assert!(matches!(inner.kind, ExprKind::Identifier(ref name) if name == "x"));
+            } else {
+                panic!("Expected type cast");
+            }
+        } else {
+            panic!("Expected expression");
+        }
+    }
+
+    #[test]
+    fn test_parse_negative_decimal_literal() {
+        let program = parse_source("def main():\n    x: fixed = -3.5").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
+            assert_eq!(decl.var_type, Type::Fixed);
+            if let Some(init) = &decl.initializer {
+                // Should be UnaryOp(Negate, DecimalLiteral("3.5"))
+                if let ExprKind::UnaryOp { op, operand } = &init.kind {
+                    assert_eq!(*op, UnaryOp::Negate);
+                    assert!(matches!(operand.kind, ExprKind::DecimalLiteral(ref s) if s == "3.5"));
+                } else {
+                    panic!("Expected unary negate");
+                }
+            }
+        } else {
+            panic!("Expected var decl");
+        }
+    }
+
+    #[test]
+    fn test_parse_decimal_zero() {
+        let program = parse_source("def main():\n    x: float = 0.0").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
+            assert_eq!(decl.var_type, Type::Float);
+            if let Some(init) = &decl.initializer {
+                assert!(matches!(init.kind, ExprKind::DecimalLiteral(ref s) if s == "0.0"));
+            }
+        } else {
+            panic!("Expected var decl");
+        }
+    }
+
+    #[test]
+    fn test_parse_top_level_fixed_var() {
+        let program = parse_source("position: fixed\ndef main():\n    pass").unwrap();
+        assert_eq!(program.items.len(), 2);
+        if let TopLevelItem::Variable(decl) = &program.items[0] {
+            assert_eq!(decl.name, "position");
+            assert_eq!(decl.var_type, Type::Fixed);
+        } else {
+            panic!("Expected variable");
+        }
+    }
+
+    #[test]
+    fn test_parse_top_level_float_var() {
+        let program = parse_source("temperature: float\ndef main():\n    pass").unwrap();
+        assert_eq!(program.items.len(), 2);
+        if let TopLevelItem::Variable(decl) = &program.items[0] {
+            assert_eq!(decl.name, "temperature");
+            assert_eq!(decl.var_type, Type::Float);
+        } else {
+            panic!("Expected variable");
+        }
+    }
+
+    #[test]
+    fn test_parse_mixed_fixed_float_expression() {
+        // This tests that the parser can handle mixed types in expressions
+        // Actual type checking will happen in the analyzer
+        let program =
+            parse_source("def main():\n    x: fixed = 1.0\n    y: float = 2.0\n    x + y").unwrap();
+        let main = program.main_function().unwrap();
+        assert_eq!(main.body.statements.len(), 3);
+        if let StatementKind::Expression(expr) = &main.body.statements[2].kind {
+            if let ExprKind::BinaryOp { op, .. } = &expr.kind {
+                assert_eq!(*op, BinaryOp::Add);
+            } else {
+                panic!("Expected binary op");
+            }
         } else {
             panic!("Expected expression");
         }

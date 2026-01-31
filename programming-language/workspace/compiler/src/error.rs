@@ -95,6 +95,7 @@ pub enum ErrorCode {
     InvalidBinaryDigit,
     InvalidHexDigit,
     EmptyNumberLiteral,
+    InvalidDecimalLiteral,
 
     // Syntax errors (E100-E146)
     UnexpectedToken,
@@ -184,6 +185,7 @@ impl ErrorCode {
             ErrorCode::InvalidBinaryDigit => "E022",
             ErrorCode::InvalidHexDigit => "E023",
             ErrorCode::EmptyNumberLiteral => "E024",
+            ErrorCode::InvalidDecimalLiteral => "E025",
 
             // Syntax errors
             ErrorCode::UnexpectedToken => "E100",

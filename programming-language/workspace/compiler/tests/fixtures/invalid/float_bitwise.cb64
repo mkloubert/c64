@@ -1,0 +1,7 @@
+# Invalid: Bitwise operations on float
+# Expected: Compile error - bitwise not allowed on float
+
+def main():
+    a: float = 3.14
+    b: float = 2.0
+    c: float = a | b  # Error: bitwise OR not allowed

@@ -1,0 +1,45 @@
+# Smooth Scroll Demo
+# Demonstrates practical fixed-point use for subpixel movement
+
+def main():
+    cls()
+    println("SMOOTH SCROLL")
+    println("=============")
+    println("")
+
+    # Subpixel position using fixed-point
+    pos_x: fixed = 0.0
+    pos_y: fixed = 0.0
+
+    # Velocity: 0.5 = half pixel per frame
+    vel_x: fixed = 0.5
+    vel_y: fixed = 0.25
+
+    # Simulate 8 frames of movement
+    println("POSITION EACH FRAME:")
+    frame: byte = 0
+    while frame < 8:
+        print(pos_x)
+        print(",")
+        println(pos_y)
+        pos_x = pos_x + vel_x
+        pos_y = pos_y + vel_y
+        frame = frame + 1
+
+    println("")
+    print("FINAL: ")
+    print(pos_x)
+    print(",")
+    println(pos_y)
+
+    # Convert to integer pixels
+    px: word = word(pos_x)
+    py: byte = byte(pos_y)
+    println("")
+    print("PIXELS: ")
+    print(px)
+    print(",")
+    println(py)
+
+    println("")
+    println("DONE")

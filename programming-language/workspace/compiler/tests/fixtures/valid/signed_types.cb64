@@ -1,0 +1,20 @@
+# Test program for signed type declarations
+# Tests sbyte and sword variable declarations with various values
+
+def main():
+    # Signed byte declarations
+    x: sbyte = -100
+    y: sbyte = 127
+    z: sbyte = -128
+    a: sbyte = 0
+
+    # Signed word declarations
+    big: sword = -30000
+    max_sword: sword = 32767
+    min_sword: sword = -32768
+    zero_sword: sword = 0
+
+    # Print some values
+    println(x)
+    println(y)
+    println(big)

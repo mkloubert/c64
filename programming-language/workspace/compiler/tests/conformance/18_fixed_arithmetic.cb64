@@ -1,0 +1,52 @@
+# Conformance Test: Fixed-Point Arithmetic
+# Tests: +, -, *, /, % operations on fixed type
+# Expected: Compiles without errors
+
+def main():
+    # Addition
+    a: fixed = 3.5
+    b: fixed = 2.25
+    c: fixed = a + b
+    println("ADDITION:")
+    println(c)  # 5.75
+
+    # Subtraction
+    d: fixed = 10.0
+    e: fixed = 4.5
+    f: fixed = d - e
+    println("SUBTRACTION:")
+    println(f)  # 5.5
+
+    # Multiplication
+    g: fixed = 2.5
+    h: fixed = 4.0
+    i: fixed = g * h
+    println("MULTIPLICATION:")
+    println(i)  # 10.0
+
+    # Division
+    j: fixed = 15.0
+    k: fixed = 3.0
+    l: fixed = j / k
+    println("DIVISION:")
+    println(l)  # 5.0
+
+    # Modulo
+    m: fixed = 10.5
+    n: fixed = 3.0
+    o: fixed = m % n
+    println("MODULO:")
+    println(o)  # 1.5
+
+    # Negation
+    p: fixed = 7.25
+    q: fixed = -p
+    println("NEGATION:")
+    println(q)  # -7.25
+
+    # Mixed with integers
+    r: fixed = 5.0
+    s: byte = 2
+    t: fixed = r + s
+    println("MIXED:")
+    println(t)  # 7.0

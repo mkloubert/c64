@@ -1,0 +1,25 @@
+# Valid: Mixed numeric types
+# Tests operations between byte, word, fixed, and float
+
+def main():
+    b: byte = 10
+    w: word = 1000
+    fx: fixed = 5.5
+    fl: float = 3.14
+
+    # Promotions
+    r1: fixed = b + fx
+    println(r1)
+
+    r2: float = w + fl
+    println(r2)
+
+    r3: float = fx + fl
+    println(r3)
+
+    # Type casts
+    b2: byte = byte(fx)
+    println(b2)
+
+    fl2: float = float(fx)
+    println(fl2)

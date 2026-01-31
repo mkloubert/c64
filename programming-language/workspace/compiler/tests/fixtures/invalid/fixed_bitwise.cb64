@@ -1,0 +1,7 @@
+# Invalid: Bitwise operations on fixed-point
+# Expected: Compile error - bitwise not allowed on fixed
+
+def main():
+    a: fixed = 3.5
+    b: fixed = 2.0
+    c: fixed = a & b  # Error: bitwise AND not allowed

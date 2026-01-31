@@ -318,10 +318,11 @@ pub mod zeropage {
     pub const TMP2_HI: u8 = 0xFE;
 
     /// Additional temporaries ($02-$05 are safe on C64).
+    /// TMP3/TMP3_HI form a 16-bit word for fixed-point operations.
     pub const TMP3: u8 = 0x02;
-    pub const TMP4: u8 = 0x03;
-    pub const TMP5: u8 = 0x04;
-    pub const TMP6: u8 = 0x05;
+    pub const TMP3_HI: u8 = 0x03;
+    pub const TMP4: u8 = 0x04;
+    pub const TMP5: u8 = 0x05;
 
     /// Pointer for string operations ($22-$23).
     pub const STR_PTR: u8 = 0x22;

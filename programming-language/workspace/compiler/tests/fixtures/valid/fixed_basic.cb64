@@ -1,0 +1,14 @@
+# Valid: Basic fixed-point operations
+# Tests basic fixed-point declaration, arithmetic, and printing
+
+def main():
+    x: fixed = 10.5
+    y: fixed = 3.25
+    z: fixed = x + y
+    println(z)
+
+    neg: fixed = -5.5
+    println(neg)
+
+    result: fixed = x * y
+    println(result)

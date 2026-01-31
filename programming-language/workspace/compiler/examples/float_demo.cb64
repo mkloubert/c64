@@ -1,0 +1,47 @@
+# Float Demo
+# Demonstrates IEEE-754 binary16 floating-point numbers
+
+def main():
+    cls()
+    println("FLOAT DEMO")
+    println("==========")
+    println("")
+
+    # Basic float values
+    pi: float = 3.14159
+    e: float = 2.71828
+    println("PI = 3.14159")
+    println("E = 2.71828")
+    println("")
+
+    # Arithmetic
+    println("ARITHMETIC:")
+    print("PI + E = ")
+    println(pi + e)
+
+    print("PI * E = ")
+    println(pi * e)
+    println("")
+
+    # Large numbers
+    println("LARGE NUMBERS:")
+    big: float = 50000.0
+    print("50000.0 = ")
+    println(big)
+    println("")
+
+    # Scientific notation
+    println("SCIENTIFIC:")
+    sci1: float = 1.5e3
+    print("1.5e3 = ")
+    println(sci1)
+    println("")
+
+    # Negative values
+    println("NEGATIVE:")
+    neg: float = -42.5
+    print("-42.5 = ")
+    println(neg)
+    println("")
+
+    println("DONE")

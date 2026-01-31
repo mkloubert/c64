@@ -194,8 +194,7 @@ impl Default for SymbolTable {
 }
 
 /// Context for semantic analysis.
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct AnalysisContext {
     /// Whether we're inside a loop (for break/continue validation).
     pub in_loop: bool,
@@ -206,7 +205,6 @@ pub struct AnalysisContext {
     /// The current function name (for error messages).
     pub function_name: Option<String>,
 }
-
 
 /// The semantic analyzer.
 pub struct Analyzer {
@@ -482,7 +480,7 @@ impl Analyzer {
         if let Some(init) = &decl.initializer {
             let init_type = self.analyze_expression(init);
             if let Some(init_type) = init_type {
-                if !init_type.is_assignable_to(&decl.var_type) {
+                if !self.is_expr_assignable_to(&init.kind, &init_type, &decl.var_type) {
                     self.error(CompileError::new(
                         ErrorCode::TypeMismatch,
                         format!(
@@ -491,6 +489,13 @@ impl Analyzer {
                         ),
                         init.span.clone(),
                     ));
+                }
+            }
+
+            // Check compile-time range for integer types
+            if decl.var_type.is_integer() {
+                if let Some(value) = self.try_eval_constant(init) {
+                    self.check_value_in_range(value, &decl.var_type, &init.span);
                 }
             }
         }
@@ -570,7 +575,7 @@ impl Analyzer {
                 }
             }
 
-            if !value_type.is_assignable_to(&target_type) {
+            if !self.is_expr_assignable_to(&assign.value.kind, &value_type, &target_type) {
                 self.error(CompileError::new(
                     ErrorCode::TypeMismatch,
                     format!("Cannot assign {} to {}", value_type, target_type),
@@ -784,7 +789,7 @@ impl Analyzer {
             (Some(expected), Some(expr)) => {
                 let actual = self.analyze_expression(expr);
                 if let Some(actual) = actual {
-                    if !actual.is_assignable_to(&expected) {
+                    if !self.is_expr_assignable_to(&expr.kind, &actual, &expected) {
                         self.error(CompileError::new(
                             ErrorCode::TypeMismatch,
                             format!("Expected return type {}, found {}", expected, actual),
@@ -876,6 +881,14 @@ impl Analyzer {
                 self.analyze_expression(inner);
                 Some(target_type.clone())
             }
+            ExprKind::FixedLiteral(_) => Some(Type::Fixed),
+            ExprKind::FloatLiteral(_) => Some(Type::Float),
+            ExprKind::DecimalLiteral(_) => {
+                // DecimalLiteral defaults to float type during analysis.
+                // Context-based conversion (e.g., for fixed variables) will be
+                // handled in a later phase during assignment checking.
+                Some(Type::Float)
+            }
             ExprKind::Grouped(inner) => self.analyze_expression(inner),
         }
     }
@@ -905,13 +918,13 @@ impl Analyzer {
         span: &Span,
     ) -> Option<Type> {
         match op {
-            // Arithmetic operators
-            BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => {
-                if !left.is_integer() || !right.is_integer() {
+            // Arithmetic operators - valid for all numeric types (integers, fixed, float)
+            BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div => {
+                if !left.is_numeric() || !right.is_numeric() {
                     self.error(CompileError::new(
                         ErrorCode::InvalidOperatorForType,
                         format!(
-                            "Operator {} requires integer operands, found {} and {}",
+                            "Operator {} requires numeric operands, found {} and {}",
                             op, left, right
                         ),
                         span.clone(),
@@ -921,14 +934,44 @@ impl Analyzer {
                 Type::binary_result_type(left, right)
             }
 
-            // Comparison operators
+            // Modulo - valid for integers and fixed, but NOT for float
+            BinaryOp::Mod => {
+                if left.is_float() || right.is_float() {
+                    self.error(CompileError::new(
+                        ErrorCode::InvalidOperatorForType,
+                        format!(
+                            "Modulo operator is not valid for float type, found {} and {}",
+                            left, right
+                        ),
+                        span.clone(),
+                    ));
+                    return None;
+                }
+                if !left.is_numeric() || !right.is_numeric() {
+                    self.error(CompileError::new(
+                        ErrorCode::InvalidOperatorForType,
+                        format!(
+                            "Operator {} requires numeric operands, found {} and {}",
+                            op, left, right
+                        ),
+                        span.clone(),
+                    ));
+                    return None;
+                }
+                Type::binary_result_type(left, right)
+            }
+
+            // Comparison operators - valid for all numeric types
             BinaryOp::Equal
             | BinaryOp::NotEqual
             | BinaryOp::Less
             | BinaryOp::Greater
             | BinaryOp::LessEqual
             | BinaryOp::GreaterEqual => {
-                if left != right && Type::binary_result_type(left, right).is_none() {
+                // Allow comparisons between any numeric types (promotion handled by binary_result_type)
+                if left.is_numeric() && right.is_numeric() {
+                    // Valid comparison
+                } else if left != right && Type::binary_result_type(left, right).is_none() {
                     self.error(CompileError::new(
                         ErrorCode::CannotCompareTypes,
                         format!("Cannot compare {} and {}", left, right),
@@ -938,7 +981,7 @@ impl Analyzer {
                 Some(Type::Bool)
             }
 
-            // Logical operators
+            // Logical operators - only valid for bool
             BinaryOp::And | BinaryOp::Or => {
                 if *left != Type::Bool || *right != Type::Bool {
                     self.error(CompileError::new(
@@ -954,7 +997,7 @@ impl Analyzer {
                 Some(Type::Bool)
             }
 
-            // Bitwise operators
+            // Bitwise operators - only valid for integers (NOT fixed/float)
             BinaryOp::BitAnd | BinaryOp::BitOr | BinaryOp::BitXor => {
                 if !left.is_integer() || !right.is_integer() {
                     self.error(CompileError::new(
@@ -970,7 +1013,7 @@ impl Analyzer {
                 Type::binary_result_type(left, right)
             }
 
-            // Shift operators
+            // Shift operators - only valid for integers (NOT fixed/float)
             BinaryOp::ShiftLeft | BinaryOp::ShiftRight => {
                 if !left.is_integer() || !right.is_integer() {
                     self.error(CompileError::new(
@@ -999,18 +1042,21 @@ impl Analyzer {
 
         match op {
             UnaryOp::Negate => {
-                if !operand.is_integer() {
+                if !operand.is_numeric() {
                     self.error(CompileError::new(
                         ErrorCode::InvalidOperatorForType,
-                        format!("Cannot negate non-integer type {}", operand),
+                        format!("Cannot negate non-numeric type {}", operand),
                         span.clone(),
                     ));
                     return None;
                 }
-                // Negation promotes to signed type
+                // Negation promotes unsigned integers to signed type
+                // Fixed and float stay the same (already signed)
                 match operand {
                     Type::Byte => Some(Type::Sbyte),
                     Type::Word => Some(Type::Sword),
+                    Type::Fixed => Some(Type::Fixed),
+                    Type::Float => Some(Type::Float),
                     _ => Some(operand.clone()),
                 }
             }
@@ -1037,6 +1083,40 @@ impl Analyzer {
                 Some(operand.clone())
             }
         }
+    }
+
+    /// Check if an expression can be assigned to a target type.
+    ///
+    /// This handles the special case of `DecimalLiteral` which can be
+    /// assigned to both `fixed` and `float` types (type is determined by context).
+    fn is_expr_assignable_to(
+        &self,
+        expr_kind: &ExprKind,
+        value_type: &Type,
+        target_type: &Type,
+    ) -> bool {
+        // DecimalLiteral can be assigned to both fixed and float
+        if matches!(expr_kind, ExprKind::DecimalLiteral(_))
+            && (target_type.is_fixed() || target_type.is_float())
+        {
+            return true;
+        }
+
+        // Handle negated decimal literals: -3.5 etc.
+        if let ExprKind::UnaryOp {
+            op: UnaryOp::Negate,
+            operand,
+        } = expr_kind
+        {
+            if matches!(operand.kind, ExprKind::DecimalLiteral(_))
+                && (target_type.is_fixed() || target_type.is_float())
+            {
+                return true;
+            }
+        }
+
+        // Default to standard type assignability
+        value_type.is_assignable_to(target_type)
     }
 
     /// Analyze a function call.
@@ -1075,8 +1155,11 @@ impl Analyzer {
                             arg_type == Type::String
                                 || arg_type.is_integer()
                                 || arg_type == Type::Bool
+                                || arg_type.is_fixed()
+                                || arg_type.is_float()
                         } else {
-                            arg_type.is_assignable_to(expected_type)
+                            // Use expr_assignable_to for DecimalLiteral handling
+                            self.is_expr_assignable_to(&arg.kind, &arg_type, expected_type)
                         };
 
                         if !compatible {
@@ -1129,6 +1212,97 @@ impl Analyzer {
     /// Get the number of errors.
     pub fn error_count(&self) -> usize {
         self.errors.len()
+    }
+
+    /// Try to evaluate a constant expression at compile time.
+    /// Returns the evaluated value as i64 to handle both signed and unsigned.
+    fn try_eval_constant(&self, expr: &Expr) -> Option<i64> {
+        match &expr.kind {
+            ExprKind::IntegerLiteral(n) => Some(*n as i64),
+            ExprKind::BoolLiteral(b) => Some(if *b { 1 } else { 0 }),
+            ExprKind::CharLiteral(c) => Some(*c as i64),
+            ExprKind::UnaryOp { op, operand } => {
+                let operand_val = self.try_eval_constant(operand)?;
+                match op {
+                    UnaryOp::Negate => Some(-operand_val),
+                    UnaryOp::Not => Some(if operand_val == 0 { 1 } else { 0 }),
+                    UnaryOp::BitNot => Some(!operand_val),
+                }
+            }
+            ExprKind::BinaryOp { left, op, right } => {
+                let left_val = self.try_eval_constant(left)?;
+                let right_val = self.try_eval_constant(right)?;
+                match op {
+                    BinaryOp::Add => Some(left_val.wrapping_add(right_val)),
+                    BinaryOp::Sub => Some(left_val.wrapping_sub(right_val)),
+                    BinaryOp::Mul => Some(left_val.wrapping_mul(right_val)),
+                    BinaryOp::Div => {
+                        if right_val == 0 {
+                            None
+                        } else {
+                            Some(left_val / right_val)
+                        }
+                    }
+                    BinaryOp::Mod => {
+                        if right_val == 0 {
+                            None
+                        } else {
+                            Some(left_val % right_val)
+                        }
+                    }
+                    BinaryOp::BitAnd => Some(left_val & right_val),
+                    BinaryOp::BitOr => Some(left_val | right_val),
+                    BinaryOp::BitXor => Some(left_val ^ right_val),
+                    BinaryOp::ShiftLeft => Some(left_val << (right_val & 0x3F)),
+                    BinaryOp::ShiftRight => Some(left_val >> (right_val & 0x3F)),
+                    _ => None, // Comparison/logical ops don't produce numeric results
+                }
+            }
+            ExprKind::Grouped(inner) => self.try_eval_constant(inner),
+            ExprKind::Identifier(name) => {
+                // Try to look up constant value
+                if let Some(symbol) = self.symbols.lookup(name) {
+                    if symbol.is_constant {
+                        // For now, we don't track constant values, return None
+                        None
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
+    /// Check if a value is within the valid range for a type.
+    fn check_value_in_range(&mut self, value: i64, target_type: &Type, span: &Span) {
+        let (min, max, type_name) = match target_type {
+            Type::Byte => (0, 255, "byte"),
+            Type::Word => (0, 65535, "word"),
+            Type::Sbyte => (-128, 127, "sbyte"),
+            Type::Sword => (-32768, 32767, "sword"),
+            Type::Bool => (0, 1, "bool"),
+            _ => return, // No range check for other types
+        };
+
+        if value < min || value > max {
+            self.error(
+                CompileError::new(
+                    ErrorCode::ConstantValueOutOfRange,
+                    format!(
+                        "Value {} is out of range for {} ({} to {})",
+                        value, type_name, min, max
+                    ),
+                    span.clone(),
+                )
+                .with_hint(format!(
+                    "Valid range for {} is {} to {}",
+                    type_name, min, max
+                )),
+            );
+        }
     }
 }
 
@@ -1594,6 +1768,436 @@ mod tests {
     fn test_call_function_with_args() {
         let result = analyze_source(
             "def add(a: byte, b: byte) -> byte:\n    return a + b\n\ndef main():\n    x: byte = add(1, 2)",
+        );
+        assert!(result.is_ok());
+    }
+
+    // ========================================
+    // Signed Type Tests
+    // ========================================
+
+    #[test]
+    fn test_valid_sbyte_declaration() {
+        let result = analyze_source("def main():\n    x: sbyte = -100");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_valid_sbyte_min_value() {
+        let result = analyze_source("def main():\n    x: sbyte = -128");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_valid_sbyte_max_value() {
+        let result = analyze_source("def main():\n    x: sbyte = 127");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_valid_sword_declaration() {
+        let result = analyze_source("def main():\n    y: sword = -30000");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_valid_sword_min_value() {
+        let result = analyze_source("def main():\n    y: sword = -32768");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_valid_sword_max_value() {
+        let result = analyze_source("def main():\n    y: sword = 32767");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_error_sbyte_overflow_positive() {
+        let result = analyze_source("def main():\n    x: sbyte = 128");
+        assert!(has_error_code(&result, ErrorCode::ConstantValueOutOfRange));
+    }
+
+    #[test]
+    fn test_error_sbyte_overflow_negative() {
+        let result = analyze_source("def main():\n    x: sbyte = -129");
+        assert!(has_error_code(&result, ErrorCode::ConstantValueOutOfRange));
+    }
+
+    #[test]
+    fn test_error_sword_overflow_positive() {
+        let result = analyze_source("def main():\n    y: sword = 32768");
+        assert!(has_error_code(&result, ErrorCode::ConstantValueOutOfRange));
+    }
+
+    #[test]
+    fn test_error_sword_overflow_negative() {
+        let result = analyze_source("def main():\n    y: sword = -32769");
+        assert!(has_error_code(&result, ErrorCode::ConstantValueOutOfRange));
+    }
+
+    #[test]
+    fn test_valid_sbyte_zero() {
+        let result = analyze_source("def main():\n    x: sbyte = 0");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_valid_sbyte_negative_zero() {
+        let result = analyze_source("def main():\n    x: sbyte = -0");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_valid_sbyte_negative_one() {
+        let result = analyze_source("def main():\n    x: sbyte = -1");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_negation_type_promotion() {
+        // Negating a byte should produce sbyte
+        let result = analyze_source("def main():\n    x: byte = 5\n    y: sbyte = -x");
+        // This should work because -x on byte becomes sbyte
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_valid_sbyte_function_param() {
+        let result =
+            analyze_source("def process(val: sbyte):\n    pass\n\ndef main():\n    process(-100)");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_valid_sword_function_return() {
+        let result = analyze_source(
+            "def get_value() -> sword:\n    return -1000\n\ndef main():\n    y: sword = get_value()",
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_sbyte_to_sword_promotion() {
+        // sbyte should be assignable to sword
+        let result = analyze_source("def main():\n    x: sbyte = -100\n    y: sword = x");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_byte_to_sword_promotion() {
+        // byte should be assignable to sword
+        let result = analyze_source("def main():\n    x: byte = 100\n    y: sword = x");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_error_negative_to_unsigned() {
+        // Negative value should not be assignable to byte
+        let result = analyze_source("def main():\n    x: byte = -1");
+        assert!(has_error_code(&result, ErrorCode::ConstantValueOutOfRange));
+    }
+
+    #[test]
+    fn test_error_negative_to_word() {
+        // Negative value should not be assignable to word
+        let result = analyze_source("def main():\n    x: word = -1");
+        assert!(has_error_code(&result, ErrorCode::ConstantValueOutOfRange));
+    }
+
+    #[test]
+    fn test_valid_const_negative() {
+        let result = analyze_source("const MIN = -128\ndef main():\n    pass");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_sbyte_arithmetic() {
+        let result = analyze_source(
+            "def main():\n    x: sbyte = -50\n    y: sbyte = -50\n    z: sbyte = x + y",
+        );
+        // Note: This might overflow at runtime, but compile-time doesn't check this
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_sbyte_comparison() {
+        let result = analyze_source("def main():\n    x: sbyte = -50\n    if x < 0:\n        pass");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_sword_comparison() {
+        let result =
+            analyze_source("def main():\n    x: sword = -1000\n    if x > -2000:\n        pass");
+        assert!(result.is_ok());
+    }
+
+    // ========================================
+    // Fixed-Point and Float Type Tests
+    // ========================================
+
+    #[test]
+    fn test_fixed_declaration() {
+        let result = analyze_source("def main():\n    x: fixed = 3.75");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_float_declaration() {
+        let result = analyze_source("def main():\n    x: float = 3.14");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_fixed_arithmetic_add() {
+        let result = analyze_source(
+            "def main():\n    x: fixed = 1.5\n    y: fixed = 2.5\n    z: fixed = x + y",
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_fixed_arithmetic_sub() {
+        let result = analyze_source(
+            "def main():\n    x: fixed = 5.0\n    y: fixed = 2.5\n    z: fixed = x - y",
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_fixed_arithmetic_mul() {
+        let result = analyze_source(
+            "def main():\n    x: fixed = 2.0\n    y: fixed = 3.5\n    z: fixed = x * y",
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_fixed_arithmetic_div() {
+        let result = analyze_source(
+            "def main():\n    x: fixed = 10.0\n    y: fixed = 2.0\n    z: fixed = x / y",
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_fixed_modulo() {
+        let result = analyze_source(
+            "def main():\n    x: fixed = 10.5\n    y: fixed = 3.0\n    z: fixed = x % y",
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_float_arithmetic_add() {
+        let result = analyze_source(
+            "def main():\n    x: float = 1.5\n    y: float = 2.5\n    z: float = x + y",
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_float_arithmetic_mul() {
+        let result = analyze_source(
+            "def main():\n    x: float = 2.0\n    y: float = 3.5\n    z: float = x * y",
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_float_arithmetic_div() {
+        let result = analyze_source(
+            "def main():\n    x: float = 10.0\n    y: float = 2.0\n    z: float = x / y",
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_fixed_comparison() {
+        let result =
+            analyze_source("def main():\n    x: fixed = 3.5\n    if x > 2.0:\n        pass");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_float_comparison() {
+        let result =
+            analyze_source("def main():\n    x: float = 3.14\n    if x < 4.0:\n        pass");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_fixed_negation() {
+        let result = analyze_source("def main():\n    x: fixed = 3.5\n    y: fixed = -x");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_float_negation() {
+        let result = analyze_source("def main():\n    x: float = 3.14\n    y: float = -x");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_fixed_type_cast_from_integer() {
+        let result = analyze_source("def main():\n    x: byte = 10\n    y: fixed = fixed(x)");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_float_type_cast_from_integer() {
+        let result = analyze_source("def main():\n    x: word = 1000\n    y: float = float(x)");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_byte_cast_from_fixed() {
+        let result = analyze_source("def main():\n    x: fixed = 3.5\n    y: byte = byte(x)");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_byte_cast_from_float() {
+        let result = analyze_source("def main():\n    x: float = 3.14\n    y: byte = byte(x)");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_fixed_plus_integer() {
+        // Integer should be promoted to fixed
+        let result = analyze_source("def main():\n    x: fixed = 3.5\n    y: fixed = x + 1");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_float_plus_integer() {
+        // Integer should be promoted to float
+        let result = analyze_source("def main():\n    x: float = 3.14\n    y: float = x + 1");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_error_float_modulo() {
+        // Modulo is not valid for float
+        let result = analyze_source(
+            "def main():\n    x: float = 10.0\n    y: float = 3.0\n    z: float = x % y",
+        );
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(!errors.is_empty());
+    }
+
+    #[test]
+    fn test_error_fixed_bitwise_and() {
+        // Bitwise AND is not valid for fixed
+        let result = analyze_source(
+            "def main():\n    x: fixed = 10.0\n    y: fixed = 3.0\n    z: fixed = x & y",
+        );
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(!errors.is_empty());
+    }
+
+    #[test]
+    fn test_error_fixed_bitwise_or() {
+        // Bitwise OR is not valid for fixed
+        let result = analyze_source(
+            "def main():\n    x: fixed = 10.0\n    y: fixed = 3.0\n    z: fixed = x | y",
+        );
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(!errors.is_empty());
+    }
+
+    #[test]
+    fn test_error_float_bitwise_xor() {
+        // Bitwise XOR is not valid for float
+        let result = analyze_source(
+            "def main():\n    x: float = 10.0\n    y: float = 3.0\n    z: float = x ^ y",
+        );
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(!errors.is_empty());
+    }
+
+    #[test]
+    fn test_error_fixed_shift_left() {
+        // Shift left is not valid for fixed
+        let result = analyze_source("def main():\n    x: fixed = 10.0\n    z: fixed = x << 2");
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(!errors.is_empty());
+    }
+
+    #[test]
+    fn test_error_float_shift_right() {
+        // Shift right is not valid for float
+        let result = analyze_source("def main():\n    x: float = 10.0\n    z: float = x >> 2");
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(!errors.is_empty());
+    }
+
+    #[test]
+    fn test_error_fixed_logical_and() {
+        // Logical AND is not valid for fixed
+        let result = analyze_source(
+            "def main():\n    x: fixed = 1.0\n    y: fixed = 2.0\n    z: bool = x and y",
+        );
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(!errors.is_empty());
+    }
+
+    #[test]
+    fn test_error_float_logical_or() {
+        // Logical OR is not valid for float
+        let result = analyze_source(
+            "def main():\n    x: float = 1.0\n    y: float = 2.0\n    z: bool = x or y",
+        );
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(!errors.is_empty());
+    }
+
+    #[test]
+    fn test_error_fixed_logical_not() {
+        // Logical NOT is not valid for fixed
+        let result = analyze_source("def main():\n    x: fixed = 1.0\n    y: bool = not x");
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(!errors.is_empty());
+    }
+
+    #[test]
+    fn test_error_float_bitwise_not() {
+        // Bitwise NOT is not valid for float
+        let result = analyze_source("def main():\n    x: float = 1.0\n    y: float = ~x");
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(!errors.is_empty());
+    }
+
+    #[test]
+    fn test_fixed_function_param() {
+        // Note: Using fixed(2.0) to keep the result as fixed type
+        // Without the cast, 2.0 would be float and val*2.0 would be float
+        let result = analyze_source("def scale(val: fixed) -> fixed:\n    return val * fixed(2.0)\ndef main():\n    x: fixed = scale(1.5)");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_float_function_param() {
+        let result = analyze_source("def compute(val: float) -> float:\n    return val + 1.0\ndef main():\n    x: float = compute(3.14)");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_mixed_fixed_float_promotes_to_float() {
+        // When mixing fixed and float, result should be float
+        let result = analyze_source(
+            "def main():\n    x: fixed = 1.5\n    y: float = 2.5\n    z: float = x + y",
         );
         assert!(result.is_ok());
     }

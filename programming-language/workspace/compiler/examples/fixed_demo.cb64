@@ -1,0 +1,44 @@
+# Fixed-Point Demo
+# Demonstrates the fixed-point 12.4 type for precise decimal values
+
+def main():
+    cls()
+    println("FIXED-POINT DEMO")
+    println("================")
+    println("")
+
+    # Basic fixed-point values
+    a: fixed = 10.5
+    b: fixed = 3.25
+    println("A = 10.5")
+    println("B = 3.25")
+    println("")
+
+    # Arithmetic
+    println("ARITHMETIC:")
+    print("A + B = ")
+    println(a + b)
+
+    print("A - B = ")
+    println(a - b)
+
+    print("A * B = ")
+    println(a * b)
+
+    print("A / B = ")
+    println(a / b)
+    println("")
+
+    # Subpixel precision example
+    println("SUBPIXEL MOVEMENT:")
+    pos: fixed = 0.0
+    speed: fixed = 0.125
+    i: byte = 0
+    while i < 5:
+        print("POS: ")
+        println(pos)
+        pos = pos + speed
+        i = i + 1
+
+    println("")
+    println("DONE")

@@ -1,0 +1,40 @@
+# Test program for signed arithmetic operations
+# Tests addition, subtraction, multiplication, division with signed types
+
+def main():
+    # Signed byte arithmetic
+    a: sbyte = -50
+    b: sbyte = 30
+
+    # Addition (should be -20)
+    sum: sbyte = a + b
+    println(sum)
+
+    # Subtraction (should be -80)
+    diff: sbyte = a - b
+    println(diff)
+
+    # Multiplication (should be -1500, but truncated to sbyte)
+    # For sbyte, this will overflow
+    c: sbyte = -5
+    d: sbyte = 10
+    prod: sbyte = c * d
+    println(prod)
+
+    # Division (should be -5)
+    e: sbyte = -50
+    f: sbyte = 10
+    quot: sbyte = e / f
+    println(quot)
+
+    # Signed word arithmetic
+    x: sword = -1000
+    y: sword = 500
+
+    # Addition (should be -500)
+    sum_w: sword = x + y
+    println(sum_w)
+
+    # Subtraction (should be -1500)
+    diff_w: sword = x - y
+    println(diff_w)

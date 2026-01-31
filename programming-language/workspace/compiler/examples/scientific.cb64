@@ -1,0 +1,69 @@
+# Scientific Calculations Demo
+# Demonstrates IEEE-754 binary16 floating-point operations
+
+def main():
+    cls()
+    println("SCIENTIFIC DEMO")
+    println("===============")
+    println("")
+
+    # Physics constants (approximations for half-precision)
+    pi: float = 3.14159
+    gravity: float = 9.81
+    speed_of_sound: float = 343.0
+
+    println("CONSTANTS:")
+    print("PI = ")
+    println(pi)
+    print("GRAVITY = ")
+    println(gravity)
+    print("SPEED OF SOUND = ")
+    println(speed_of_sound)
+    println("")
+
+    # Scientific notation
+    println("SCIENTIFIC NOTATION:")
+    small: float = 1.5e-2
+    large: float = 6.5e4
+    print("1.5e-2 = ")
+    println(small)
+    print("6.5e4 = ")
+    println(large)
+    println("")
+
+    # Circle calculations
+    println("CIRCLE (R=10):")
+    radius: float = 10.0
+    circumference: float = 2.0 * pi * radius
+    print("CIRCUMFERENCE = ")
+    println(circumference)
+    println("")
+
+    # Falling object
+    println("FREE FALL:")
+    time: float = 2.0
+    distance: float = 0.5 * gravity * time * time
+    print("DISTANCE IN 2S = ")
+    println(distance)
+    println("")
+
+    # Temperature conversion
+    println("TEMPERATURE:")
+    celsius: float = 25.0
+    fahrenheit: float = celsius * 1.8 + 32.0
+    print("25C = ")
+    print(fahrenheit)
+    println("F")
+    println("")
+
+    # Large number arithmetic
+    println("LARGE NUMBERS:")
+    a: float = 50000.0
+    b: float = 15000.0
+    print("50000 + 15000 = ")
+    println(a + b)
+    print("50000 - 15000 = ")
+    println(a - b)
+    println("")
+
+    println("DONE")

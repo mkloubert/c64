@@ -1,0 +1,18 @@
+# Valid: Basic float operations
+# Tests basic float declaration, arithmetic, and printing
+
+def main():
+    x: float = 3.14159
+    y: float = 2.71828
+    z: float = x + y
+    println(z)
+
+    neg: float = -100.5
+    println(neg)
+
+    result: float = x * y
+    println(result)
+
+    # Scientific notation
+    sci: float = 1.5e3
+    println(sci)

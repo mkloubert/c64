@@ -249,9 +249,12 @@ proptest! {
         if let Ok(code) = cobra64::compile(&source) {
             // Each variable should add roughly 5-15 bytes
             // Base size increased to account for full runtime library
-            // (print_word 16-bit support, print_bool TRUE/FALSE output)
+            // (print_word 16-bit support, print_bool TRUE/FALSE output,
+            // signed types: print_sbyte, print_sword, mul_sbyte, div_sbyte, etc.,
+            // fixed-point 12.4 routines, IEEE-754 binary16 float routines,
+            // float/fixed/int conversion routines, print_fixed, print_float)
             let min_expected = 20 + count * 5;
-            let max_expected = 400 + count * 50;
+            let max_expected = 2100 + count * 50;
 
             prop_assert!(
                 code.len() >= min_expected,

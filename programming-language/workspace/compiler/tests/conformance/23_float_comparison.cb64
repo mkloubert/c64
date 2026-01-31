@@ -1,0 +1,59 @@
+# Conformance Test: Float Comparisons
+# Tests: ==, !=, <, <=, >, >= on float type
+# Expected: Compiles without errors
+
+def main():
+    a: float = 3.5
+    b: float = 3.5
+    c: float = 2.0
+    d: float = 5.0
+
+    # Equality
+    println("EQUALITY:")
+    if a == b:
+        println("3.5 == 3.5: TRUE")
+    if a != c:
+        println("3.5 != 2.0: TRUE")
+
+    # Less than
+    println("LESS THAN:")
+    if c < a:
+        println("2.0 < 3.5: TRUE")
+    if a < d:
+        println("3.5 < 5.0: TRUE")
+
+    # Less than or equal
+    println("LESS EQUAL:")
+    if a <= b:
+        println("3.5 <= 3.5: TRUE")
+    if c <= a:
+        println("2.0 <= 3.5: TRUE")
+
+    # Greater than
+    println("GREATER THAN:")
+    if d > a:
+        println("5.0 > 3.5: TRUE")
+    if a > c:
+        println("3.5 > 2.0: TRUE")
+
+    # Greater than or equal
+    println("GREATER EQUAL:")
+    if a >= b:
+        println("3.5 >= 3.5: TRUE")
+    if d >= a:
+        println("5.0 >= 3.5: TRUE")
+
+    # Negative comparisons
+    e: float = -2.5
+    f: float = -1.0
+    println("NEGATIVE:")
+    if e < f:
+        println("-2.5 < -1.0: TRUE")
+    if f > e:
+        println("-1.0 > -2.5: TRUE")
+
+    # Zero comparison
+    z: float = 0.0
+    println("ZERO:")
+    if z == 0.0:
+        println("0.0 == 0.0: TRUE")

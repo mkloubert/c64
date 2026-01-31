@@ -27,6 +27,10 @@ pub enum Type {
     Sbyte,
     /// 16-bit signed integer (-32768 to 32767).
     Sword,
+    /// 16-bit fixed-point (12.4 format, range -2048.0 to +2047.9375).
+    Fixed,
+    /// 16-bit IEEE-754 binary16 floating-point (range ±65504).
+    Float,
     /// Boolean value.
     Bool,
     /// Text string.
@@ -44,7 +48,7 @@ impl Type {
     pub fn size(&self) -> usize {
         match self {
             Type::Byte | Type::Sbyte | Type::Bool => 1,
-            Type::Word | Type::Sword => 2,
+            Type::Word | Type::Sword | Type::Fixed | Type::Float => 2,
             Type::String => 2, // String variable stores a 16-bit pointer
             Type::ByteArray(Some(n)) => *n as usize,
             Type::ByteArray(None) => 0, // Unknown size
@@ -59,9 +63,24 @@ impl Type {
         matches!(self, Type::Byte | Type::Word | Type::Sbyte | Type::Sword)
     }
 
+    /// Check if this is a fixed-point type.
+    pub fn is_fixed(&self) -> bool {
+        matches!(self, Type::Fixed)
+    }
+
+    /// Check if this is a floating-point type.
+    pub fn is_float(&self) -> bool {
+        matches!(self, Type::Float)
+    }
+
+    /// Check if this is a numeric type (integer, fixed, or float).
+    pub fn is_numeric(&self) -> bool {
+        self.is_integer() || self.is_fixed() || self.is_float()
+    }
+
     /// Check if this is a signed type.
     pub fn is_signed(&self) -> bool {
-        matches!(self, Type::Sbyte | Type::Sword)
+        matches!(self, Type::Sbyte | Type::Sword | Type::Fixed | Type::Float)
     }
 
     /// Check if this is an array type.
@@ -86,9 +105,38 @@ impl Type {
 
         // Integer type promotion rules
         match (self, target) {
+            // Unsigned to larger unsigned
             (Type::Byte, Type::Word) => true,
+            // Unsigned to larger signed (safe: byte 0-255 fits in sword -32768..32767)
             (Type::Byte, Type::Sword) => true,
+            // Signed to larger signed
             (Type::Sbyte, Type::Sword) => true,
+            // Byte to sbyte: allowed for literals, range checked at compile time
+            // This allows `x: sbyte = 127` to work (127 is a valid sbyte value)
+            (Type::Byte, Type::Sbyte) => true,
+            // Word to sword: allowed for literals, range checked at compile time
+            // This allows `x: sword = 32767` to work (32767 is a valid sword value)
+            (Type::Word, Type::Sword) => true,
+
+            // Integer to fixed: allowed (value becomes N.0)
+            // Range is checked at compile time (-2048 to 2047 for integer part)
+            (Type::Byte, Type::Fixed) => true,
+            (Type::Sbyte, Type::Fixed) => true,
+            (Type::Word, Type::Fixed) => true, // Range checked at compile time
+            (Type::Sword, Type::Fixed) => true, // Range checked at compile time
+
+            // Integer to float: allowed (may lose precision for large values)
+            (Type::Byte, Type::Float) => true,
+            (Type::Sbyte, Type::Float) => true,
+            (Type::Word, Type::Float) => true,
+            (Type::Sword, Type::Float) => true,
+
+            // Fixed to float: allowed (fixed range fits in float range)
+            (Type::Fixed, Type::Float) => true,
+
+            // Float to fixed: requires explicit cast (potential precision/range loss)
+            // Fixed to integer: requires explicit cast (truncation)
+            // Float to integer: requires explicit cast (truncation)
             _ => false,
         }
     }
@@ -101,6 +149,8 @@ impl Type {
             (Type::Word, Type::Word) => Some(Type::Word),
             (Type::Sbyte, Type::Sbyte) => Some(Type::Sbyte),
             (Type::Sword, Type::Sword) => Some(Type::Sword),
+            (Type::Fixed, Type::Fixed) => Some(Type::Fixed),
+            (Type::Float, Type::Float) => Some(Type::Float),
             (Type::Bool, Type::Bool) => Some(Type::Bool),
 
             // Mixed unsigned: promote to larger
@@ -108,6 +158,41 @@ impl Type {
 
             // Mixed signed: promote to larger
             (Type::Sbyte, Type::Sword) | (Type::Sword, Type::Sbyte) => Some(Type::Sword),
+
+            // Mixed signed/unsigned of same size: promote to signed
+            // byte + sbyte -> sbyte (comparison/arithmetic with literals like 0)
+            (Type::Byte, Type::Sbyte) | (Type::Sbyte, Type::Byte) => Some(Type::Sbyte),
+            // word + sword -> sword
+            (Type::Word, Type::Sword) | (Type::Sword, Type::Word) => Some(Type::Sword),
+
+            // Mixed sizes, different signedness: promote to larger signed
+            // byte + sword -> sword
+            (Type::Byte, Type::Sword) | (Type::Sword, Type::Byte) => Some(Type::Sword),
+            // sbyte + word -> sword
+            (Type::Sbyte, Type::Word) | (Type::Word, Type::Sbyte) => Some(Type::Sword),
+
+            // Fixed with integers: promote to fixed
+            (Type::Fixed, Type::Byte)
+            | (Type::Byte, Type::Fixed)
+            | (Type::Fixed, Type::Sbyte)
+            | (Type::Sbyte, Type::Fixed)
+            | (Type::Fixed, Type::Word)
+            | (Type::Word, Type::Fixed)
+            | (Type::Fixed, Type::Sword)
+            | (Type::Sword, Type::Fixed) => Some(Type::Fixed),
+
+            // Float with integers: promote to float
+            (Type::Float, Type::Byte)
+            | (Type::Byte, Type::Float)
+            | (Type::Float, Type::Sbyte)
+            | (Type::Sbyte, Type::Float)
+            | (Type::Float, Type::Word)
+            | (Type::Word, Type::Float)
+            | (Type::Float, Type::Sword)
+            | (Type::Sword, Type::Float) => Some(Type::Float),
+
+            // Fixed + Float: promote to float (float has larger range)
+            (Type::Fixed, Type::Float) | (Type::Float, Type::Fixed) => Some(Type::Float),
 
             // Other combinations not allowed
             _ => None,
@@ -121,6 +206,8 @@ impl Type {
             Type::Word => "word",
             Type::Sbyte => "sbyte",
             Type::Sword => "sword",
+            Type::Fixed => "fixed",
+            Type::Float => "float",
             Type::Bool => "bool",
             Type::String => "string",
             Type::ByteArray(_) => "byte[]",
@@ -153,6 +240,8 @@ mod tests {
         assert_eq!(Type::Bool.size(), 1);
         assert_eq!(Type::Sbyte.size(), 1);
         assert_eq!(Type::Sword.size(), 2);
+        assert_eq!(Type::Fixed.size(), 2);
+        assert_eq!(Type::Float.size(), 2);
         assert_eq!(Type::String.size(), 2); // Pointer size
         assert_eq!(Type::Void.size(), 0);
     }
@@ -171,9 +260,43 @@ mod tests {
         assert!(Type::Word.is_integer());
         assert!(Type::Sbyte.is_integer());
         assert!(Type::Sword.is_integer());
+        assert!(!Type::Fixed.is_integer());
+        assert!(!Type::Float.is_integer());
         assert!(!Type::Bool.is_integer());
         assert!(!Type::String.is_integer());
         assert!(!Type::Void.is_integer());
+    }
+
+    #[test]
+    fn test_is_fixed() {
+        assert!(Type::Fixed.is_fixed());
+        assert!(!Type::Float.is_fixed());
+        assert!(!Type::Byte.is_fixed());
+        assert!(!Type::Word.is_fixed());
+    }
+
+    #[test]
+    fn test_is_float() {
+        assert!(Type::Float.is_float());
+        assert!(!Type::Fixed.is_float());
+        assert!(!Type::Byte.is_float());
+        assert!(!Type::Word.is_float());
+    }
+
+    #[test]
+    fn test_is_numeric() {
+        // Integers are numeric
+        assert!(Type::Byte.is_numeric());
+        assert!(Type::Word.is_numeric());
+        assert!(Type::Sbyte.is_numeric());
+        assert!(Type::Sword.is_numeric());
+        // Fixed and float are numeric
+        assert!(Type::Fixed.is_numeric());
+        assert!(Type::Float.is_numeric());
+        // Others are not
+        assert!(!Type::Bool.is_numeric());
+        assert!(!Type::String.is_numeric());
+        assert!(!Type::Void.is_numeric());
     }
 
     #[test]
@@ -182,6 +305,8 @@ mod tests {
         assert!(!Type::Word.is_signed());
         assert!(Type::Sbyte.is_signed());
         assert!(Type::Sword.is_signed());
+        assert!(Type::Fixed.is_signed());
+        assert!(Type::Float.is_signed());
         assert!(!Type::Bool.is_signed());
     }
 
@@ -211,6 +336,42 @@ mod tests {
         assert!(Type::Sbyte.is_assignable_to(&Type::Sword));
         assert!(!Type::Word.is_assignable_to(&Type::Byte));
         assert!(!Type::Sword.is_assignable_to(&Type::Sbyte));
+    }
+
+    #[test]
+    fn test_assignable_to_fixed() {
+        // All integers can be assigned to fixed
+        assert!(Type::Byte.is_assignable_to(&Type::Fixed));
+        assert!(Type::Sbyte.is_assignable_to(&Type::Fixed));
+        assert!(Type::Word.is_assignable_to(&Type::Fixed));
+        assert!(Type::Sword.is_assignable_to(&Type::Fixed));
+        // Fixed to itself
+        assert!(Type::Fixed.is_assignable_to(&Type::Fixed));
+        // Fixed to float is allowed
+        assert!(Type::Fixed.is_assignable_to(&Type::Float));
+        // Float to fixed requires explicit cast
+        assert!(!Type::Float.is_assignable_to(&Type::Fixed));
+        // Fixed to integers requires explicit cast
+        assert!(!Type::Fixed.is_assignable_to(&Type::Byte));
+        assert!(!Type::Fixed.is_assignable_to(&Type::Sword));
+    }
+
+    #[test]
+    fn test_assignable_to_float() {
+        // All integers can be assigned to float
+        assert!(Type::Byte.is_assignable_to(&Type::Float));
+        assert!(Type::Sbyte.is_assignable_to(&Type::Float));
+        assert!(Type::Word.is_assignable_to(&Type::Float));
+        assert!(Type::Sword.is_assignable_to(&Type::Float));
+        // Fixed can be assigned to float
+        assert!(Type::Fixed.is_assignable_to(&Type::Float));
+        // Float to itself
+        assert!(Type::Float.is_assignable_to(&Type::Float));
+        // Float to integers requires explicit cast
+        assert!(!Type::Float.is_assignable_to(&Type::Byte));
+        assert!(!Type::Float.is_assignable_to(&Type::Sword));
+        // Float to fixed requires explicit cast
+        assert!(!Type::Float.is_assignable_to(&Type::Fixed));
     }
 
     #[test]
@@ -251,11 +412,71 @@ mod tests {
     }
 
     #[test]
+    fn test_binary_result_type_fixed() {
+        // Fixed + Fixed = Fixed
+        assert_eq!(
+            Type::binary_result_type(&Type::Fixed, &Type::Fixed),
+            Some(Type::Fixed)
+        );
+
+        // Fixed + integer = Fixed
+        assert_eq!(
+            Type::binary_result_type(&Type::Fixed, &Type::Byte),
+            Some(Type::Fixed)
+        );
+        assert_eq!(
+            Type::binary_result_type(&Type::Sword, &Type::Fixed),
+            Some(Type::Fixed)
+        );
+
+        // Fixed + Float = Float
+        assert_eq!(
+            Type::binary_result_type(&Type::Fixed, &Type::Float),
+            Some(Type::Float)
+        );
+
+        // Fixed + non-numeric = None
+        assert_eq!(Type::binary_result_type(&Type::Fixed, &Type::String), None);
+        assert_eq!(Type::binary_result_type(&Type::Fixed, &Type::Bool), None);
+    }
+
+    #[test]
+    fn test_binary_result_type_float() {
+        // Float + Float = Float
+        assert_eq!(
+            Type::binary_result_type(&Type::Float, &Type::Float),
+            Some(Type::Float)
+        );
+
+        // Float + integer = Float
+        assert_eq!(
+            Type::binary_result_type(&Type::Float, &Type::Byte),
+            Some(Type::Float)
+        );
+        assert_eq!(
+            Type::binary_result_type(&Type::Word, &Type::Float),
+            Some(Type::Float)
+        );
+
+        // Float + Fixed = Float
+        assert_eq!(
+            Type::binary_result_type(&Type::Float, &Type::Fixed),
+            Some(Type::Float)
+        );
+
+        // Float + non-numeric = None
+        assert_eq!(Type::binary_result_type(&Type::Float, &Type::String), None);
+        assert_eq!(Type::binary_result_type(&Type::Float, &Type::Bool), None);
+    }
+
+    #[test]
     fn test_type_name() {
         assert_eq!(Type::Byte.name(), "byte");
         assert_eq!(Type::Word.name(), "word");
         assert_eq!(Type::Sbyte.name(), "sbyte");
         assert_eq!(Type::Sword.name(), "sword");
+        assert_eq!(Type::Fixed.name(), "fixed");
+        assert_eq!(Type::Float.name(), "float");
         assert_eq!(Type::Bool.name(), "bool");
         assert_eq!(Type::String.name(), "string");
         assert_eq!(Type::Void.name(), "void");
@@ -269,6 +490,8 @@ mod tests {
         assert_eq!(format!("{}", Type::Word), "word");
         assert_eq!(format!("{}", Type::Sbyte), "sbyte");
         assert_eq!(format!("{}", Type::Sword), "sword");
+        assert_eq!(format!("{}", Type::Fixed), "fixed");
+        assert_eq!(format!("{}", Type::Float), "float");
         assert_eq!(format!("{}", Type::Bool), "bool");
         assert_eq!(format!("{}", Type::String), "string");
         assert_eq!(format!("{}", Type::Void), "void");
@@ -282,6 +505,10 @@ mod tests {
     fn test_type_equality() {
         assert_eq!(Type::Byte, Type::Byte);
         assert_ne!(Type::Byte, Type::Word);
+        assert_eq!(Type::Fixed, Type::Fixed);
+        assert_eq!(Type::Float, Type::Float);
+        assert_ne!(Type::Fixed, Type::Float);
+        assert_ne!(Type::Fixed, Type::Sword);
         assert_eq!(Type::ByteArray(Some(10)), Type::ByteArray(Some(10)));
         assert_ne!(Type::ByteArray(Some(10)), Type::ByteArray(Some(20)));
         assert_ne!(Type::ByteArray(Some(10)), Type::ByteArray(None));

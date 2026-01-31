@@ -110,25 +110,112 @@ def main():
 
 ### Data Types
 
-| Type     | Size    | Range             | Description     |
-| -------- | ------- | ----------------- | --------------- |
-| `byte`   | 1 byte  | 0 to 255          | Unsigned 8-bit  |
-| `word`   | 2 bytes | 0 to 65535        | Unsigned 16-bit |
-| `bool`   | 1 byte  | `true` or `false` | Boolean value   |
-| `string` | varies  | -                 | Text string     |
+#### Integer Types
+
+| Type    | Size    | Range           | Description     |
+| ------- | ------- | --------------- | --------------- |
+| `byte`  | 1 byte  | 0 to 255        | Unsigned 8-bit  |
+| `sbyte` | 1 byte  | -128 to 127     | Signed 8-bit    |
+| `word`  | 2 bytes | 0 to 65535      | Unsigned 16-bit |
+| `sword` | 2 bytes | -32768 to 32767 | Signed 16-bit   |
+
+#### Decimal Types
+
+| Type    | Size    | Range                 | Precision         | Description             |
+| ------- | ------- | --------------------- | ----------------- | ----------------------- |
+| `fixed` | 2 bytes | -2048.0 to +2047.9375 | 0.0625 (1/16)     | Fixed-point 12.4 format |
+| `float` | 2 bytes | ±65504 (±6.1e-5 min)  | ~3 decimal digits | IEEE-754 binary16       |
+
+#### Other Types
+
+| Type     | Size   | Range             | Description   |
+| -------- | ------ | ----------------- | ------------- |
+| `bool`   | 1 byte | `true` or `false` | Boolean value |
+| `string` | varies | -                 | Text string   |
+
+#### Signed vs Unsigned Types
+
+Use signed types (`sbyte`, `sword`) when you need negative numbers:
+
+```python
+def main():
+    # Signed types can hold negative values
+    temperature: sbyte = -10
+    altitude: sword = -500
+
+    # Unsigned types cannot (will cause compile error)
+    # x: byte = -1  # Error: out of range for byte
+```
+
+#### Fixed vs Float Types
+
+Both `fixed` and `float` support decimal numbers but have different trade-offs:
+
+**Fixed-point (12.4 format):**
+
+- Constant precision of 0.0625 (1/16) across entire range
+- Fast operations (similar speed to integers)
+- Best for: screen coordinates, smooth scrolling, game physics
+- Limited range: -2048.0 to +2047.9375
+
+**Float (IEEE-754 binary16):**
+
+- Relative precision (~3 decimal digits)
+- Slower operations (software emulated)
+- Best for: scientific calculations, large value ranges
+- Wide range: ±65504
+
+```python
+def main():
+    # Use fixed for game coordinates with subpixel precision
+    x: fixed = 100.5
+    speed: fixed = 0.125
+
+    # Use float for calculations with large numbers
+    distance: float = 50000.0
+    scale: float = 0.001
+```
+
+**Performance comparison (approximate cycles):**
+
+| Operation | Integer | Fixed | Float |
+| --------- | ------- | ----- | ----- |
+| Add/Sub   | ~10     | ~20   | ~300  |
+| Multiply  | ~100    | ~150  | ~1200 |
+| Divide    | ~200    | ~250  | ~2500 |
 
 #### Literals
 
 ```python
-# Decimal numbers
+# Integer literals
 x: byte = 42
 y: word = 1000
 
+# Negative numbers (for signed types)
+temp: sbyte = -50
+offset: sword = -1000
+
 # Hexadecimal (prefix $)
 addr: word = $D020      # VIC border color register
+neg_hex: sbyte = -$7F   # -127
 
 # Binary (prefix %)
 mask: byte = %10101010
+neg_bin: sbyte = -%01111111  # -127
+
+# Fixed-point literals (decimal with type annotation)
+pos: fixed = 100.5
+velocity: fixed = -2.25
+fraction: fixed = 0.0625    # Smallest fixed fraction (1/16)
+
+# Float literals (decimal notation)
+pi: float = 3.14159
+tiny: float = 0.001
+big: float = 50000.0
+
+# Scientific notation (for float)
+light_speed: float = 3.0e8   # 300000000
+planck: float = 6.6e-10      # Very small number
 
 # Strings
 msg: string = "HELLO"
@@ -138,6 +225,13 @@ ch: byte = 'A'          # PETSCII value 65
 
 # Booleans
 flag: bool = true
+```
+
+**Note:** Decimal literals (like `3.14`) are inferred as `float` by default. Use explicit type annotation to get `fixed`:
+
+```python
+f: fixed = 3.14    # fixed-point
+g: float = 3.14    # float (default for decimals)
 ```
 
 ### Variables
@@ -176,13 +270,15 @@ Constants must be numeric values (byte or word).
 
 #### Arithmetic Operators
 
-| Operator | Description    | Example |
-| -------- | -------------- | ------- |
-| `+`      | Addition       | `a + b` |
-| `-`      | Subtraction    | `a - b` |
-| `*`      | Multiplication | `a * b` |
-| `/`      | Division       | `a / b` |
-| `%`      | Modulo         | `a % b` |
+| Operator | Description    | Example | Types                  |
+| -------- | -------------- | ------- | ---------------------- |
+| `+`      | Addition       | `a + b` | All numeric            |
+| `-`      | Subtraction    | `a - b` | All numeric            |
+| `*`      | Multiplication | `a * b` | All numeric            |
+| `/`      | Division       | `a / b` | All numeric            |
+| `%`      | Modulo         | `a % b` | Integer and fixed only |
+
+**Note:** Modulo (`%`) is not supported for `float` type.
 
 #### Comparison Operators
 
@@ -213,6 +309,8 @@ Constants must be numeric values (byte or word).
 | `~`      | Bitwise NOT | `~a`     |
 | `<<`     | Left shift  | `a << 2` |
 | `>>`     | Right shift | `a >> 2` |
+
+**Note:** Bitwise operators only work with integer types (`byte`, `sbyte`, `word`, `sword`). They are not supported for `fixed` or `float`.
 
 #### Operator Precedence (highest to lowest)
 
@@ -388,7 +486,10 @@ def main():
 Both `print` and `println` accept:
 
 - Strings: `println("HELLO")`
-- Numbers: `println(42)` (byte or word)
+- Unsigned numbers: `println(42)` (byte or word)
+- Signed numbers: `println(-50)` (sbyte or sword, prints with minus sign)
+- Fixed-point: `println(3.75)` (prints as "3.7500")
+- Float: `println(3.14)` (prints integer part with ".0", or "INF"/"NAN" for special values)
 - Booleans: `println(flag)` (prints "TRUE" or "FALSE")
 - Variables: `println(score)`
 
@@ -541,6 +642,172 @@ def main():
                 println("TOO HIGH")
 ```
 
+### Temperature Converter (Signed Types)
+
+```python
+# Example using signed types for temperature values
+
+def main():
+    cls()
+    println("TEMPERATURE VALUES")
+    println("------------------")
+
+    # Signed byte for temperatures that can be negative
+    freezing: sbyte = 0
+    cold: sbyte = -10
+    very_cold: sbyte = -40
+
+    print("FREEZING: ")
+    println(freezing)
+
+    print("COLD: ")
+    println(cold)
+
+    print("VERY COLD: ")
+    println(very_cold)
+
+    # Signed comparisons work correctly
+    if cold < freezing:
+        println("COLD IS BELOW FREEZING")
+
+    # Counting from negative to positive
+    temp: sbyte = -5
+    println("COUNTING UP:")
+    while temp <= 5:
+        println(temp)
+        temp = temp + 1
+```
+
+### Signed Arithmetic
+
+```python
+# Example demonstrating signed arithmetic operations
+
+def main():
+    cls()
+
+    a: sbyte = -50
+    b: sbyte = 30
+
+    # Addition: -50 + 30 = -20
+    print("-50 + 30 = ")
+    println(a + b)
+
+    # Subtraction: -50 - 30 = -80
+    print("-50 - 30 = ")
+    println(a - b)
+
+    # Multiplication: -5 * 10 = -50
+    c: sbyte = -5
+    d: sbyte = 10
+    print("-5 * 10 = ")
+    println(c * d)
+
+    # Division: -50 / 10 = -5
+    print("-50 / 10 = ")
+    println(a / d)
+
+    # 16-bit signed operations
+    big: sword = -1000
+    small: sword = 500
+    print("-1000 + 500 = ")
+    println(big + small)
+```
+
+### Fixed-Point Smooth Movement
+
+```python
+# Example using fixed-point for smooth sprite movement
+
+const SCREEN_WIDTH = 320
+
+def main():
+    cls()
+    println("SMOOTH MOVEMENT DEMO")
+
+    # Position with subpixel precision
+    x: fixed = 0.0
+    speed: fixed = 0.5
+
+    # Move across screen smoothly
+    while x < 100.0:
+        # Get integer part for display
+        screen_x: word = word(x)
+        print("X = ")
+        println(screen_x)
+
+        # Smooth movement
+        x = x + speed
+
+    println("DONE")
+```
+
+### Float Calculations
+
+```python
+# Example using float for scientific calculations
+
+def main():
+    cls()
+    println("FLOAT CALCULATIONS")
+    println("------------------")
+
+    # Basic float arithmetic
+    a: float = 3.14159
+    b: float = 2.71828
+    println("PI + E:")
+    println(a + b)
+
+    # Large numbers
+    big: float = 50000.0
+    small: float = 0.001
+    println("50000 * 0.001:")
+    println(big * small)
+
+    # Scientific notation
+    sci: float = 1.5e3
+    print("1.5e3 = ")
+    println(sci)
+
+    # Negative values
+    neg: float = -42.5
+    println("NEGATIVE:")
+    println(neg)
+```
+
+### Mixed Type Operations
+
+```python
+# Example showing type promotions between int, fixed, and float
+
+def main():
+    cls()
+    println("MIXED TYPES")
+
+    # Integer + Fixed = Fixed
+    i: byte = 10
+    f: fixed = 2.5
+    result1: fixed = i + f
+    print("10 + 2.5 = ")
+    println(result1)
+
+    # Fixed + Float = Float
+    fx: fixed = 5.25
+    fl: float = 2.75
+    result2: float = fx + fl
+    print("5.25 + 2.75 = ")
+    println(result2)
+
+    # Type conversions
+    big_float: float = 1234.5
+    as_fixed: fixed = fixed(big_float)
+    as_int: word = word(big_float)
+    print("FLOAT TO FIXED: ")
+    println(as_fixed)
+    print("FLOAT TO INT: ")
+    println(as_int)
+```
+
 ---
 
 ## Error Messages
@@ -565,14 +832,15 @@ def main():
 
 ### Semantic Errors
 
-| Error                  | Description                         |
-| ---------------------- | ----------------------------------- |
-| `Undefined variable`   | Variable used before declaration    |
-| `Undefined function`   | Function called but not defined     |
-| `Type mismatch`        | Incompatible types in operation     |
-| `Duplicate definition` | Variable or function already exists |
-| `No main() function`   | Entry point missing                 |
-| `Break outside loop`   | Break used outside while loop       |
+| Error                  | Description                                     |
+| ---------------------- | ----------------------------------------------- |
+| `Undefined variable`   | Variable used before declaration                |
+| `Undefined function`   | Function called but not defined                 |
+| `Type mismatch`        | Incompatible types in operation                 |
+| `Duplicate definition` | Variable or function already exists             |
+| `No main() function`   | Entry point missing                             |
+| `Break outside loop`   | Break used outside while loop                   |
+| `Value out of range`   | Value exceeds type bounds (e.g., 128 for sbyte) |
 
 ---
 
@@ -593,18 +861,17 @@ def main():
 
 2. **Deep nesting limit** - The 6510 CPU has a ~127 byte branch range. Very deep nesting (more than 4-5 levels) may fail to compile.
 
-3. **Signed type comparisons** - Signed types (`sbyte`, `sword`) have limited comparison support. Use unsigned types when possible.
-
 ### Platform Constraints
 
 - **Memory:** Programs must fit in available RAM (~38KB typically)
 - **Stack:** 256 bytes for the 6510 stack
 - **Strings:** Limited by available memory
-- **Numbers:** byte (0-255), word (0-65535)
+- **Numbers:**
+  - Unsigned: byte (0-255), word (0-65535)
+  - Signed: sbyte (-128 to 127), sword (-32768 to 32767)
 
 ### Not Supported
 
-- Floating point numbers
 - Arrays (planned for future)
 - Structs/records
 - Pointers
@@ -651,6 +918,24 @@ The generated PRG and D64 files should work with any C64 emulator that supports 
 ---
 
 ## Version History
+
+- **1.2.0** - Decimal number types
+  - Added `fixed` type (12.4 fixed-point, -2048.0 to +2047.9375)
+  - Added `float` type (IEEE-754 binary16, ±65504)
+  - Decimal literal support (3.14, 0.5, -2.25)
+  - Scientific notation for floats (1.5e3, 2.0e-5)
+  - Full arithmetic operations for both types
+  - Type conversions between int, fixed, and float
+  - Automatic type promotion in mixed operations
+  - Print support for fixed and float values
+
+- **1.1.0** - Signed integer types
+  - Added `sbyte` type (-128 to 127)
+  - Added `sword` type (-32768 to 32767)
+  - Full signed arithmetic (add, sub, mul, div)
+  - Full signed comparisons (<, >, <=, >=, ==, !=)
+  - Negative number literals (-128, -$7F, -%01111111)
+  - Compile-time range validation
 
 - **1.0.0** - Initial release
   - Complete language implementation

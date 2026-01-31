@@ -1,0 +1,63 @@
+# Test program for signed comparisons
+# Tests <, >, <=, >=, ==, != with signed types
+
+def main():
+    # Test negative vs positive
+    neg: sbyte = -50
+    pos: sbyte = 50
+
+    # Less than
+    if neg < pos:
+        println(1)
+    else:
+        println(0)
+
+    # Greater than
+    if pos > neg:
+        println(1)
+    else:
+        println(0)
+
+    # Less than with zero
+    if neg < 0:
+        println(1)
+    else:
+        println(0)
+
+    # Greater than or equal
+    if pos >= 0:
+        println(1)
+    else:
+        println(0)
+
+    # Test edge cases
+    min_val: sbyte = -128
+    max_val: sbyte = 127
+
+    if min_val < max_val:
+        println(1)
+    else:
+        println(0)
+
+    # Equality
+    zero1: sbyte = 0
+    zero2: sbyte = 0
+    if zero1 == zero2:
+        println(1)
+    else:
+        println(0)
+
+    # Inequality
+    if neg != pos:
+        println(1)
+    else:
+        println(0)
+
+    # Signed word comparisons
+    big_neg: sword = -30000
+    big_pos: sword = 30000
+
+    if big_neg < big_pos:
+        println(1)
+    else:
+        println(0)

@@ -18,6 +18,140 @@
 
 use crate::error::Span;
 
+/// Convert a 12.4 fixed-point internal value to a display string.
+///
+/// # Examples
+/// - 60 (3.75 × 16) → "3.75"
+/// - -24 (-1.5 × 16) → "-1.5"
+/// - 16 (1.0 × 16) → "1.0"
+/// - 0 → "0.0"
+pub fn fixed_to_string(value: i16) -> String {
+    let is_negative = value < 0;
+    let abs_value = value.unsigned_abs() as u32;
+
+    // Integer part: upper 12 bits (value / 16)
+    let int_part = abs_value >> 4;
+
+    // Fractional part: lower 4 bits
+    // Each bit represents: 0.5, 0.25, 0.125, 0.0625
+    // Multiply by 625 to get 4 decimal digits (0.0625 × 10000 = 625)
+    let frac_bits = abs_value & 0xF;
+    let frac_decimal = frac_bits * 625; // 0-9375
+
+    // Format with trailing zeros trimmed
+    let frac_str = if frac_decimal == 0 {
+        "0".to_string()
+    } else {
+        // Format as 4 digits, then trim trailing zeros
+        let s = format!("{:04}", frac_decimal);
+        s.trim_end_matches('0').to_string()
+    };
+
+    let sign = if is_negative { "-" } else { "" };
+    format!("{}{}.{}", sign, int_part, frac_str)
+}
+
+/// Convert an IEEE-754 binary16 value to a display string.
+///
+/// # Format
+/// - Sign: bit 15
+/// - Exponent: bits 14-10 (bias 15)
+/// - Mantissa: bits 9-0 (implicit leading 1 for normalized)
+///
+/// # Special values
+/// - 0x0000: "0.0"
+/// - 0x8000: "-0.0" (displayed as "0.0")
+/// - 0x7C00: "inf"
+/// - 0xFC00: "-inf"
+/// - 0x7Cxx (mantissa != 0): "nan"
+pub fn float_to_string(bits: u16) -> String {
+    let sign = (bits >> 15) & 1;
+    let exponent = (bits >> 10) & 0x1F;
+    let mantissa = bits & 0x3FF;
+
+    // Special cases
+    if exponent == 0 && mantissa == 0 {
+        // Zero (positive or negative, display as "0.0")
+        return "0.0".to_string();
+    }
+
+    if exponent == 31 {
+        // Infinity or NaN
+        if mantissa == 0 {
+            return if sign == 1 {
+                "-inf".to_string()
+            } else {
+                "inf".to_string()
+            };
+        } else {
+            return "nan".to_string();
+        }
+    }
+
+    // Convert to f64 for display
+    let value = binary16_to_f64(bits);
+
+    // Format with reasonable precision
+    let sign_str = if sign == 1 { "-" } else { "" };
+    let abs_value = value.abs();
+
+    // Use scientific notation for very small or very large values
+    if abs_value != 0.0 && !(0.001..10000.0).contains(&abs_value) {
+        format!("{}{:e}", sign_str, abs_value)
+    } else {
+        // Regular decimal notation, trim unnecessary trailing zeros
+        let formatted = format!("{:.4}", abs_value);
+        let trimmed = formatted.trim_end_matches('0');
+        let result = if trimmed.ends_with('.') {
+            format!("{}0", trimmed)
+        } else {
+            trimmed.to_string()
+        };
+        format!("{}{}", sign_str, result)
+    }
+}
+
+/// Convert IEEE-754 binary16 bits to f64 for display purposes.
+fn binary16_to_f64(bits: u16) -> f64 {
+    let sign = ((bits >> 15) & 1) as i32;
+    let exponent = ((bits >> 10) & 0x1F) as i32;
+    let mantissa = (bits & 0x3FF) as u64;
+
+    if exponent == 0 {
+        if mantissa == 0 {
+            // Zero
+            return if sign == 1 { -0.0 } else { 0.0 };
+        }
+        // Subnormal number
+        let value = (mantissa as f64) * 2.0_f64.powi(-24);
+        return if sign == 1 { -value } else { value };
+    }
+
+    if exponent == 31 {
+        if mantissa == 0 {
+            // Infinity
+            return if sign == 1 {
+                f64::NEG_INFINITY
+            } else {
+                f64::INFINITY
+            };
+        }
+        // NaN
+        return f64::NAN;
+    }
+
+    // Normalized number
+    // value = (-1)^sign × 2^(exponent-15) × (1 + mantissa/1024)
+    let mantissa_value = 1.0 + (mantissa as f64) / 1024.0;
+    let value = mantissa_value * 2.0_f64.powi(exponent - 15);
+
+    if sign == 1 {
+        -value
+    } else {
+        value
+    }
+}
+
 /// An expression in the Cobra64 language.
 #[derive(Debug, Clone)]
 pub struct Expr {
@@ -39,6 +173,21 @@ impl Expr {
 pub enum ExprKind {
     /// An integer literal.
     IntegerLiteral(u16),
+
+    /// A fixed-point literal (12.4 format).
+    /// Stores the internal representation: value × 16.
+    /// Range: -2048.0 to +2047.9375 (internal: -32768 to +32767).
+    FixedLiteral(i16),
+
+    /// A floating-point literal (IEEE-754 binary16).
+    /// Stores the raw 16-bit IEEE-754 binary16 representation.
+    /// Range: ±65504.
+    FloatLiteral(u16),
+
+    /// A decimal literal that hasn't been resolved to fixed or float yet.
+    /// The parser creates this, and the analyzer converts it to
+    /// FixedLiteral or FloatLiteral based on context.
+    DecimalLiteral(String),
 
     /// A string literal.
     StringLiteral(String),
@@ -203,6 +352,9 @@ impl std::fmt::Display for ExprKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ExprKind::IntegerLiteral(n) => write!(f, "{}", n),
+            ExprKind::FixedLiteral(n) => write!(f, "{}", fixed_to_string(*n)),
+            ExprKind::FloatLiteral(bits) => write!(f, "{}", float_to_string(*bits)),
+            ExprKind::DecimalLiteral(s) => write!(f, "{}", s),
             ExprKind::StringLiteral(s) => write!(f, "\"{}\"", s),
             ExprKind::CharLiteral(c) => write!(f, "'{}'", c),
             ExprKind::BoolLiteral(b) => write!(f, "{}", b),
@@ -405,5 +557,169 @@ mod tests {
             assert!(!op.as_str().is_empty());
             assert!(op.is_left_associative());
         }
+    }
+
+    // ========================================
+    // Fixed-Point Literal Tests
+    // ========================================
+
+    #[test]
+    fn test_fixed_to_string_positive() {
+        // 3.75 × 16 = 60
+        assert_eq!(super::fixed_to_string(60), "3.75");
+        // 1.0 × 16 = 16
+        assert_eq!(super::fixed_to_string(16), "1.0");
+        // 0.5 × 16 = 8
+        assert_eq!(super::fixed_to_string(8), "0.5");
+        // 0.25 × 16 = 4
+        assert_eq!(super::fixed_to_string(4), "0.25");
+        // 0.0625 × 16 = 1
+        assert_eq!(super::fixed_to_string(1), "0.0625");
+        // 100.5 × 16 = 1608
+        assert_eq!(super::fixed_to_string(1608), "100.5");
+    }
+
+    #[test]
+    fn test_fixed_to_string_negative() {
+        // -1.5 × 16 = -24
+        assert_eq!(super::fixed_to_string(-24), "-1.5");
+        // -3.75 × 16 = -60
+        assert_eq!(super::fixed_to_string(-60), "-3.75");
+        // -0.5 × 16 = -8
+        assert_eq!(super::fixed_to_string(-8), "-0.5");
+    }
+
+    #[test]
+    fn test_fixed_to_string_zero() {
+        assert_eq!(super::fixed_to_string(0), "0.0");
+    }
+
+    #[test]
+    fn test_fixed_to_string_whole_numbers() {
+        // 10.0 × 16 = 160
+        assert_eq!(super::fixed_to_string(160), "10.0");
+        // 255.0 × 16 = 4080
+        assert_eq!(super::fixed_to_string(4080), "255.0");
+    }
+
+    #[test]
+    fn test_fixed_to_string_boundaries() {
+        // Maximum: 2047.9375 × 16 = 32767
+        assert_eq!(super::fixed_to_string(32767), "2047.9375");
+        // Minimum: -2048.0 × 16 = -32768
+        assert_eq!(super::fixed_to_string(-32768), "-2048.0");
+    }
+
+    #[test]
+    fn test_display_fixed_literal() {
+        let expr = Expr::new(ExprKind::FixedLiteral(60), Span::new(0, 4));
+        assert_eq!(format!("{}", expr), "3.75");
+    }
+
+    #[test]
+    fn test_display_fixed_literal_negative() {
+        let expr = Expr::new(ExprKind::FixedLiteral(-24), Span::new(0, 4));
+        assert_eq!(format!("{}", expr), "-1.5");
+    }
+
+    // ========================================
+    // Float Literal Tests
+    // ========================================
+
+    #[test]
+    fn test_float_to_string_zero() {
+        // Positive zero: 0x0000
+        assert_eq!(super::float_to_string(0x0000), "0.0");
+        // Negative zero: 0x8000 (displayed as "0.0")
+        assert_eq!(super::float_to_string(0x8000), "0.0");
+    }
+
+    #[test]
+    fn test_float_to_string_one() {
+        // 1.0 in binary16: sign=0, exp=15 (01111), mantissa=0
+        // bits = 0_01111_0000000000 = 0x3C00
+        assert_eq!(super::float_to_string(0x3C00), "1.0");
+    }
+
+    #[test]
+    fn test_float_to_string_negative_one() {
+        // -1.0 in binary16: sign=1, exp=15 (01111), mantissa=0
+        // bits = 1_01111_0000000000 = 0xBC00
+        assert_eq!(super::float_to_string(0xBC00), "-1.0");
+    }
+
+    #[test]
+    fn test_float_to_string_two() {
+        // 2.0 in binary16: sign=0, exp=16 (10000), mantissa=0
+        // bits = 0_10000_0000000000 = 0x4000
+        assert_eq!(super::float_to_string(0x4000), "2.0");
+    }
+
+    #[test]
+    fn test_float_to_string_half() {
+        // 0.5 in binary16: sign=0, exp=14 (01110), mantissa=0
+        // bits = 0_01110_0000000000 = 0x3800
+        assert_eq!(super::float_to_string(0x3800), "0.5");
+    }
+
+    #[test]
+    fn test_float_to_string_special_values() {
+        // Positive infinity: 0x7C00
+        assert_eq!(super::float_to_string(0x7C00), "inf");
+        // Negative infinity: 0xFC00
+        assert_eq!(super::float_to_string(0xFC00), "-inf");
+        // NaN: 0x7C01 (any mantissa != 0 with exp=31)
+        assert_eq!(super::float_to_string(0x7C01), "nan");
+        assert_eq!(super::float_to_string(0x7E00), "nan");
+    }
+
+    #[test]
+    fn test_float_to_string_pi_approx() {
+        // π ≈ 3.140625 in binary16
+        // sign=0, exp=16 (10000), mantissa=0x248 (584)
+        // bits = 0_10000_1001001000 = 0x4248
+        let s = super::float_to_string(0x4248);
+        assert!(s.starts_with("3.14"));
+    }
+
+    #[test]
+    fn test_display_float_literal() {
+        let expr = Expr::new(ExprKind::FloatLiteral(0x3C00), Span::new(0, 3));
+        assert_eq!(format!("{}", expr), "1.0");
+    }
+
+    #[test]
+    fn test_display_float_literal_special() {
+        let expr_inf = Expr::new(ExprKind::FloatLiteral(0x7C00), Span::new(0, 3));
+        assert_eq!(format!("{}", expr_inf), "inf");
+
+        let expr_nan = Expr::new(ExprKind::FloatLiteral(0x7C01), Span::new(0, 3));
+        assert_eq!(format!("{}", expr_nan), "nan");
+    }
+
+    #[test]
+    fn test_binary16_to_f64_normalized() {
+        // 1.0
+        assert_eq!(super::binary16_to_f64(0x3C00), 1.0);
+        // 2.0
+        assert_eq!(super::binary16_to_f64(0x4000), 2.0);
+        // 0.5
+        assert_eq!(super::binary16_to_f64(0x3800), 0.5);
+        // -1.0
+        assert_eq!(super::binary16_to_f64(0xBC00), -1.0);
+    }
+
+    #[test]
+    fn test_binary16_to_f64_special() {
+        // Zero
+        assert_eq!(super::binary16_to_f64(0x0000), 0.0);
+        // Infinity
+        assert!(super::binary16_to_f64(0x7C00).is_infinite());
+        assert!(super::binary16_to_f64(0x7C00).is_sign_positive());
+        // Negative infinity
+        assert!(super::binary16_to_f64(0xFC00).is_infinite());
+        assert!(super::binary16_to_f64(0xFC00).is_sign_negative());
+        // NaN
+        assert!(super::binary16_to_f64(0x7C01).is_nan());
     }
 }

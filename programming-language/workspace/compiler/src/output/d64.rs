@@ -254,8 +254,7 @@ impl D64Builder {
             }
         }
 
-        let entry_offset =
-            entry_offset.ok_or_else(|| io::Error::other("Directory full"))?;
+        let entry_offset = entry_offset.ok_or_else(|| io::Error::other("Directory full"))?;
 
         // Allocate sectors for file data
         let mut file_sectors: Vec<(u8, u8)> = Vec::new();

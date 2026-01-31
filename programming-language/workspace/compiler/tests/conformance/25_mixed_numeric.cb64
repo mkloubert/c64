@@ -1,0 +1,55 @@
+# Conformance Test: Mixed Numeric Operations
+# Tests: Operations mixing byte, word, fixed, float types
+# Expected: Compiles without errors, proper type promotions
+
+def main():
+    # Integer + fixed = fixed
+    b: byte = 10
+    fx: fixed = 2.5
+    r1: fixed = b + fx
+    println("BYTE + FIXED:")
+    println(r1)  # 12.5
+
+    # Integer + float = float
+    w: word = 100
+    fl: float = 0.5
+    r2: float = w + fl
+    println("WORD + FLOAT:")
+    println(r2)  # 100.5
+
+    # Fixed + float = float
+    fx2: fixed = 5.25
+    fl2: float = 2.75
+    r3: float = fx2 + fl2
+    println("FIXED + FLOAT:")
+    println(r3)  # 8.0
+
+    # Sword + fixed = fixed
+    sw: sword = -50
+    fx3: fixed = 25.5
+    r4: fixed = sw + fx3
+    println("SWORD + FIXED:")
+    println(r4)  # -24.5
+
+    # Complex expression
+    a: byte = 5
+    b2: fixed = 2.5
+    c: float = 1.5
+    # (a + b2) promotes to fixed, then + c promotes to float
+    r5: float = a + b2 + c
+    println("COMPLEX:")
+    println(r5)  # 9.0
+
+    # Multiplication with mixed types
+    m1: byte = 3
+    m2: fixed = 4.5
+    r6: fixed = m1 * m2
+    println("BYTE * FIXED:")
+    println(r6)  # 13.5
+
+    # Division with mixed types
+    d1: word = 100
+    d2: float = 4.0
+    r7: float = d1 / d2
+    println("WORD / FLOAT:")
+    println(r7)  # 25.0

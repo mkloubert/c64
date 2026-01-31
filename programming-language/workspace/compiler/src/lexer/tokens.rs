@@ -22,6 +22,10 @@ pub enum Token {
     // Literals
     /// Integer literal (decimal, hex, or binary).
     Integer(u16),
+    /// Decimal literal (number with decimal point or scientific notation).
+    /// Stored as string for later conversion to fixed or float based on context.
+    /// Examples: "3.14", "0.5", "1.5e-3", ".25"
+    Decimal(String),
     /// String literal.
     String(String),
     /// Character literal.
@@ -42,6 +46,10 @@ pub enum Token {
     Bool,
     /// `string` - string type.
     StringType,
+    /// `fixed` - 12.4 fixed-point type.
+    Fixed,
+    /// `float` - IEEE-754 binary16 floating-point type.
+    Float,
 
     // Definition keywords
     /// `const` - constant declaration.
@@ -189,6 +197,8 @@ impl Token {
                 | Token::Sword
                 | Token::Bool
                 | Token::StringType
+                | Token::Fixed
+                | Token::Float
         )
     }
 
@@ -202,6 +212,8 @@ impl Token {
                 | Token::Sword
                 | Token::Bool
                 | Token::StringType
+                | Token::Fixed
+                | Token::Float
                 | Token::Const
                 | Token::Def
                 | Token::If
@@ -265,6 +277,8 @@ impl Token {
             "sword" => Token::Sword,
             "bool" => Token::Bool,
             "string" => Token::StringType,
+            "fixed" => Token::Fixed,
+            "float" => Token::Float,
 
             // Definition keywords
             "const" => Token::Const,
@@ -302,6 +316,7 @@ impl Token {
     pub fn name(&self) -> &'static str {
         match self {
             Token::Integer(_) => "integer",
+            Token::Decimal(_) => "decimal",
             Token::String(_) => "string",
             Token::Char(_) => "character",
             Token::Identifier(_) => "identifier",
@@ -311,6 +326,8 @@ impl Token {
             Token::Sword => "'sword'",
             Token::Bool => "'bool'",
             Token::StringType => "'string'",
+            Token::Fixed => "'fixed'",
+            Token::Float => "'float'",
             Token::Const => "'const'",
             Token::Def => "'def'",
             Token::If => "'if'",
@@ -376,6 +393,7 @@ impl std::fmt::Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Token::Integer(n) => write!(f, "{}", n),
+            Token::Decimal(s) => write!(f, "{}", s),
             Token::String(s) => write!(f, "\"{}\"", s),
             Token::Char(c) => write!(f, "'{}'", c),
             Token::Identifier(s) => write!(f, "{}", s),
@@ -414,6 +432,8 @@ mod tests {
         assert!(Token::Byte.is_type());
         assert!(Token::Word.is_type());
         assert!(Token::Bool.is_type());
+        assert!(Token::Fixed.is_type());
+        assert!(Token::Float.is_type());
         assert!(!Token::If.is_type());
     }
 
@@ -422,6 +442,32 @@ mod tests {
         assert!(Token::If.is_keyword());
         assert!(Token::While.is_keyword());
         assert!(Token::True.is_keyword());
+        assert!(Token::Fixed.is_keyword());
+        assert!(Token::Float.is_keyword());
         assert!(!Token::Plus.is_keyword());
+    }
+
+    #[test]
+    fn test_fixed_float_keyword_recognition() {
+        assert!(matches!(
+            Token::from_keyword_or_identifier("fixed"),
+            Token::Fixed
+        ));
+        assert!(matches!(
+            Token::from_keyword_or_identifier("float"),
+            Token::Float
+        ));
+    }
+
+    #[test]
+    fn test_decimal_token_display() {
+        let token = Token::Decimal("3.14".to_string());
+        assert_eq!(format!("{}", token), "3.14");
+    }
+
+    #[test]
+    fn test_decimal_token_name() {
+        let token = Token::Decimal("3.14".to_string());
+        assert_eq!(token.name(), "decimal");
     }
 }

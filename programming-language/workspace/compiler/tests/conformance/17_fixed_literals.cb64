@@ -1,0 +1,38 @@
+# Conformance Test: Fixed-Point Literals
+# Tests: fixed type declaration, 12.4 format literals
+# Expected: Compiles without errors
+
+def main():
+    # Basic fixed-point declarations
+    a: fixed = 3.75
+    b: fixed = 0.5
+    c: fixed = 10.0
+    d: fixed = 0.0625  # Smallest fraction (1/16)
+
+    # Print fixed values
+    println("FIXED LITERALS:")
+    println(a)
+    println(b)
+    println(c)
+    println(d)
+
+    # Negative fixed values
+    e: fixed = -2.5
+    f: fixed = -100.25
+    println("NEGATIVE FIXED:")
+    println(e)
+    println(f)
+
+    # Integer-like fixed values
+    g: fixed = 100.0
+    h: fixed = 2047.0  # Near max
+    println("INTEGER-LIKE:")
+    println(g)
+    println(h)
+
+    # Small fractions
+    i: fixed = 0.125   # 2/16 = 1/8
+    j: fixed = 0.1875  # 3/16
+    println("SMALL FRACTIONS:")
+    println(i)
+    println(j)

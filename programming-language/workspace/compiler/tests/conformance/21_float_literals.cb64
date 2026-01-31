@@ -1,0 +1,42 @@
+# Conformance Test: Float Literals
+# Tests: float type declaration, IEEE-754 binary16 literals
+# Expected: Compiles without errors
+
+def main():
+    # Basic float declarations
+    a: float = 3.14
+    b: float = 0.5
+    c: float = 100.0
+    println("FLOAT LITERALS:")
+    println(a)
+    println(b)
+    println(c)
+
+    # Scientific notation
+    d: float = 1.5e3   # 1500
+    e: float = 2.5e-1  # 0.25
+    println("SCIENTIFIC:")
+    println(d)
+    println(e)
+
+    # Negative floats
+    f: float = -42.5
+    g: float = -1.0e2  # -100
+    println("NEGATIVE:")
+    println(f)
+    println(g)
+
+    # Large values
+    h: float = 65000.0  # Near max
+    println("LARGE:")
+    println(h)
+
+    # Small values
+    i: float = 0.001
+    println("SMALL:")
+    println(i)
+
+    # Zero
+    j: float = 0.0
+    println("ZERO:")
+    println(j)

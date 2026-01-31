@@ -1,0 +1,21 @@
+# Test program for signed comparisons in loops
+# Tests while loops with signed counter variables
+
+def main():
+    # Count up from negative to positive
+    counter: sbyte = -5
+    while counter <= 5:
+        println(counter)
+        counter = counter + 1
+
+    # Count down from positive to negative
+    i: sbyte = 3
+    while i >= -3:
+        println(i)
+        i = i - 1
+
+    # Sword loop
+    big: sword = -100
+    while big < 0:
+        big = big + 25
+    println(big)

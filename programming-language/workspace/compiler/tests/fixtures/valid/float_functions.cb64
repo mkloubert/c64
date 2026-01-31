@@ -1,0 +1,19 @@
+# Valid: Float with functions
+# Tests float as function parameters and return values
+
+def add_float(a: float, b: float) -> float:
+    return a + b
+
+def scale(x: float, factor: float) -> float:
+    return x * factor
+
+def main():
+    result: float = add_float(3.14, 2.86)
+    println(result)
+
+    scaled: float = scale(10.0, 2.5)
+    println(scaled)
+
+    # Chained calls
+    final: float = add_float(result, scaled)
+    println(final)

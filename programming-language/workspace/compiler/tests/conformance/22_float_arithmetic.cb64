@@ -1,0 +1,53 @@
+# Conformance Test: Float Arithmetic
+# Tests: +, -, *, / operations on float type
+# Expected: Compiles without errors
+
+def main():
+    # Addition
+    a: float = 3.5
+    b: float = 2.25
+    c: float = a + b
+    println("ADDITION:")
+    println(c)  # 5.75
+
+    # Subtraction
+    d: float = 100.0
+    e: float = 45.5
+    f: float = d - e
+    println("SUBTRACTION:")
+    println(f)  # 54.5
+
+    # Multiplication
+    g: float = 2.5
+    h: float = 4.0
+    i: float = g * h
+    println("MULTIPLICATION:")
+    println(i)  # 10.0
+
+    # Division
+    j: float = 15.0
+    k: float = 3.0
+    l: float = j / k
+    println("DIVISION:")
+    println(l)  # 5.0
+
+    # Negation
+    m: float = 7.25
+    n: float = -m
+    println("NEGATION:")
+    println(n)  # -7.25
+
+    # Mixed with integers
+    o: float = 5.0
+    p: byte = 3
+    q: float = o + p
+    println("MIXED:")
+    println(q)  # 8.0
+
+    # Chained operations
+    r: float = 10.0
+    s: float = 2.0
+    t: float = 3.0
+    u: float = r + s * t
+    println("CHAINED:")
+    println(u)  # 16.0 (10 + 2*3)

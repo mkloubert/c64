@@ -440,16 +440,33 @@ impl<'source> Lexer<'source> {
         Ok((Token::Char(value), self.span_from(start)))
     }
 
-    /// Scan a decimal number literal.
+    /// Scan a decimal number literal (integer or decimal with fractional part).
     fn scan_decimal_number(&mut self) -> Result<(Token, Span), CompileError> {
         let start = self.position;
         let mut value: u64 = 0;
+        let mut has_decimal_point = false;
+        let mut has_exponent = false;
 
+        // Scan integer part
         while let Some(c) = self.peek() {
             if let Some(digit) = c.to_digit(10) {
                 self.advance();
                 value = value.saturating_mul(10).saturating_add(digit as u64);
-            } else if c.is_ascii_alphanumeric() || c == '_' {
+            } else if c == '.' {
+                // Check if this is a decimal point (not a method call like "123.to_string")
+                if let Some(next) = self.peek_next() {
+                    if next.is_ascii_digit() {
+                        has_decimal_point = true;
+                        break;
+                    }
+                }
+                // Not a decimal number, just an integer followed by a dot
+                break;
+            } else if c == 'e' || c == 'E' {
+                // Scientific notation without decimal point (e.g., "1e5")
+                has_exponent = true;
+                break;
+            } else if c.is_ascii_alphabetic() || c == '_' {
                 return Err(CompileError::new(
                     ErrorCode::InvalidDigitInNumber,
                     "Invalid digit in number literal",
@@ -460,6 +477,12 @@ impl<'source> Lexer<'source> {
             }
         }
 
+        // If we have a decimal point or exponent, scan as decimal literal
+        if has_decimal_point || has_exponent {
+            return self.scan_decimal_literal(start);
+        }
+
+        // Otherwise, it's an integer
         if value > 65535 {
             return Err(CompileError::new(
                 ErrorCode::IntegerTooLargeForWord,
@@ -469,6 +492,119 @@ impl<'source> Lexer<'source> {
         }
 
         Ok((Token::Integer(value as u16), self.span_from(start)))
+    }
+
+    /// Scan a decimal literal (number with decimal point or scientific notation).
+    /// Called when we've detected a '.' or 'e'/'E' in a number.
+    fn scan_decimal_literal(&mut self, start: usize) -> Result<(Token, Span), CompileError> {
+        // Reset position to start and re-scan the entire number as a string
+        self.position = start;
+        self.column = self.column.saturating_sub(self.position - start);
+
+        let mut literal = String::new();
+        let mut has_decimal_point = false;
+        let mut has_exponent = false;
+        let mut has_digit = false;
+
+        // Scan integer part
+        while let Some(c) = self.peek() {
+            if c.is_ascii_digit() {
+                has_digit = true;
+                literal.push(c);
+                self.advance();
+            } else {
+                break;
+            }
+        }
+
+        // Scan decimal point and fractional part
+        if self.peek() == Some('.') {
+            if let Some(next) = self.peek_next() {
+                if next.is_ascii_digit() {
+                    has_decimal_point = true;
+                    literal.push('.');
+                    self.advance(); // consume '.'
+
+                    // Scan fractional digits
+                    while let Some(c) = self.peek() {
+                        if c.is_ascii_digit() {
+                            has_digit = true;
+                            literal.push(c);
+                            self.advance();
+                        } else {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Scan exponent part (e.g., e+10, E-5, e3)
+        if let Some(c) = self.peek() {
+            if c == 'e' || c == 'E' {
+                has_exponent = true;
+                literal.push(c);
+                self.advance();
+
+                // Optional sign
+                if let Some(sign) = self.peek() {
+                    if sign == '+' || sign == '-' {
+                        literal.push(sign);
+                        self.advance();
+                    }
+                }
+
+                // Exponent digits (required)
+                let mut has_exp_digit = false;
+                while let Some(c) = self.peek() {
+                    if c.is_ascii_digit() {
+                        has_exp_digit = true;
+                        literal.push(c);
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
+
+                if !has_exp_digit {
+                    return Err(CompileError::new(
+                        ErrorCode::InvalidDecimalLiteral,
+                        "Exponent requires at least one digit",
+                        self.span_from(start),
+                    ));
+                }
+            }
+        }
+
+        // Validate: must have at least one digit and either decimal point or exponent
+        if !has_digit {
+            return Err(CompileError::new(
+                ErrorCode::InvalidDecimalLiteral,
+                "Decimal literal requires at least one digit",
+                self.span_from(start),
+            ));
+        }
+
+        if !has_decimal_point && !has_exponent {
+            return Err(CompileError::new(
+                ErrorCode::InvalidDecimalLiteral,
+                "Expected decimal point or exponent",
+                self.span_from(start),
+            ));
+        }
+
+        // Check for invalid trailing characters
+        if let Some(c) = self.peek() {
+            if c.is_ascii_alphabetic() || c == '_' {
+                return Err(CompileError::new(
+                    ErrorCode::InvalidDecimalLiteral,
+                    format!("Invalid character '{}' in decimal literal", c),
+                    self.span_from(start),
+                ));
+            }
+        }
+
+        Ok((Token::Decimal(literal), self.span_from(start)))
     }
 
     /// Scan a hexadecimal number literal (starting with $).
@@ -1401,5 +1537,290 @@ def main():
         assert!(result.is_ok());
         let tokens = result.unwrap();
         assert!(!tokens.is_empty());
+    }
+
+    // ========================================
+    // Negative Literal Tests (for signed types)
+    // ========================================
+
+    #[test]
+    fn test_negative_decimal_literal() {
+        // Negative literals are tokenized as [Minus, Integer]
+        let tokens = tokenize("-128").unwrap();
+        assert_eq!(tokens.len(), 2);
+        assert!(matches!(tokens[0].0, Token::Minus));
+        assert!(matches!(tokens[1].0, Token::Integer(128)));
+    }
+
+    #[test]
+    fn test_negative_decimal_literal_word() {
+        let tokens = tokenize("-32768").unwrap();
+        assert_eq!(tokens.len(), 2);
+        assert!(matches!(tokens[0].0, Token::Minus));
+        assert!(matches!(tokens[1].0, Token::Integer(32768)));
+    }
+
+    #[test]
+    fn test_negative_hex_literal() {
+        // -$7F = -127
+        let tokens = tokenize("-$7F").unwrap();
+        assert_eq!(tokens.len(), 2);
+        assert!(matches!(tokens[0].0, Token::Minus));
+        assert!(matches!(tokens[1].0, Token::Integer(127)));
+    }
+
+    #[test]
+    fn test_negative_hex_literal_word() {
+        // -$7FFF = -32767
+        let tokens = tokenize("-$7FFF").unwrap();
+        assert_eq!(tokens.len(), 2);
+        assert!(matches!(tokens[0].0, Token::Minus));
+        assert!(matches!(tokens[1].0, Token::Integer(32767)));
+    }
+
+    #[test]
+    fn test_negative_binary_literal() {
+        // -%01111111 = -127
+        let tokens = tokenize("-%01111111").unwrap();
+        assert_eq!(tokens.len(), 2);
+        assert!(matches!(tokens[0].0, Token::Minus));
+        assert!(matches!(tokens[1].0, Token::Integer(127)));
+    }
+
+    #[test]
+    fn test_negative_binary_literal_word() {
+        // -%0111111111111111 = -32767
+        let tokens = tokenize("-%0111111111111111").unwrap();
+        assert_eq!(tokens.len(), 2);
+        assert!(matches!(tokens[0].0, Token::Minus));
+        assert!(matches!(tokens[1].0, Token::Integer(32767)));
+    }
+
+    #[test]
+    fn test_negative_zero() {
+        let tokens = tokenize("-0").unwrap();
+        assert_eq!(tokens.len(), 2);
+        assert!(matches!(tokens[0].0, Token::Minus));
+        assert!(matches!(tokens[1].0, Token::Integer(0)));
+    }
+
+    #[test]
+    fn test_negative_one() {
+        let tokens = tokenize("-1").unwrap();
+        assert_eq!(tokens.len(), 2);
+        assert!(matches!(tokens[0].0, Token::Minus));
+        assert!(matches!(tokens[1].0, Token::Integer(1)));
+    }
+
+    #[test]
+    fn test_negative_literal_in_expression() {
+        // Ensure negative literals work in expressions
+        let tokens = tokenize("x = -100").unwrap();
+        assert_eq!(tokens.len(), 4);
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "x"));
+        assert!(matches!(tokens[1].0, Token::Equal));
+        assert!(matches!(tokens[2].0, Token::Minus));
+        assert!(matches!(tokens[3].0, Token::Integer(100)));
+    }
+
+    #[test]
+    fn test_subtraction_vs_negative() {
+        // a - 1 should be [a, Minus, 1] - subtraction
+        let tokens = tokenize("a - 1").unwrap();
+        assert_eq!(tokens.len(), 3);
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "a"));
+        assert!(matches!(tokens[1].0, Token::Minus));
+        assert!(matches!(tokens[2].0, Token::Integer(1)));
+    }
+
+    #[test]
+    fn test_negative_literal_no_space() {
+        // -128 without space should still tokenize correctly
+        let tokens = tokenize("x=-128").unwrap();
+        assert_eq!(tokens.len(), 4);
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "x"));
+        assert!(matches!(tokens[1].0, Token::Equal));
+        assert!(matches!(tokens[2].0, Token::Minus));
+        assert!(matches!(tokens[3].0, Token::Integer(128)));
+    }
+
+    #[test]
+    fn test_signed_type_declaration_with_negative() {
+        let tokens = tokenize("x: sbyte = -100").unwrap();
+        assert_eq!(tokens.len(), 6);
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "x"));
+        assert!(matches!(tokens[1].0, Token::Colon));
+        assert!(matches!(tokens[2].0, Token::Sbyte));
+        assert!(matches!(tokens[3].0, Token::Equal));
+        assert!(matches!(tokens[4].0, Token::Minus));
+        assert!(matches!(tokens[5].0, Token::Integer(100)));
+    }
+
+    #[test]
+    fn test_sword_type_declaration_with_negative() {
+        let tokens = tokenize("y: sword = -30000").unwrap();
+        assert_eq!(tokens.len(), 6);
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "y"));
+        assert!(matches!(tokens[1].0, Token::Colon));
+        assert!(matches!(tokens[2].0, Token::Sword));
+        assert!(matches!(tokens[3].0, Token::Equal));
+        assert!(matches!(tokens[4].0, Token::Minus));
+        assert!(matches!(tokens[5].0, Token::Integer(30000)));
+    }
+
+    // ========================================
+    // Decimal Literal Tests (for fixed/float)
+    // ========================================
+
+    #[test]
+    fn test_decimal_simple() {
+        let tokens = tokenize("3.14").unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(matches!(&tokens[0].0, Token::Decimal(s) if s == "3.14"));
+    }
+
+    #[test]
+    fn test_decimal_zero_prefix() {
+        let tokens = tokenize("0.5").unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(matches!(&tokens[0].0, Token::Decimal(s) if s == "0.5"));
+    }
+
+    #[test]
+    fn test_decimal_multiple_fractional_digits() {
+        let tokens = tokenize("3.14159").unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(matches!(&tokens[0].0, Token::Decimal(s) if s == "3.14159"));
+    }
+
+    #[test]
+    fn test_decimal_zero() {
+        let tokens = tokenize("0.0").unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(matches!(&tokens[0].0, Token::Decimal(s) if s == "0.0"));
+    }
+
+    #[test]
+    fn test_decimal_large_integer_part() {
+        let tokens = tokenize("1234.5678").unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(matches!(&tokens[0].0, Token::Decimal(s) if s == "1234.5678"));
+    }
+
+    #[test]
+    fn test_decimal_scientific_notation() {
+        let tokens = tokenize("1.5e3").unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(matches!(&tokens[0].0, Token::Decimal(s) if s == "1.5e3"));
+    }
+
+    #[test]
+    fn test_decimal_scientific_notation_uppercase() {
+        let tokens = tokenize("1.5E3").unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(matches!(&tokens[0].0, Token::Decimal(s) if s == "1.5E3"));
+    }
+
+    #[test]
+    fn test_decimal_scientific_notation_negative_exp() {
+        let tokens = tokenize("2.0e-5").unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(matches!(&tokens[0].0, Token::Decimal(s) if s == "2.0e-5"));
+    }
+
+    #[test]
+    fn test_decimal_scientific_notation_positive_exp() {
+        let tokens = tokenize("1.0e+10").unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(matches!(&tokens[0].0, Token::Decimal(s) if s == "1.0e+10"));
+    }
+
+    #[test]
+    fn test_decimal_scientific_no_decimal_point() {
+        let tokens = tokenize("1e5").unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(matches!(&tokens[0].0, Token::Decimal(s) if s == "1e5"));
+    }
+
+    #[test]
+    fn test_integer_not_decimal() {
+        // Regular integers should not become decimals
+        let tokens = tokenize("42").unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(matches!(tokens[0].0, Token::Integer(42)));
+    }
+
+    #[test]
+    fn test_decimal_in_expression() {
+        let tokens = tokenize("x = 3.14 + 2.0").unwrap();
+        assert_eq!(tokens.len(), 5);
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "x"));
+        assert!(matches!(tokens[1].0, Token::Equal));
+        assert!(matches!(&tokens[2].0, Token::Decimal(s) if s == "3.14"));
+        assert!(matches!(tokens[3].0, Token::Plus));
+        assert!(matches!(&tokens[4].0, Token::Decimal(s) if s == "2.0"));
+    }
+
+    #[test]
+    fn test_decimal_negative() {
+        // Negative decimals are tokenized as [Minus, Decimal]
+        let tokens = tokenize("-3.14").unwrap();
+        assert_eq!(tokens.len(), 2);
+        assert!(matches!(tokens[0].0, Token::Minus));
+        assert!(matches!(&tokens[1].0, Token::Decimal(s) if s == "3.14"));
+    }
+
+    #[test]
+    fn test_decimal_with_fixed_type() {
+        let tokens = tokenize("x: fixed = 3.75").unwrap();
+        assert_eq!(tokens.len(), 5);
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "x"));
+        assert!(matches!(tokens[1].0, Token::Colon));
+        assert!(matches!(tokens[2].0, Token::Fixed));
+        assert!(matches!(tokens[3].0, Token::Equal));
+        assert!(matches!(&tokens[4].0, Token::Decimal(s) if s == "3.75"));
+    }
+
+    #[test]
+    fn test_decimal_with_float_type() {
+        let tokens = tokenize("y: float = 3.14").unwrap();
+        assert_eq!(tokens.len(), 5);
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "y"));
+        assert!(matches!(tokens[1].0, Token::Colon));
+        assert!(matches!(tokens[2].0, Token::Float));
+        assert!(matches!(tokens[3].0, Token::Equal));
+        assert!(matches!(&tokens[4].0, Token::Decimal(s) if s == "3.14"));
+    }
+
+    #[test]
+    fn test_fixed_float_keywords() {
+        let tokens = tokenize("fixed float").unwrap();
+        assert_eq!(tokens.len(), 2);
+        assert!(matches!(tokens[0].0, Token::Fixed));
+        assert!(matches!(tokens[1].0, Token::Float));
+    }
+
+    #[test]
+    fn test_decimal_invalid_exponent() {
+        let result = tokenize("1.5e");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidDecimalLiteral);
+    }
+
+    #[test]
+    fn test_decimal_invalid_trailing_char() {
+        let result = tokenize("3.14x");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidDecimalLiteral);
+    }
+
+    #[test]
+    fn test_decimal_scientific_invalid_trailing_char() {
+        let result = tokenize("1e5x");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidDecimalLiteral);
     }
 }

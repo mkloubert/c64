@@ -1,0 +1,58 @@
+# Conformance Test: Float Type Conversions
+# Tests: Conversions between float and other types
+# Expected: Compiles without errors
+
+def main():
+    # Byte to float
+    b: byte = 100
+    f1: float = float(b)
+    println("BYTE TO FLOAT:")
+    println(f1)  # 100.0
+
+    # Word to float
+    w: word = 10000
+    f2: float = float(w)
+    println("WORD TO FLOAT:")
+    println(f2)  # 10000.0
+
+    # Sbyte to float
+    sb: sbyte = -50
+    f3: float = float(sb)
+    println("SBYTE TO FLOAT:")
+    println(f3)  # -50.0
+
+    # Sword to float
+    sw: sword = -5000
+    f4: float = float(sw)
+    println("SWORD TO FLOAT:")
+    println(f4)  # -5000.0
+
+    # Float to byte (truncation)
+    f5: float = 123.75
+    b2: byte = byte(f5)
+    println("FLOAT TO BYTE:")
+    println(b2)  # 123
+
+    # Float to word
+    f6: float = 50000.5
+    w2: word = word(f6)
+    println("FLOAT TO WORD:")
+    println(w2)  # 50000
+
+    # Float to sbyte
+    f7: float = -25.75
+    sb2: sbyte = sbyte(f7)
+    println("FLOAT TO SBYTE:")
+    println(sb2)  # -25
+
+    # Fixed to float
+    fx: fixed = 12.5
+    f8: float = float(fx)
+    println("FIXED TO FLOAT:")
+    println(f8)  # 12.5
+
+    # Float to fixed
+    f9: float = 7.25
+    fx2: fixed = fixed(f9)
+    println("FLOAT TO FIXED:")
+    println(fx2)  # 7.25

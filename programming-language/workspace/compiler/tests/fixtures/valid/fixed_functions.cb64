@@ -1,0 +1,19 @@
+# Valid: Fixed-point with functions
+# Tests fixed-point as function parameters and return values
+
+def add_fixed(a: fixed, b: fixed) -> fixed:
+    return a + b
+
+def negate_fixed(x: fixed) -> fixed:
+    return -x
+
+def main():
+    result: fixed = add_fixed(5.5, 3.25)
+    println(result)
+
+    neg: fixed = negate_fixed(10.0)
+    println(neg)
+
+    # Chained calls
+    final: fixed = add_fixed(result, neg)
+    println(final)

@@ -1,0 +1,52 @@
+# Conformance Test: Fixed-Point Type Conversions
+# Tests: Conversions between fixed and integer types
+# Expected: Compiles without errors
+
+def main():
+    # Byte to fixed
+    b: byte = 100
+    f1: fixed = fixed(b)
+    println("BYTE TO FIXED:")
+    println(f1)  # 100.0
+
+    # Word to fixed
+    w: word = 1000
+    f2: fixed = fixed(w)
+    println("WORD TO FIXED:")
+    println(f2)  # 1000.0
+
+    # Sbyte to fixed
+    sb: sbyte = -50
+    f3: fixed = fixed(sb)
+    println("SBYTE TO FIXED:")
+    println(f3)  # -50.0
+
+    # Sword to fixed
+    sw: sword = -500
+    f4: fixed = fixed(sw)
+    println("SWORD TO FIXED:")
+    println(f4)  # -500.0
+
+    # Fixed to byte (truncation)
+    f5: fixed = 123.75
+    b2: byte = byte(f5)
+    println("FIXED TO BYTE:")
+    println(b2)  # 123
+
+    # Fixed to word
+    f6: fixed = 1500.5
+    w2: word = word(f6)
+    println("FIXED TO WORD:")
+    println(w2)  # 1500
+
+    # Fixed to sbyte
+    f7: fixed = -25.75
+    sb2: sbyte = sbyte(f7)
+    println("FIXED TO SBYTE:")
+    println(sb2)  # -25
+
+    # Negative fixed to byte (wraps)
+    f8: fixed = -10.5
+    b3: byte = byte(f8)
+    println("NEG FIXED TO BYTE:")
+    println(b3)
