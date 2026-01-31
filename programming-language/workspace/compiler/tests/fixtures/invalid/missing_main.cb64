@@ -1,0 +1,3 @@
+# Missing main function
+def foo():
+    pass

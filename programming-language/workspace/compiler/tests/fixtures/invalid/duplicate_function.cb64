@@ -1,0 +1,9 @@
+# Duplicate function definition
+def foo():
+    pass
+
+def foo():
+    pass
+
+def main():
+    pass

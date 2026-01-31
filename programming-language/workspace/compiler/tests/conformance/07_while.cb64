@@ -1,0 +1,38 @@
+# Conformance Test: While Loops
+# Tests: while statement, loop counter, nested loops
+# Expected: Compiles without errors, loops execute correctly
+
+def main():
+    println("COUNT:")  # Simple counter loop
+    i: byte = 0
+    while i < 5:
+        println(i)
+        i = i + 1
+
+    # Countdown loop
+    println("DOWN:")
+    j: byte = 3
+    while j > 0:
+        println(j)
+        j = j - 1
+
+    # Loop with condition variable
+    done: bool = false
+    k: byte = 0
+    while not done:
+        k = k + 1
+        if k >= 3:
+            done = true
+    println("K=")
+    println(k)
+
+    # Nested loops (limited depth for branch range)
+    println("NESTED:")
+    a: byte = 0
+    while a < 2:
+        b: byte = 0
+        while b < 2:
+            println(a)
+            println(b)
+            b = b + 1
+        a = a + 1

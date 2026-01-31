@@ -1,0 +1,19 @@
+# Regression Test: Issue #002 - Comment as first line in function body
+#
+# Bug: Parser fails with "Expected indented block, found NEWLINE"
+#      when a comment is the first line after function definition
+# Status: KNOWN BUG (not fixed)
+# Workaround: Put actual code before comments, or use inline comments
+#
+# This demonstrates the workaround. The bug occurs with:
+#
+# def main():
+#     # This comment causes the bug
+#     x: byte = 1
+#
+# Workaround is to put code first:
+
+def main():
+    x: byte = 1  # Comment after code works fine
+    y: byte = 2
+    println(x + y)

@@ -1,0 +1,3 @@
+# Minimal valid program
+def main():
+    pass

@@ -1,0 +1,394 @@
+---
+source: tests/snapshots_test.rs
+expression: "format!(\"{:#?}\", ast)"
+---
+Program {
+    items: [
+        Function(
+            FunctionDef {
+                name: "add",
+                params: [
+                    Parameter {
+                        name: "a",
+                        param_type: Byte,
+                        span: Span {
+                            start: 33,
+                            end: 40,
+                        },
+                    },
+                    Parameter {
+                        name: "b",
+                        param_type: Byte,
+                        span: Span {
+                            start: 42,
+                            end: 49,
+                        },
+                    },
+                ],
+                return_type: Some(
+                    Byte,
+                ),
+                body: Block {
+                    statements: [
+                        Statement {
+                            kind: Return(
+                                Some(
+                                    Expr {
+                                        kind: BinaryOp {
+                                            left: Expr {
+                                                kind: Identifier(
+                                                    "a",
+                                                ),
+                                                span: Span {
+                                                    start: 71,
+                                                    end: 72,
+                                                },
+                                            },
+                                            op: Add,
+                                            right: Expr {
+                                                kind: Identifier(
+                                                    "b",
+                                                ),
+                                                span: Span {
+                                                    start: 75,
+                                                    end: 76,
+                                                },
+                                            },
+                                        },
+                                        span: Span {
+                                            start: 71,
+                                            end: 76,
+                                        },
+                                    },
+                                ),
+                            ),
+                            span: Span {
+                                start: 64,
+                                end: 76,
+                            },
+                        },
+                    ],
+                    span: Span {
+                        start: 60,
+                        end: 78,
+                    },
+                },
+                span: Span {
+                    start: 25,
+                    end: 78,
+                },
+            },
+        ),
+        Function(
+            FunctionDef {
+                name: "multiply",
+                params: [
+                    Parameter {
+                        name: "a",
+                        param_type: Byte,
+                        span: Span {
+                            start: 91,
+                            end: 98,
+                        },
+                    },
+                    Parameter {
+                        name: "b",
+                        param_type: Byte,
+                        span: Span {
+                            start: 100,
+                            end: 107,
+                        },
+                    },
+                ],
+                return_type: Some(
+                    Byte,
+                ),
+                body: Block {
+                    statements: [
+                        Statement {
+                            kind: Return(
+                                Some(
+                                    Expr {
+                                        kind: BinaryOp {
+                                            left: Expr {
+                                                kind: Identifier(
+                                                    "a",
+                                                ),
+                                                span: Span {
+                                                    start: 129,
+                                                    end: 130,
+                                                },
+                                            },
+                                            op: Mul,
+                                            right: Expr {
+                                                kind: Identifier(
+                                                    "b",
+                                                ),
+                                                span: Span {
+                                                    start: 133,
+                                                    end: 134,
+                                                },
+                                            },
+                                        },
+                                        span: Span {
+                                            start: 129,
+                                            end: 134,
+                                        },
+                                    },
+                                ),
+                            ),
+                            span: Span {
+                                start: 122,
+                                end: 134,
+                            },
+                        },
+                    ],
+                    span: Span {
+                        start: 118,
+                        end: 136,
+                    },
+                },
+                span: Span {
+                    start: 78,
+                    end: 136,
+                },
+            },
+        ),
+        Function(
+            FunctionDef {
+                name: "greet",
+                params: [],
+                return_type: None,
+                body: Block {
+                    statements: [
+                        Statement {
+                            kind: Expression(
+                                Expr {
+                                    kind: FunctionCall {
+                                        name: "println",
+                                        args: [
+                                            Expr {
+                                                kind: StringLiteral(
+                                                    "HELLO!",
+                                                ),
+                                                span: Span {
+                                                    start: 161,
+                                                    end: 169,
+                                                },
+                                            },
+                                        ],
+                                    },
+                                    span: Span {
+                                        start: 153,
+                                        end: 170,
+                                    },
+                                },
+                            ),
+                            span: Span {
+                                start: 153,
+                                end: 170,
+                            },
+                        },
+                    ],
+                    span: Span {
+                        start: 149,
+                        end: 172,
+                    },
+                },
+                span: Span {
+                    start: 136,
+                    end: 172,
+                },
+            },
+        ),
+        Function(
+            FunctionDef {
+                name: "main",
+                params: [],
+                return_type: None,
+                body: Block {
+                    statements: [
+                        Statement {
+                            kind: Expression(
+                                Expr {
+                                    kind: FunctionCall {
+                                        name: "greet",
+                                        args: [],
+                                    },
+                                    span: Span {
+                                        start: 188,
+                                        end: 195,
+                                    },
+                                },
+                            ),
+                            span: Span {
+                                start: 188,
+                                end: 195,
+                            },
+                        },
+                        Statement {
+                            kind: VarDecl(
+                                VarDecl {
+                                    name: "result",
+                                    var_type: Byte,
+                                    initializer: Some(
+                                        Expr {
+                                            kind: FunctionCall {
+                                                name: "add",
+                                                args: [
+                                                    Expr {
+                                                        kind: IntegerLiteral(
+                                                            3,
+                                                        ),
+                                                        span: Span {
+                                                            start: 219,
+                                                            end: 220,
+                                                        },
+                                                    },
+                                                    Expr {
+                                                        kind: IntegerLiteral(
+                                                            4,
+                                                        ),
+                                                        span: Span {
+                                                            start: 222,
+                                                            end: 223,
+                                                        },
+                                                    },
+                                                ],
+                                            },
+                                            span: Span {
+                                                start: 215,
+                                                end: 224,
+                                            },
+                                        },
+                                    ),
+                                    array_size: None,
+                                    span: Span {
+                                        start: 200,
+                                        end: 224,
+                                    },
+                                },
+                            ),
+                            span: Span {
+                                start: 200,
+                                end: 224,
+                            },
+                        },
+                        Statement {
+                            kind: Expression(
+                                Expr {
+                                    kind: FunctionCall {
+                                        name: "println",
+                                        args: [
+                                            Expr {
+                                                kind: Identifier(
+                                                    "result",
+                                                ),
+                                                span: Span {
+                                                    start: 237,
+                                                    end: 243,
+                                                },
+                                            },
+                                        ],
+                                    },
+                                    span: Span {
+                                        start: 229,
+                                        end: 244,
+                                    },
+                                },
+                            ),
+                            span: Span {
+                                start: 229,
+                                end: 244,
+                            },
+                        },
+                        Statement {
+                            kind: VarDecl(
+                                VarDecl {
+                                    name: "product",
+                                    var_type: Byte,
+                                    initializer: Some(
+                                        Expr {
+                                            kind: FunctionCall {
+                                                name: "multiply",
+                                                args: [
+                                                    Expr {
+                                                        kind: IntegerLiteral(
+                                                            5,
+                                                        ),
+                                                        span: Span {
+                                                            start: 274,
+                                                            end: 275,
+                                                        },
+                                                    },
+                                                    Expr {
+                                                        kind: IntegerLiteral(
+                                                            6,
+                                                        ),
+                                                        span: Span {
+                                                            start: 277,
+                                                            end: 278,
+                                                        },
+                                                    },
+                                                ],
+                                            },
+                                            span: Span {
+                                                start: 265,
+                                                end: 279,
+                                            },
+                                        },
+                                    ),
+                                    array_size: None,
+                                    span: Span {
+                                        start: 249,
+                                        end: 279,
+                                    },
+                                },
+                            ),
+                            span: Span {
+                                start: 249,
+                                end: 279,
+                            },
+                        },
+                        Statement {
+                            kind: Expression(
+                                Expr {
+                                    kind: FunctionCall {
+                                        name: "println",
+                                        args: [
+                                            Expr {
+                                                kind: Identifier(
+                                                    "product",
+                                                ),
+                                                span: Span {
+                                                    start: 292,
+                                                    end: 299,
+                                                },
+                                            },
+                                        ],
+                                    },
+                                    span: Span {
+                                        start: 284,
+                                        end: 300,
+                                    },
+                                },
+                            ),
+                            span: Span {
+                                start: 284,
+                                end: 300,
+                            },
+                        },
+                    ],
+                    span: Span {
+                        start: 184,
+                        end: 301,
+                    },
+                },
+                span: Span {
+                    start: 172,
+                    end: 301,
+                },
+            },
+        ),
+    ],
+}

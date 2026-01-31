@@ -1,0 +1,35 @@
+# Conformance Test: Break Statement
+# Tests: break inside while loop
+# Expected: Compiles without errors, loop exits early
+
+def main():
+    println("BREAK TEST:")  # Break on condition
+    i: byte = 0
+    while i < 10:
+        println(i)
+        if i == 3:
+            break
+        i = i + 1
+    println("DONE")
+
+    # Break in nested context
+    println("NESTED:")
+    j: byte = 0
+    while j < 5:
+        if j == 2:
+            println("BREAK AT 2")
+            break
+        println(j)
+        j = j + 1
+
+    # Multiple potential breaks
+    k: byte = 0
+    found: bool = false
+    while k < 10:
+        if k == 5:
+            found = true
+            break
+        k = k + 1
+
+    if found:
+        println("FOUND 5")

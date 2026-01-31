@@ -1,0 +1,49 @@
+# Conformance Test: Function Definitions
+# Tests: def, parameters, function calls
+# Expected: Compiles without errors, functions execute correctly
+
+# Function with no parameters
+def greet():
+    println("HELLO")
+
+# Function with one parameter
+def print_twice(x: byte):
+    println(x)
+    println(x)
+
+# Function with multiple parameters
+def print_sum(a: byte, b: byte):
+    result: byte = a + b
+    println(result)
+
+# Function calling another function
+def outer():
+    println("OUTER")
+    inner()
+
+def inner():
+    println("INNER")
+
+# Recursive function
+def countdown(n: byte):
+    if n > 0:
+        println(n)
+        countdown(n - 1)
+    else:
+        println("DONE")
+
+def main():
+    greet()  # Call simple function
+
+    # Call with parameter
+    print_twice(42)
+
+    # Call with multiple parameters
+    print_sum(10, 20)
+
+    # Call nested functions
+    outer()
+
+    # Call recursive function
+    println("COUNTDOWN:")
+    countdown(3)

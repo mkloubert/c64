@@ -1,0 +1,39 @@
+# Conformance Test: Type Conversions
+# Tests: byte(), word(), bool() type casts
+# Expected: Compiles without errors, conversions work correctly
+
+def main():
+    w: word = 300  # Word to byte (truncation)
+    b: byte = byte(w)
+    println("WORD TO BYTE:")
+    println(b)
+
+    # Byte to word (extension)
+    x: byte = 255
+    y: word = word(x)
+    println("BYTE TO WORD:")
+    println(y)
+
+    # Integer literal to byte
+    z: byte = byte(100)
+    println(z)
+
+    # Signed conversions
+    neg: sbyte = -10
+    uns: byte = byte(neg)
+    println("SIGNED TO UNSIGNED:")
+    println(uns)
+
+    # Calculations with mixed types
+    a: byte = 200
+    c: word = word(a) + word(a)
+    println("MIXED CALC:")
+    println(c)
+
+    # Bool conversions (conceptual)
+    t: bool = true
+    f: bool = false
+    if t:
+        println("TRUE")
+    if not f:
+        println("NOT FALSE")

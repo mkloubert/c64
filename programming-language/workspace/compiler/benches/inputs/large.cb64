@@ -1,0 +1,334 @@
+# Large benchmark program (~500 lines)
+# Auto-generated for performance testing
+
+const C0 = 0
+const C1 = 1
+const C2 = 2
+const C3 = 3
+const C4 = 4
+const C5 = 5
+const C6 = 6
+const C7 = 7
+const C8 = 8
+const C9 = 9
+const C10 = 10
+const C11 = 11
+const C12 = 12
+const C13 = 13
+const C14 = 14
+const C15 = 15
+const C16 = 16
+const C17 = 17
+const C18 = 18
+const C19 = 19
+const MAX_VAL = 255
+const SCREEN_WIDTH = 40
+const SCREEN_HEIGHT = 25
+const VIC_BASE = $D000
+const SID_BASE = $D400
+const COLOR_RAM = $D800
+
+def func_0(x: byte) -> byte:
+    y: byte = x + 0
+    return y
+
+def func_1(x: byte) -> byte:
+    y: byte = x + 1
+    return y
+
+def func_2(x: byte) -> byte:
+    y: byte = x + 2
+    return y
+
+def func_3(x: byte) -> byte:
+    y: byte = x + 3
+    return y
+
+def func_4(x: byte) -> byte:
+    y: byte = x + 4
+    return y
+
+def func_5(x: byte) -> byte:
+    y: byte = x + 5
+    return y
+
+def func_6(x: byte) -> byte:
+    y: byte = x + 6
+    return y
+
+def func_7(x: byte) -> byte:
+    y: byte = x + 7
+    return y
+
+def func_8(x: byte) -> byte:
+    y: byte = x + 8
+    return y
+
+def func_9(x: byte) -> byte:
+    y: byte = x + 9
+    return y
+
+def func_10(x: byte) -> byte:
+    y: byte = x + 10
+    return y
+
+def func_11(x: byte) -> byte:
+    y: byte = x + 11
+    return y
+
+def func_12(x: byte) -> byte:
+    y: byte = x + 12
+    return y
+
+def func_13(x: byte) -> byte:
+    y: byte = x + 13
+    return y
+
+def func_14(x: byte) -> byte:
+    y: byte = x + 14
+    return y
+
+def func_15(x: byte) -> byte:
+    y: byte = x + 15
+    return y
+
+def func_16(x: byte) -> byte:
+    y: byte = x + 16
+    return y
+
+def func_17(x: byte) -> byte:
+    y: byte = x + 17
+    return y
+
+def func_18(x: byte) -> byte:
+    y: byte = x + 18
+    return y
+
+def func_19(x: byte) -> byte:
+    y: byte = x + 19
+    return y
+
+def func_20(x: byte) -> byte:
+    y: byte = x + 20
+    return y
+
+def func_21(x: byte) -> byte:
+    y: byte = x + 21
+    return y
+
+def func_22(x: byte) -> byte:
+    y: byte = x + 22
+    return y
+
+def func_23(x: byte) -> byte:
+    y: byte = x + 23
+    return y
+
+def func_24(x: byte) -> byte:
+    y: byte = x + 24
+    return y
+
+def func_25(x: byte) -> byte:
+    y: byte = x + 25
+    return y
+
+def func_26(x: byte) -> byte:
+    y: byte = x + 26
+    return y
+
+def func_27(x: byte) -> byte:
+    y: byte = x + 27
+    return y
+
+def func_28(x: byte) -> byte:
+    y: byte = x + 28
+    return y
+
+def func_29(x: byte) -> byte:
+    y: byte = x + 29
+    return y
+
+def func_30(x: byte) -> byte:
+    y: byte = x + 30
+    return y
+
+def func_31(x: byte) -> byte:
+    y: byte = x + 31
+    return y
+
+def func_32(x: byte) -> byte:
+    y: byte = x + 32
+    return y
+
+def func_33(x: byte) -> byte:
+    y: byte = x + 33
+    return y
+
+def func_34(x: byte) -> byte:
+    y: byte = x + 34
+    return y
+
+def func_35(x: byte) -> byte:
+    y: byte = x + 35
+    return y
+
+def func_36(x: byte) -> byte:
+    y: byte = x + 36
+    return y
+
+def func_37(x: byte) -> byte:
+    y: byte = x + 37
+    return y
+
+def func_38(x: byte) -> byte:
+    y: byte = x + 38
+    return y
+
+def func_39(x: byte) -> byte:
+    y: byte = x + 39
+    return y
+
+def func_40(x: byte) -> byte:
+    y: byte = x + 40
+    return y
+
+def func_41(x: byte) -> byte:
+    y: byte = x + 41
+    return y
+
+def func_42(x: byte) -> byte:
+    y: byte = x + 42
+    return y
+
+def func_43(x: byte) -> byte:
+    y: byte = x + 43
+    return y
+
+def func_44(x: byte) -> byte:
+    y: byte = x + 44
+    return y
+
+def func_45(x: byte) -> byte:
+    y: byte = x + 45
+    return y
+
+def func_46(x: byte) -> byte:
+    y: byte = x + 46
+    return y
+
+def func_47(x: byte) -> byte:
+    y: byte = x + 47
+    return y
+
+def func_48(x: byte) -> byte:
+    y: byte = x + 48
+    return y
+
+def func_49(x: byte) -> byte:
+    y: byte = x + 49
+    return y
+
+def add_all(a: byte, b: byte, c: byte) -> byte:
+    return a + b + c
+
+def sub_all(a: byte, b: byte, c: byte) -> byte:
+    return a - b - c
+
+def max_byte(a: byte, b: byte) -> byte:
+    if a > b:
+        return a
+    return b
+
+def min_byte(a: byte, b: byte) -> byte:
+    if a < b:
+        return a
+    return b
+
+def clamp(val: byte, lo: byte, hi: byte) -> byte:
+    if val < lo:
+        return lo
+    if val > hi:
+        return hi
+    return val
+
+def is_in_range(val: byte, lo: byte, hi: byte) -> bool:
+    return val >= lo and val <= hi
+
+def print_header():
+    println("================")
+    println("BENCHMARK TEST")
+    println("================")
+
+def print_footer():
+    println("================")
+    println("COMPLETE")
+    println("================")
+
+def test_arithmetic():
+    a: byte = 10
+    b: byte = 20
+    c: byte = 30
+    d: byte = a + b
+    e: byte = d + c
+    f: byte = e - a
+    g: byte = f * 2
+    h: byte = g / 2
+    println(h)
+
+def test_comparisons():
+    x: byte = 50
+    if x == 50:
+        println("EQ")
+    if x != 100:
+        println("NE")
+    if x < 100:
+        println("LT")
+    if x > 10:
+        println("GT")
+    if x <= 50:
+        println("LE")
+    if x >= 50:
+        println("GE")
+
+def test_loops():
+    sum: byte = 0
+    i: byte = 0
+    while i < 10:
+        sum = sum + i
+        i = i + 1
+    println(sum)
+
+def test_nested():
+    total: byte = 0
+    i: byte = 0
+    while i < 3:
+        j: byte = 0
+        while j < 3:
+            total = total + 1
+            j = j + 1
+        i = i + 1
+    println(total)
+
+def test_functions():
+    a: byte = func_0(1)
+    b: byte = func_1(2)
+    c: byte = func_2(3)
+    d: byte = func_3(4)
+    e: byte = func_4(5)
+    f: byte = add_all(a, b, c)
+    g: byte = max_byte(d, e)
+    h: byte = min_byte(f, g)
+    println(h)
+
+def run_all_tests():
+    test_arithmetic()
+    test_comparisons()
+    test_loops()
+    test_nested()
+    test_functions()
+
+def main():
+    cls()
+    print_header()
+    run_all_tests()
+    print_footer()

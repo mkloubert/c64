@@ -1,0 +1,16 @@
+# User-defined functions
+def add(a: byte, b: byte) -> byte:
+    return a + b
+
+def multiply(a: byte, b: byte) -> byte:
+    return a * b
+
+def greet():
+    println("HELLO!")
+
+def main():
+    greet()
+    result: byte = add(3, 4)
+    println(result)
+    product: byte = multiply(5, 6)
+    println(product)

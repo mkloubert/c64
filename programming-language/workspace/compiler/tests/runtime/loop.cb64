@@ -1,0 +1,10 @@
+# Runtime Test: Loop Execution
+# Expected output: Numbers 0 through 4
+# Verify: 0, 1, 2, 3, 4 printed on separate lines
+
+def main():
+    cls()
+    i: byte = 0
+    while i < 5:
+        println(i)
+        i = i + 1

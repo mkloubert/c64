@@ -1,0 +1,18 @@
+---
+source: tests/snapshots_test.rs
+expression: format_tokens(&tokens)
+---
+Newline @ 21..22
+Def @ 22..25
+Identifier("main") @ 26..30
+LeftParen @ 30..31
+RightParen @ 31..32
+Colon @ 32..33
+Newline @ 33..34
+Indent @ 34..38
+Identifier("println") @ 38..45
+LeftParen @ 45..46
+String("HELLO, WORLD!") @ 46..61
+RightParen @ 61..62
+Newline @ 62..63
+Dedent @ 63..63

@@ -1,0 +1,18 @@
+# Runtime Test: Conditional Branching
+# Expected output: Correct branch taken
+# Verify: "BIG", "YES", "DONE"
+
+def main():
+    cls()
+    x: byte = 10
+
+    if x > 5:
+        println("BIG")
+    else:
+        println("SMALL")
+
+    flag: bool = true
+    if flag:
+        println("YES")
+
+    println("DONE")

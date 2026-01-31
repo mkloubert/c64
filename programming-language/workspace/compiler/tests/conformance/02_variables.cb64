@@ -1,0 +1,24 @@
+# Conformance Test: Variable Declarations
+# Tests: byte, word, bool variable types
+# Expected: Compiles without errors, variables hold correct values
+# Note: sbyte/sword have limited support - tested separately
+
+def main():
+    x: byte = 10  # Byte variables (0-255)
+    y: byte = 20
+    z: byte = x + y
+
+    big: word = 1000  # Word variables (0-65535)
+    addr: word = $C000
+
+    flag: bool = true  # Boolean variables
+    done: bool = false
+
+    x = 100  # Variable reassignment
+    x = x + 1
+    flag = false
+
+    println("VARIABLES:")  # Print results
+    println(z)
+    println(big)
+    println(x)

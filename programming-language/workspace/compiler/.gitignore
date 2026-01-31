@@ -1,0 +1,5 @@
+/target
+
+# custom
+*.d64
+*.prg

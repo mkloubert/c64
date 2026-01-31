@@ -1,0 +1,6 @@
+# Hello World program for Cobra64
+# This is the simplest possible program
+
+def main():
+    cls()
+    println("HELLO, WORLD!")

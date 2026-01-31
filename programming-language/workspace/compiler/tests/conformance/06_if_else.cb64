@@ -1,0 +1,43 @@
+# Conformance Test: If/Else Statements
+# Tests: if, else, nested if
+# Expected: Compiles without errors, correct branch execution
+# Note: elif has known codegen bug, using nested if instead
+
+def main():
+    x: byte = 5  # Test value for if/else conditions
+    if x > 0:
+        println("POSITIVE")
+
+    # If-else
+    if x > 10:
+        println("BIG")
+    else:
+        println("SMALL")
+
+    # Nested if (workaround for elif bug)
+    if x > 7:
+        println("LARGE")
+    else:
+        if x > 3:
+            println("MEDIUM")
+        else:
+            println("TINY")
+
+    # Boolean conditions
+    flag: bool = true
+    if flag:
+        println("FLAG SET")
+
+    if not flag:
+        println("NOT REACHED")
+    else:
+        println("FLAG TRUE")
+
+    # Complex conditions
+    a: byte = 10
+    b: byte = 20
+    if a < b and b > 15:
+        println("BOTH TRUE")
+
+    if a > 100 or b > 10:
+        println("ONE TRUE")

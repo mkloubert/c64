@@ -1,0 +1,13 @@
+# Counter program for Cobra64
+# Demonstrates variables and loops
+
+def main():
+    cls()
+    i: byte = 0
+
+    while i < 10:
+        print(i)
+        println("")
+        i = i + 1
+
+    println("DONE!")

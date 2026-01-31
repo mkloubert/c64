@@ -1,0 +1,9 @@
+---
+source: tests/snapshots_test.rs
+expression: error
+---
+error[E200]: Undefined variable 'x'
+  --> undefined_variable.cb64:3:5
+  |
+3 |     x = undefined_var
+  |     ^^^^^^^^^^^^^^^^^

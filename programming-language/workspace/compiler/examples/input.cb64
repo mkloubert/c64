@@ -1,0 +1,8 @@
+# Input program for Cobra64
+# Demonstrates keyboard input
+
+def main():
+    cls()
+    println("PRESS ANY KEY...")
+    wait_for_key()
+    println("YOU PRESSED A KEY!")

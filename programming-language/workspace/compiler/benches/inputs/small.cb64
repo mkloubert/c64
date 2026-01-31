@@ -1,0 +1,7 @@
+# Small benchmark program (~10 lines)
+def main():
+    x: byte = 10
+    y: byte = 20
+    z: byte = x + y
+    println("RESULT:")
+    println(z)

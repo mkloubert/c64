@@ -1,0 +1,9 @@
+---
+source: tests/snapshots_test.rs
+expression: error
+---
+error[E220]: Missing main() function
+  --> missing_main.cb64:1:1
+  |
+1 | # Missing main function
+  | ^

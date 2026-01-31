@@ -1,0 +1,40 @@
+# Conformance Test: Overflow Behavior
+# Tests: Integer overflow wrapping behavior
+# Expected: Compiles without errors, overflow wraps correctly
+# Note: C64/6510 uses unsigned wraparound
+
+def main():
+    println("BYTE OVERFLOW:")  # Byte overflow (255 + 1 = 0)
+    x: byte = 255
+    x = x + 1
+    println(x)
+
+    # Byte underflow (0 - 1 = 255)
+    println("BYTE UNDERFLOW:")
+    y: byte = 0
+    y = y - 1
+    println(y)
+
+    # Word overflow (65535 + 1 = 0)
+    println("WORD OVERFLOW:")
+    w: word = 65535
+    w = w + 1
+    println(w)
+
+    # Word underflow (0 - 1 = 65535)
+    println("WORD UNDERFLOW:")
+    v: word = 0
+    v = v - 1
+    println(v)
+
+    # Multiplication overflow
+    println("MUL OVERFLOW:")
+    a: byte = 200
+    b: byte = a * 2
+    println(b)
+
+    # Addition chain overflow
+    println("CHAIN OVERFLOW:")
+    c: byte = 250
+    c = c + 10
+    println(c)

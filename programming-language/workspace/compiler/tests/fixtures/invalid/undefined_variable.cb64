@@ -1,0 +1,3 @@
+# Undefined variable
+def main():
+    x = undefined_var

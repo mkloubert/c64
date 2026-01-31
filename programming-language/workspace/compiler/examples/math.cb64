@@ -1,0 +1,31 @@
+# Math program for Cobra64
+# Demonstrates arithmetic operations
+
+def main():
+    cls()
+    a: byte = 10
+    b: byte = 5
+
+    print(a)
+    print(" + ")
+    print(b)
+    print(" = ")
+    println(a + b)
+
+    print(a)
+    print(" - ")
+    print(b)
+    print(" = ")
+    println(a - b)
+
+    print(a)
+    print(" * ")
+    print(b)
+    print(" = ")
+    println(a * b)
+
+    print(a)
+    print(" / ")
+    print(b)
+    print(" = ")
+    println(a / b)

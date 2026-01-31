@@ -1,0 +1,6 @@
+# Return type mismatch
+def foo() -> byte:
+    return "string"
+
+def main():
+    pass

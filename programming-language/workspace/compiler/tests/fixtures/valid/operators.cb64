@@ -1,0 +1,32 @@
+# All operators
+def main():
+    a: byte = 10
+    b: byte = 3
+
+    # Arithmetic
+    add: byte = a + b
+    sub: byte = a - b
+    mul: byte = a * b
+    div: byte = a / b
+    mod: byte = a % b
+
+    # Comparison
+    eq: bool = a == b
+    ne: bool = a != b
+    lt: bool = a < b
+    gt: bool = a > b
+    le: bool = a <= b
+    ge: bool = a >= b
+
+    # Logical
+    land: bool = true and false
+    lor: bool = true or false
+    lnot: bool = not true
+
+    # Bitwise
+    band: byte = a & b
+    bor: byte = a | b
+    bxor: byte = a ^ b
+    bnot: byte = ~a
+    shl: byte = a << 1
+    shr: byte = a >> 1

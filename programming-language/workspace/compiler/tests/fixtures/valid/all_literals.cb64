@@ -1,0 +1,17 @@
+# All literal types
+def main():
+    dec: byte = 42  # Integer literals
+    hex: byte = $FF
+    bin: byte = %10101010
+
+    # Word literals
+    big: word = 1000
+    hex_word: word = $ABCD
+
+    # Boolean literals
+    yes: bool = true
+    no: bool = false
+
+    # String and char
+    println("STRING")
+    c: byte = 'A'

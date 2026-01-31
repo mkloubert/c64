@@ -1,0 +1,7 @@
+# Runtime Test: Hello World
+# Expected output: "HELLO WORLD" on screen
+# Verify: Text appears at top of screen
+
+def main():
+    cls()
+    println("HELLO WORLD")

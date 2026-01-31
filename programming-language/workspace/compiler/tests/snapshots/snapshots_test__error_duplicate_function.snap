@@ -1,0 +1,10 @@
+---
+source: tests/snapshots_test.rs
+expression: error
+---
+error[E221]: Function 'foo' is already defined
+  --> duplicate_function.cb64:5:1
+  |
+5 | def foo():
+  | ^^^^^^^^^^
+  = hint: Previously defined at position 32

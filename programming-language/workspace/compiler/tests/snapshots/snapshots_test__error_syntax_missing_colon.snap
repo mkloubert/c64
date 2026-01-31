@@ -1,0 +1,9 @@
+---
+source: tests/snapshots_test.rs
+expression: error
+---
+error[E100]: Expected ':' before function body, found NEWLINE
+  --> syntax_missing_colon.cb64:2:11
+  |
+2 | def main()
+  |

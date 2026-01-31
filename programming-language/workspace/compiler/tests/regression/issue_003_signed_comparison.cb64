@@ -1,0 +1,20 @@
+# Regression Test: Issue #003 - Signed type comparison limitations
+#
+# Bug: Cannot compare sbyte with byte or use sbyte in some contexts
+# Status: KNOWN LIMITATION
+# Error: "Cannot compare sbyte and byte"
+#
+# This test uses only unsigned types as workaround.
+
+def main():
+    x: byte = 10  # Using byte instead of sbyte
+    y: byte = 20
+
+    if x < y:
+        println("X < Y")
+
+    # Workaround for negative values:
+    # Use byte with values > 127 representing negative
+    # (two's complement interpretation)
+    neg: byte = 246  # Represents -10 in two's complement
+    println(neg)

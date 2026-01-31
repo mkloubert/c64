@@ -1,0 +1,35 @@
+# Conformance Test: Arithmetic Operators
+# Tests: +, -, *, /, mod
+# Expected: Compiles without errors, correct arithmetic results
+# Note: Signed types (sbyte/sword) have limited support
+
+def main():
+    a: byte = 10 + 5  # Addition
+    println(a)
+
+    b: byte = 20 - 8  # Subtraction
+    println(b)
+
+    c: byte = 6 * 7  # Multiplication
+    println(c)
+
+    d: byte = 100 / 4  # Division
+    println(d)
+
+    e: byte = 17 % 5  # Modulo
+    println(e)
+
+    f: byte = 2 + 3 * 4  # Combined operations (precedence)
+    println(f)
+
+    g: byte = (2 + 3) * 4  # Parentheses
+    println(g)
+
+    w1: word = 1000 + 500  # Word arithmetic
+    println(w1)
+
+    w2: word = 50000 - 10000
+    println(w2)
+
+    result: byte = 10 + 20 - 5 * 2  # Compound expressions
+    println(result)

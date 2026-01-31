@@ -1,0 +1,17 @@
+# Control flow constructs
+def main():
+    x: byte = 5
+
+    # Note: elif has a known code generation bug - using nested if for now
+    if x > 3:
+        println("BIG")
+    else:
+        if x > 1:
+            println("MEDIUM")
+        else:
+            println("SMALL")
+
+    i: byte = 0
+    while i < 3:
+        println(i)
+        i = i + 1

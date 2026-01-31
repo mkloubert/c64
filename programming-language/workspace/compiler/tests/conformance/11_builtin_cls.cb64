@@ -1,0 +1,15 @@
+# Conformance Test: cls() Built-in Function
+# Tests: Clear screen function
+# Expected: Compiles without errors, clears screen when run
+
+def main():
+    println("BEFORE CLS")  # Print something first
+    println("LINE 2")
+    println("LINE 3")
+
+    # Clear the screen
+    cls()
+
+    # Print after clear
+    println("AFTER CLS")
+    println("SCREEN CLEARED")

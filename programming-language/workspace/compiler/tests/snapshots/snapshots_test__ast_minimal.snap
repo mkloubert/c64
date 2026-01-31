@@ -1,0 +1,34 @@
+---
+source: tests/snapshots_test.rs
+expression: "format!(\"{:#?}\", ast)"
+---
+Program {
+    items: [
+        Function(
+            FunctionDef {
+                name: "main",
+                params: [],
+                return_type: None,
+                body: Block {
+                    statements: [
+                        Statement {
+                            kind: Pass,
+                            span: Span {
+                                start: 40,
+                                end: 44,
+                            },
+                        },
+                    ],
+                    span: Span {
+                        start: 36,
+                        end: 45,
+                    },
+                },
+                span: Span {
+                    start: 24,
+                    end: 45,
+                },
+            },
+        ),
+    ],
+}

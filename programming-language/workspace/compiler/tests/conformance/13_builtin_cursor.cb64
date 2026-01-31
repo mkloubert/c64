@@ -1,0 +1,28 @@
+# Conformance Test: cursor() Built-in Function
+# Tests: Cursor positioning on screen
+# Expected: Compiles without errors, positions cursor correctly
+
+def main():
+    cls()  # Clear screen first
+
+    # Position at top-left
+    cursor(0, 0)
+    println("TOP LEFT")
+
+    # Position in middle of screen
+    cursor(15, 12)
+    println("CENTER")
+
+    # Position at different locations
+    cursor(0, 5)
+    println("ROW 5")
+
+    cursor(30, 10)
+    println("COL 30")
+
+    # Position near edges (40x25 screen)
+    cursor(0, 24)
+    println("BOTTOM")
+
+    cursor(35, 0)
+    print("RIGHT")

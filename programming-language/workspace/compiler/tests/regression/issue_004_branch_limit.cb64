@@ -1,0 +1,25 @@
+# Regression Test: Issue #004 - Deep nesting exceeds branch limit
+#
+# Bug: Deeply nested if/while exceeds 6510's 127-byte branch range
+# Status: HARDWARE LIMITATION (cannot be fixed without long branches)
+# Error: "Branch target too far: N bytes"
+#
+# This test stays within safe nesting limits.
+
+def main():
+    x: byte = 5
+
+    # Safe: 3-4 levels of nesting
+    if x > 0:
+        if x > 1:
+            if x > 2:
+                println("DEEP OK")
+
+    # Loop nesting also limited
+    i: byte = 2
+    while i > 0:
+        j: byte = 2
+        while j > 0:
+            println(i)
+            j = j - 1
+        i = i - 1

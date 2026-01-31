@@ -1,0 +1,48 @@
+# Conformance Test: Return Values
+# Tests: return statement, function return types
+# Expected: Compiles without errors, return values work correctly
+# Note: Signed types have limited support - not tested here
+
+def get_byte() -> byte:
+    return 42  # Return byte value
+
+def get_word() -> word:
+    return 1000  # Return word value
+
+def get_true() -> bool:
+    return true  # Return bool value
+
+def get_false() -> bool:
+    return false
+
+def double(x: byte) -> byte:
+    return x * 2  # Return with expression
+
+def add(a: byte, b: byte) -> byte:
+    return a + b  # Return with calculation
+
+def check(x: byte):
+    if x == 0:  # Void function with early return
+        println("ZERO")
+        return
+    println("NONZERO")
+
+def main():
+    a: byte = get_byte()  # Use return values
+    println(a)
+
+    b: word = get_word()
+    println(b)
+
+    c: bool = get_true()
+    if c:
+        println("TRUE")
+
+    d: byte = double(21)  # Use in expressions
+    println(d)
+
+    e: byte = add(10, 5)
+    println(e)
+
+    check(0)  # Test early return
+    check(5)

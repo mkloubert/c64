@@ -1,0 +1,27 @@
+# Conformance Test: Input Built-in Functions
+# Tests: get_key(), wait_for_key(), readln()
+# Expected: Compiles without errors, handles input when run
+
+def main():
+    println("INPUT TEST")  # Display prompt
+    println("")
+
+    # Test get_key (non-blocking)
+    println("PRESS ANY KEY...")
+    k: byte = wait_for_key()
+    print("YOU PRESSED: ")
+    println(k)
+
+    # Test in a loop
+    println("")
+    println("PRESS Q TO QUIT")
+    done: bool = false
+    while not done:
+        key: byte = get_key()
+        if key != 0:
+            if key == 81:
+                done = true
+            else:
+                println(key)
+
+    println("GOODBYE")

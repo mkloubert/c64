@@ -1,0 +1,6 @@
+# Wrong number of arguments
+def add(a: byte, b: byte) -> byte:
+    return a + b
+
+def main():
+    x: byte = add(1)

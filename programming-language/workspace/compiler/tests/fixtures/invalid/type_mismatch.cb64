@@ -1,0 +1,3 @@
+# Type mismatch
+def main():
+    x: byte = "string"

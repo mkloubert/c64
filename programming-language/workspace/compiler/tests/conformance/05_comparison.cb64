@@ -1,0 +1,46 @@
+# Conformance Test: Comparison Operators
+# Tests: ==, !=, <, >, <=, >=
+# Expected: Compiles without errors, correct boolean results
+
+def main():
+    x: byte = 10
+    y: byte = 20
+    z: byte = 10  # Setup variables for comparison tests
+    eq1: bool = x == z
+    eq2: bool = x == y
+    println("EQUAL:")
+    if eq1:
+        println("X==Z TRUE")
+    if eq2:
+        println("X==Y TRUE")
+
+    # Inequality
+    neq: bool = x != y
+    if neq:
+        println("X!=Y TRUE")
+
+    # Less than
+    lt: bool = x < y
+    if lt:
+        println("X<Y TRUE")
+
+    # Greater than
+    gt: bool = y > x
+    if gt:
+        println("Y>X TRUE")
+
+    # Less or equal
+    le1: bool = x <= z
+    le2: bool = x <= y
+    if le1:
+        println("X<=Z TRUE")
+
+    # Greater or equal
+    ge1: bool = y >= x
+    ge2: bool = x >= z
+    if ge2:
+        println("X>=Z TRUE")
+
+    # Chained comparisons in conditions
+    if x < y and y > z:
+        println("CHAIN OK")

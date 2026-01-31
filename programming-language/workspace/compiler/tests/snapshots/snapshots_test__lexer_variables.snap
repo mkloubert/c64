@@ -1,0 +1,44 @@
+---
+source: tests/snapshots_test.rs
+expression: format_tokens(&tokens)
+---
+Newline @ 38..39
+Def @ 39..42
+Identifier("main") @ 43..47
+LeftParen @ 47..48
+RightParen @ 48..49
+Colon @ 49..50
+Newline @ 50..51
+Indent @ 51..55
+Identifier("x") @ 55..56
+Colon @ 56..57
+Byte @ 58..62
+Equal @ 63..64
+Integer(10) @ 65..67
+Newline @ 67..68
+Identifier("y") @ 72..73
+Colon @ 73..74
+Byte @ 75..79
+Equal @ 80..81
+Integer(20) @ 82..84
+Newline @ 84..85
+Identifier("z") @ 89..90
+Colon @ 90..91
+Byte @ 92..96
+Equal @ 97..98
+Identifier("x") @ 99..100
+Plus @ 101..102
+Identifier("y") @ 103..104
+Newline @ 104..105
+Identifier("w") @ 109..110
+Colon @ 110..111
+Word @ 112..116
+Equal @ 117..118
+Integer(1000) @ 119..123
+Newline @ 123..124
+Identifier("println") @ 128..135
+LeftParen @ 135..136
+Identifier("z") @ 136..137
+RightParen @ 137..138
+Newline @ 138..139
+Dedent @ 139..139

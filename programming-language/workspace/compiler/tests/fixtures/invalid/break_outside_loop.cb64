@@ -1,0 +1,3 @@
+# Break outside loop
+def main():
+    break

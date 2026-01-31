@@ -1,0 +1,55 @@
+---
+source: tests/snapshots_test.rs
+expression: "format!(\"{:#?}\", ast)"
+---
+Program {
+    items: [
+        Function(
+            FunctionDef {
+                name: "main",
+                params: [],
+                return_type: None,
+                body: Block {
+                    statements: [
+                        Statement {
+                            kind: Expression(
+                                Expr {
+                                    kind: FunctionCall {
+                                        name: "println",
+                                        args: [
+                                            Expr {
+                                                kind: StringLiteral(
+                                                    "HELLO, WORLD!",
+                                                ),
+                                                span: Span {
+                                                    start: 46,
+                                                    end: 61,
+                                                },
+                                            },
+                                        ],
+                                    },
+                                    span: Span {
+                                        start: 38,
+                                        end: 62,
+                                    },
+                                },
+                            ),
+                            span: Span {
+                                start: 38,
+                                end: 62,
+                            },
+                        },
+                    ],
+                    span: Span {
+                        start: 34,
+                        end: 63,
+                    },
+                },
+                span: Span {
+                    start: 22,
+                    end: 63,
+                },
+            },
+        ),
+    ],
+}

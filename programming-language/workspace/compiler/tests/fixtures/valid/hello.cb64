@@ -1,0 +1,3 @@
+# Hello World program
+def main():
+    println("HELLO, WORLD!")

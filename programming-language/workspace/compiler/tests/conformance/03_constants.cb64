@@ -1,0 +1,29 @@
+# Conformance Test: Constant Declarations
+# Tests: const keyword, constant usage in expressions
+# Expected: Compiles without errors, constants work in expressions
+
+# Global constants
+const MAX_VALUE = 255
+const SCREEN_WIDTH = 40
+const SCREEN_HEIGHT = 25
+const VIC_BASE = $D000
+const SPRITE_ENABLE = $D015
+
+def main():
+    x: byte = MAX_VALUE  # Use constants in expressions
+    y: byte = SCREEN_WIDTH - 1
+    z: byte = SCREEN_HEIGHT - 1
+
+    # Use constant addresses
+    addr: word = VIC_BASE
+    sprite_reg: word = SPRITE_ENABLE
+
+    # Constants in calculations
+    total: word = SCREEN_WIDTH * SCREEN_HEIGHT
+    half: byte = MAX_VALUE / 2
+
+    # Print results
+    println("CONSTANTS:")
+    println(x)
+    println(total)
+    println(half)

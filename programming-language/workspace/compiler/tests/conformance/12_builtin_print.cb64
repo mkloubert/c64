@@ -1,0 +1,39 @@
+# Conformance Test: print/println Built-in Functions
+# Tests: print(), println() with various types
+# Expected: Compiles without errors, outputs correct values
+
+def main():
+    println("HELLO WORLD")  # println with string
+
+    # println with byte
+    x: byte = 42
+    println(x)
+
+    # println with word
+    w: word = 12345
+    println(w)
+
+    # println with literal
+    println(255)
+    println(1000)
+
+    # println with expression
+    println(10 + 20)
+
+    # Multiple println calls
+    println("LINE 1")
+    println("LINE 2")
+    println("LINE 3")
+
+    # println with empty string
+    println("")
+    println("AFTER EMPTY")
+
+    # println with escape sequences
+    println("TAB:\tHERE")
+    println("QUOTE: \"HI\"")
+
+    # print without newline (if supported)
+    print("NO ")
+    print("NEWLINE ")
+    println("END")

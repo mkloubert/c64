@@ -1,0 +1,45 @@
+# Conformance Test: All Literal Types
+# Tests: decimal, hex, binary integers, strings, chars, booleans
+# Expected: Compiles without errors, prints various literal values
+
+def main():
+    d1: byte = 0  # Decimal integer literals
+    d2: byte = 42
+    d3: byte = 255
+    d4: word = 1000
+    d5: word = 65535
+
+    # Hexadecimal literals (prefix $)
+    h1: byte = $00
+    h2: byte = $FF
+    h3: byte = $A5
+    h4: word = $0000
+    h5: word = $FFFF
+    h6: word = $C000
+
+    # Binary literals (prefix %)
+    b1: byte = %00000000
+    b2: byte = %11111111
+    b3: byte = %10101010
+    b4: byte = %01010101
+
+    # Boolean literals
+    t: bool = true
+    f: bool = false
+
+    # Character literals
+    c1: byte = 'A'
+    c2: byte = '0'
+    c3: byte = ' '
+    c4: byte = '\n'
+    c5: byte = '\\'
+
+    # String literals
+    println("HELLO WORLD")
+    println("")
+    println("WITH ESCAPES:\n\tTAB")
+
+    # Print some values
+    println(d2)
+    println(h3)
+    println(b3)

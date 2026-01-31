@@ -1,0 +1,9 @@
+---
+source: tests/snapshots_test.rs
+expression: error
+---
+error[E144]: 'break' can only be used inside a loop
+  --> break_outside_loop.cb64:3:5
+  |
+3 |     break
+  |     ^^^^^

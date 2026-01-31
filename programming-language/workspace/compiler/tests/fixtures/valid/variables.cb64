@@ -1,0 +1,7 @@
+# Variable declarations and operations
+def main():
+    x: byte = 10
+    y: byte = 20
+    z: byte = x + y
+    w: word = 1000
+    println(z)

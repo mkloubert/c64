@@ -1,0 +1,9 @@
+---
+source: tests/snapshots_test.rs
+expression: error
+---
+error[E222]: Function 'add' expects 2 arguments, but 1 were provided
+  --> wrong_argument_count.cb64:6:15
+  |
+6 |     x: byte = add(1)
+  |               ^^^^^^

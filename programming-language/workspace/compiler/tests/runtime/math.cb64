@@ -1,0 +1,11 @@
+# Runtime Test: Arithmetic Results
+# Expected output: Correct arithmetic results
+# Verify: 15, 12, 42, 25, 2
+
+def main():
+    cls()
+    println(10 + 5)
+    println(20 - 8)
+    println(6 * 7)
+    println(100 / 4)
+    println(17 % 5)
