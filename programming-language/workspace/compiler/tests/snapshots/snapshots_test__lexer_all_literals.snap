@@ -2,7 +2,6 @@
 source: tests/snapshots_test.rs
 expression: format_tokens(&tokens)
 ---
-Newline @ 19..20
 Def @ 20..23
 Identifier("main") @ 24..28
 LeftParen @ 28..29
@@ -28,7 +27,6 @@ Byte @ 100..104
 Equal @ 105..106
 Integer(170) @ 107..116
 Newline @ 116..117
-Newline @ 137..138
 Identifier("big") @ 142..145
 Colon @ 145..146
 Word @ 147..151
@@ -41,7 +39,6 @@ Word @ 173..177
 Equal @ 178..179
 Integer(43981) @ 180..185
 Newline @ 185..186
-Newline @ 209..210
 Identifier("yes") @ 214..217
 Colon @ 217..218
 Bool @ 219..223
@@ -54,7 +51,6 @@ Bool @ 239..243
 Equal @ 244..245
 False @ 246..251
 Newline @ 251..252
-Newline @ 274..275
 Identifier("println") @ 279..286
 LeftParen @ 286..287
 String("STRING") @ 287..295

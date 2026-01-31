@@ -32,7 +32,7 @@ use crate::ast::{
     VarDecl, WhileStatement,
 };
 use crate::error::{CompileError, ErrorCode, Span};
-use mos6510::{kernal, opcodes, petscii, zeropage};
+use mos6510::{c64, kernal, opcodes, petscii, zeropage};
 use std::collections::HashMap;
 
 /// Memory layout constants.
@@ -297,7 +297,9 @@ impl CodeGenerator {
         index
     }
 
-    /// Emit code to load a string address into TMP1/TMP1_HI.
+    /// Emit code to load a string address.
+    /// Sets A=low byte, X=high byte (consistent with other 16-bit values).
+    /// Also sets TMP1/TMP1_HI for print_str compatibility.
     /// The actual address will be patched later when string positions are known.
     fn emit_string_ref(&mut self, string_index: usize) {
         // LDA #<string_addr (placeholder)
@@ -309,14 +311,16 @@ impl CodeGenerator {
         self.emit_byte(opcodes::STA_ZP);
         self.emit_byte(zeropage::TMP1);
 
-        // LDA #>string_addr (placeholder)
-        self.emit_byte(opcodes::LDA_IMM);
+        // LDX #>string_addr (placeholder)
+        self.emit_byte(opcodes::LDX_IMM);
         let code_offset_hi = self.code.len();
         self.emit_byte(0); // Placeholder for high byte
 
-        // STA TMP1_HI
-        self.emit_byte(opcodes::STA_ZP);
+        // STX TMP1_HI
+        self.emit_byte(opcodes::STX_ZP);
         self.emit_byte(zeropage::TMP1_HI);
+
+        // A=low, X=high is now set (consistent with Word and String variables)
 
         // Record pending reference
         self.pending_string_refs.push(PendingStringRef {
@@ -479,6 +483,9 @@ impl CodeGenerator {
         // Print word routine
         self.emit_print_word_routine();
 
+        // Print bool routine
+        self.emit_print_bool_routine();
+
         // Multiply routines
         self.emit_multiply_byte_routine();
         self.emit_multiply_word_routine();
@@ -486,6 +493,9 @@ impl CodeGenerator {
         // Divide routines
         self.emit_divide_byte_routine();
         self.emit_divide_word_routine();
+
+        // Input routine
+        self.emit_readln_routine();
     }
 
     /// Emit print string routine.
@@ -580,16 +590,179 @@ impl CodeGenerator {
         self.emit_byte(opcodes::RTS);
     }
 
-    /// Emit print word routine (simplified).
+    /// Emit print word routine.
+    /// Input: A = low byte, X = high byte of 16-bit value
+    /// Prints the decimal value (0-65535) without leading zeros.
     fn emit_print_word_routine(&mut self) {
         self.define_label("__print_word");
         self.runtime_addresses
             .insert("print_word".to_string(), self.current_address);
 
-        // For now, just print low byte
-        // A proper implementation would handle full 16-bit
-        self.emit_jsr_label("__print_byte");
+        // Store the 16-bit value in TMP1 (low) and TMP1_HI (high)
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::STX_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
 
+        // If high byte is 0, just print as byte
+        self.emit_byte(opcodes::CPX_IMM);
+        self.emit_byte(0);
+        self.emit_branch(opcodes::BNE, "__pw_full");
+        self.emit_jsr_label("__print_byte");
+        self.emit_byte(opcodes::RTS);
+
+        // Full 16-bit printing needed
+        self.define_label("__pw_full");
+
+        // Use TMP3 as "started printing" flag (0 = no digits yet)
+        self.emit_imm(opcodes::LDA_IMM, 0);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP3);
+
+        // Divide by 10000 (0x2710)
+        self.emit_imm(opcodes::LDA_IMM, 0x10); // low byte of 10000
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_imm(opcodes::LDA_IMM, 0x27); // high byte of 10000
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+        self.emit_jsr_label("__pw_digit");
+
+        // Divide by 1000 (0x03E8)
+        self.emit_imm(opcodes::LDA_IMM, 0xE8);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_imm(opcodes::LDA_IMM, 0x03);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+        self.emit_jsr_label("__pw_digit");
+
+        // Divide by 100 (0x0064)
+        self.emit_imm(opcodes::LDA_IMM, 0x64);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_imm(opcodes::LDA_IMM, 0x00);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+        self.emit_jsr_label("__pw_digit");
+
+        // Divide by 10 (0x000A)
+        self.emit_imm(opcodes::LDA_IMM, 0x0A);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_imm(opcodes::LDA_IMM, 0x00);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+        self.emit_jsr_label("__pw_digit");
+
+        // Print final digit (ones place, always print)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::CLC);
+        self.emit_imm(opcodes::ADC_IMM, b'0');
+        self.emit_abs(opcodes::JSR, kernal::CHROUT);
+
+        self.emit_byte(opcodes::RTS);
+
+        // Subroutine: divide TMP1/TMP1_HI by TMP2/TMP2_HI, print digit if non-zero or started
+        self.define_label("__pw_digit");
+        self.emit_imm(opcodes::LDX_IMM, 0); // X = quotient digit
+
+        self.define_label("__pw_digit_loop");
+        // Compare TMP1/TMP1_HI >= TMP2/TMP2_HI
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_byte(opcodes::CMP_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+        self.emit_branch(opcodes::BCC, "__pw_digit_done"); // high < divisor high, done
+        self.emit_branch(opcodes::BNE, "__pw_digit_sub");  // high > divisor high, subtract
+
+        // High bytes equal, compare low bytes
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::CMP_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_branch(opcodes::BCC, "__pw_digit_done"); // low < divisor low, done
+
+        // Subtract divisor from value
+        self.define_label("__pw_digit_sub");
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+
+        // Increment quotient
+        self.emit_byte(opcodes::INX);
+        self.emit_jmp("__pw_digit_loop");
+
+        self.define_label("__pw_digit_done");
+        // X = digit value. Print if X != 0 or TMP3 != 0 (already started)
+        self.emit_byte(opcodes::CPX_IMM);
+        self.emit_byte(0);
+        self.emit_branch(opcodes::BNE, "__pw_digit_print");
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_branch(opcodes::BEQ, "__pw_digit_skip"); // skip leading zero
+
+        self.define_label("__pw_digit_print");
+        self.emit_byte(opcodes::TXA);
+        self.emit_byte(opcodes::CLC);
+        self.emit_imm(opcodes::ADC_IMM, b'0');
+        self.emit_abs(opcodes::JSR, kernal::CHROUT);
+        // Mark that we've started printing
+        self.emit_imm(opcodes::LDA_IMM, 1);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP3);
+
+        self.define_label("__pw_digit_skip");
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit print bool routine.
+    /// Input: A = bool value (0 = false, non-zero = true)
+    /// Prints "TRUE" or "FALSE".
+    fn emit_print_bool_routine(&mut self) {
+        self.define_label("__print_bool");
+        self.runtime_addresses
+            .insert("print_bool".to_string(), self.current_address);
+
+        // Check if A is zero (false) or non-zero (true)
+        self.emit_byte(opcodes::CMP_IMM);
+        self.emit_byte(0);
+        self.emit_branch(opcodes::BEQ, "__pb_false");
+
+        // Print "TRUE"
+        self.emit_imm(opcodes::LDA_IMM, b'T');
+        self.emit_abs(opcodes::JSR, kernal::CHROUT);
+        self.emit_imm(opcodes::LDA_IMM, b'R');
+        self.emit_abs(opcodes::JSR, kernal::CHROUT);
+        self.emit_imm(opcodes::LDA_IMM, b'U');
+        self.emit_abs(opcodes::JSR, kernal::CHROUT);
+        self.emit_imm(opcodes::LDA_IMM, b'E');
+        self.emit_abs(opcodes::JSR, kernal::CHROUT);
+        self.emit_byte(opcodes::RTS);
+
+        // Print "FALSE"
+        self.define_label("__pb_false");
+        self.emit_imm(opcodes::LDA_IMM, b'F');
+        self.emit_abs(opcodes::JSR, kernal::CHROUT);
+        self.emit_imm(opcodes::LDA_IMM, b'A');
+        self.emit_abs(opcodes::JSR, kernal::CHROUT);
+        self.emit_imm(opcodes::LDA_IMM, b'L');
+        self.emit_abs(opcodes::JSR, kernal::CHROUT);
+        self.emit_imm(opcodes::LDA_IMM, b'S');
+        self.emit_abs(opcodes::JSR, kernal::CHROUT);
+        self.emit_imm(opcodes::LDA_IMM, b'E');
+        self.emit_abs(opcodes::JSR, kernal::CHROUT);
         self.emit_byte(opcodes::RTS);
     }
 
@@ -726,6 +899,58 @@ impl CodeGenerator {
 
         // Simplified: just do byte divide
         self.emit_jsr_label("__div_byte");
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit readln routine.
+    /// Uses KERNAL CHRIN ($FFCF) which handles cursor, echo, and line editing.
+    /// Stores input in INPUT_BUFFER ($C100), null-terminated.
+    /// Returns string address in A (low) and X (high).
+    fn emit_readln_routine(&mut self) {
+        self.define_label("__readln");
+        self.runtime_addresses
+            .insert("readln".to_string(), self.current_address);
+
+        // Initialize buffer index to 0 (stored in TMP3 since CHRIN may clobber Y)
+        self.emit_imm(opcodes::LDA_IMM, 0);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP3);
+
+        // Loop: get characters using CHRIN (handles cursor, echo, editing)
+        self.define_label("__readln_loop");
+        self.emit_abs(opcodes::JSR, kernal::CHRIN); // CHRIN at $FFCF
+
+        // Check for RETURN (end of input)
+        self.emit_byte(opcodes::CMP_IMM);
+        self.emit_byte(petscii::RETURN);
+        self.emit_branch(opcodes::BEQ, "__readln_done");
+
+        // Load buffer index into Y and store character
+        self.emit_byte(opcodes::LDY_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_abs(opcodes::STA_ABY, c64::INPUT_BUFFER);
+
+        // Increment index and save back to TMP3
+        self.emit_byte(opcodes::INY);
+        self.emit_byte(opcodes::STY_ZP);
+        self.emit_byte(zeropage::TMP3);
+
+        // Continue loop (with overflow protection)
+        self.emit_byte(opcodes::CPY_IMM);
+        self.emit_byte(255);
+        self.emit_branch(opcodes::BCC, "__readln_loop");
+
+        // Done: null-terminate
+        self.define_label("__readln_done");
+        self.emit_byte(opcodes::LDY_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_imm(opcodes::LDA_IMM, 0);
+        self.emit_abs(opcodes::STA_ABY, c64::INPUT_BUFFER); // Null terminator
+
+        // Return buffer address in A (low) and X (high)
+        self.emit_imm(opcodes::LDA_IMM, (c64::INPUT_BUFFER & 0xFF) as u8);
+        self.emit_imm(opcodes::LDX_IMM, (c64::INPUT_BUFFER >> 8) as u8);
+
         self.emit_byte(opcodes::RTS);
     }
 
@@ -1546,12 +1771,21 @@ impl CodeGenerator {
                     // Call appropriate print routine based on type
                     match arg_type {
                         Type::String => {
+                            // For string variables, copy A/X to TMP1/TMP1_HI
+                            // (String literals already set TMP1/TMP1_HI, this is safe)
+                            self.emit_byte(opcodes::STA_ZP);
+                            self.emit_byte(zeropage::TMP1);
+                            self.emit_byte(opcodes::STX_ZP);
+                            self.emit_byte(zeropage::TMP1_HI);
                             self.emit_jsr_label("__print_str");
                         }
                         Type::Word => {
                             self.emit_jsr_label("__print_word");
                         }
-                        Type::Byte | Type::Bool | Type::Sbyte => {
+                        Type::Bool => {
+                            self.emit_jsr_label("__print_bool");
+                        }
+                        Type::Byte | Type::Sbyte => {
                             self.emit_jsr_label("__print_byte");
                         }
                         _ => {
@@ -1567,11 +1801,12 @@ impl CodeGenerator {
             }
             "cursor" => {
                 if args.len() >= 2 {
-                    // X position
-                    self.generate_expression(&args[0])?;
+                    // KERNAL PLOT expects: X=Row, Y=Column
+                    // Our API: cursor(x=column, y=row)
+                    // So we need: Y=args[0] (column), X=args[1] (row)
+                    self.generate_expression(&args[1])?; // row -> X
                     self.emit_byte(opcodes::TAX);
-                    // Y position
-                    self.generate_expression(&args[1])?;
+                    self.generate_expression(&args[0])?; // column -> Y
                     self.emit_byte(opcodes::TAY);
                     // Call PLOT with carry clear (set position)
                     self.emit_byte(opcodes::CLC);
@@ -1590,27 +1825,23 @@ impl CodeGenerator {
                 self.emit_branch(opcodes::BEQ, &wait_label);
             }
             "readln" => {
-                // Simple input routine - read until RETURN
-                // For now, just wait for a key
-                let read_label = self.make_label("readln");
-                self.define_label(&read_label);
-                self.emit_abs(opcodes::JSR, kernal::GETIN);
-                self.emit_byte(opcodes::CMP_IMM);
-                self.emit_byte(petscii::RETURN);
-                self.emit_branch(opcodes::BNE, &read_label);
+                // Read a line of input into buffer at INPUT_BUFFER ($C100)
+                // Returns string address in TMP1/TMP1_HI (for print_str compatibility)
+                self.emit_jsr_label("__readln");
             }
             "poke" => {
                 if args.len() >= 2 {
                     // Value to poke
                     self.generate_expression(&args[1])?;
                     self.emit_byte(opcodes::PHA);
-                    // Address
+                    // Address (A=low, X=high for word values)
+                    // First set X to 0 as default for byte addresses
+                    self.emit_imm(opcodes::LDX_IMM, 0);
                     self.generate_expression(&args[0])?;
+                    // Store address (A=low byte, X=high byte)
                     self.emit_byte(opcodes::STA_ZP);
                     self.emit_byte(zeropage::TMP1);
-                    // High byte of address (if word)
-                    self.emit_imm(opcodes::LDA_IMM, 0);
-                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(opcodes::STX_ZP);
                     self.emit_byte(zeropage::TMP1_HI);
                     // Store value
                     self.emit_byte(opcodes::PLA);
@@ -1621,12 +1852,14 @@ impl CodeGenerator {
             }
             "peek" => {
                 if !args.is_empty() {
-                    // Address
+                    // Address (A=low, X=high for word values)
+                    // First set X to 0 as default for byte addresses
+                    self.emit_imm(opcodes::LDX_IMM, 0);
                     self.generate_expression(&args[0])?;
+                    // Store address (A=low byte, X=high byte)
                     self.emit_byte(opcodes::STA_ZP);
                     self.emit_byte(zeropage::TMP1);
-                    self.emit_imm(opcodes::LDA_IMM, 0);
-                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(opcodes::STX_ZP);
                     self.emit_byte(zeropage::TMP1_HI);
                     // Load value
                     self.emit_imm(opcodes::LDY_IMM, 0);
@@ -1656,13 +1889,14 @@ impl CodeGenerator {
         Ok(())
     }
 
-    /// Emit code to load a value from an address into A.
+    /// Emit code to load a value from an address into A (and X for 16-bit types).
     fn emit_load_from_address(&mut self, address: u16, var_type: &Type) {
         match var_type {
             Type::Byte | Type::Sbyte | Type::Bool => {
                 self.emit_abs(opcodes::LDA_ABS, address);
             }
-            Type::Word | Type::Sword => {
+            Type::Word | Type::Sword | Type::String => {
+                // String is a 16-bit pointer, same as Word
                 self.emit_abs(opcodes::LDA_ABS, address);
                 self.emit_abs(opcodes::LDX_ABS, address.wrapping_add(1));
             }
@@ -1673,13 +1907,14 @@ impl CodeGenerator {
         }
     }
 
-    /// Emit code to store A to an address.
+    /// Emit code to store A (and X for 16-bit types) to an address.
     fn emit_store_to_address(&mut self, address: u16, var_type: &Type) {
         match var_type {
             Type::Byte | Type::Sbyte | Type::Bool => {
                 self.emit_abs(opcodes::STA_ABS, address);
             }
-            Type::Word | Type::Sword => {
+            Type::Word | Type::Sword | Type::String => {
+                // String is a 16-bit pointer, same as Word
                 self.emit_abs(opcodes::STA_ABS, address);
                 self.emit_byte(opcodes::STX_ABS);
                 self.emit_word(address.wrapping_add(1));

@@ -212,9 +212,15 @@ impl<'source> Lexer<'source> {
                     return self.next_token();
                 }
                 '#' => {
-                    // Comment line, skip indentation handling
-                    self.at_line_start = false;
+                    // Comment-only line - skip entire line (comment + trailing newline)
+                    // This makes comment lines "invisible" to the token stream
                     self.skip_comment();
+                    // Consume the newline at end of line (if present)
+                    // Note: advance() on '\n' sets at_line_start = true automatically
+                    if self.peek() == Some('\n') {
+                        self.advance();
+                    }
+                    // Continue to next line
                     return self.next_token();
                 }
                 _ => break,

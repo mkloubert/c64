@@ -1,4 +1,8 @@
+# Top-Level comment
+
 def main():
+    # first line in block comment
     cls()
-    a: byte = 42 + 1
+    a: byte = 42 + 2  # inline comment
     println(a)
+    # last line comment

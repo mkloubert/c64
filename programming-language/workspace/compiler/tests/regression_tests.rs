@@ -129,18 +129,20 @@ def main():
     );
 }
 
-/// Verify that comment-first-line still fails (documents known bug).
-/// When this test starts failing, the bug has been fixed!
+/// BUG-007: Comments as first line in block now work correctly.
+/// Previously this caused "Expected indented block, found NEWLINE" error.
+/// Fixed by treating comment-only lines as invisible (like empty lines).
 #[test]
-fn test_known_bug_comment_first_line_fails() {
+fn test_bug_007_comment_first_line_fixed() {
     let source = r#"def main():
-    # This comment as first line causes the bug
+    # This comment as first line used to cause the bug
     x: byte = 1
 "#;
     let result = cobra64::compile(source);
     assert!(
-        result.is_err(),
-        "Comment-first-line bug appears to be fixed! Update regression test."
+        result.is_ok(),
+        "Comment-first-line should work now: {:?}",
+        result.err()
     );
 }
 

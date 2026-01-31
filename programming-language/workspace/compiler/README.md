@@ -323,9 +323,15 @@ def print_result(val: byte):
 Comments start with `#` and continue to the end of the line:
 
 ```python
-# This is a comment
+# Top-level comment
+# Multiple lines work too
+
 def main():
+    # Comment as first line in block
     x: byte = 10  # Inline comment
+
+    # Comments anywhere in the code
+    println(x)
 ```
 
 ---
@@ -382,7 +388,8 @@ def main():
 Both `print` and `println` accept:
 
 - Strings: `println("HELLO")`
-- Numbers: `println(42)`
+- Numbers: `println(42)` (byte or word)
+- Booleans: `println(flag)` (prints "TRUE" or "FALSE")
 - Variables: `println(score)`
 
 ### Input Functions
@@ -584,16 +591,9 @@ def main():
            # ...
    ```
 
-2. **Comments after function definition** - Put comments inline or after the first statement:
+2. **Deep nesting limit** - The 6510 CPU has a ~127 byte branch range. Very deep nesting (more than 4-5 levels) may fail to compile.
 
-   ```python
-   def foo():
-       pass  # Comment here is OK
-   ```
-
-3. **Deep nesting limit** - The 6510 CPU has a ~127 byte branch range. Very deep nesting (more than 4-5 levels) may fail to compile.
-
-4. **Signed type comparisons** - Signed types (`sbyte`, `sword`) have limited comparison support. Use unsigned types when possible.
+3. **Signed type comparisons** - Signed types (`sbyte`, `sword`) have limited comparison support. Use unsigned types when possible.
 
 ### Platform Constraints
 

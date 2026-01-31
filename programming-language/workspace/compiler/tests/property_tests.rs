@@ -248,8 +248,10 @@ proptest! {
 
         if let Ok(code) = cobra64::compile(&source) {
             // Each variable should add roughly 5-15 bytes
+            // Base size increased to account for full runtime library
+            // (print_word 16-bit support, print_bool TRUE/FALSE output)
             let min_expected = 20 + count * 5;
-            let max_expected = 200 + count * 50;
+            let max_expected = 400 + count * 50;
 
             prop_assert!(
                 code.len() >= min_expected,

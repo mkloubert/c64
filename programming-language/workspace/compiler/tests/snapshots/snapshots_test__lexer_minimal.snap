@@ -2,7 +2,6 @@
 source: tests/snapshots_test.rs
 expression: format_tokens(&tokens)
 ---
-Newline @ 23..24
 Def @ 24..27
 Identifier("main") @ 28..32
 LeftParen @ 32..33

@@ -2,7 +2,6 @@
 source: tests/snapshots_test.rs
 expression: format_tokens(&tokens)
 ---
-Newline @ 15..16
 Def @ 16..19
 Identifier("main") @ 20..24
 LeftParen @ 24..25
@@ -22,7 +21,6 @@ Byte @ 52..56
 Equal @ 57..58
 Integer(3) @ 59..60
 Newline @ 60..61
-Newline @ 78..79
 Identifier("add") @ 83..86
 Colon @ 86..87
 Byte @ 88..92
@@ -63,7 +61,6 @@ Identifier("a") @ 183..184
 Percent @ 185..186
 Identifier("b") @ 187..188
 Newline @ 188..189
-Newline @ 206..207
 Identifier("eq") @ 211..213
 Colon @ 213..214
 Bool @ 215..219
@@ -112,7 +109,6 @@ Identifier("a") @ 330..331
 GreaterEqual @ 332..334
 Identifier("b") @ 335..336
 Newline @ 336..337
-Newline @ 351..352
 Identifier("land") @ 356..360
 Colon @ 360..361
 Bool @ 362..366
@@ -136,7 +132,6 @@ Equal @ 429..430
 Not @ 431..434
 True @ 435..439
 Newline @ 439..440
-Newline @ 454..455
 Identifier("band") @ 459..463
 Colon @ 463..464
 Byte @ 465..469

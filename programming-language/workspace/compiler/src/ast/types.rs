@@ -45,7 +45,7 @@ impl Type {
         match self {
             Type::Byte | Type::Sbyte | Type::Bool => 1,
             Type::Word | Type::Sword => 2,
-            Type::String => 256, // Maximum string size
+            Type::String => 2, // String variable stores a 16-bit pointer
             Type::ByteArray(Some(n)) => *n as usize,
             Type::ByteArray(None) => 0, // Unknown size
             Type::WordArray(Some(n)) => (*n as usize) * 2,
@@ -153,7 +153,7 @@ mod tests {
         assert_eq!(Type::Bool.size(), 1);
         assert_eq!(Type::Sbyte.size(), 1);
         assert_eq!(Type::Sword.size(), 2);
-        assert_eq!(Type::String.size(), 256);
+        assert_eq!(Type::String.size(), 2); // Pointer size
         assert_eq!(Type::Void.size(), 0);
     }
 

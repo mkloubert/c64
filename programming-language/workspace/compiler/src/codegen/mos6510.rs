@@ -299,15 +299,19 @@ pub mod c64 {
 
     /// Number of characters in keyboard buffer.
     pub const KEYBOARD_BUFFER_LEN: u16 = 0x00C6;
+
+    /// Input buffer for readln (256 bytes at $C100).
+    pub const INPUT_BUFFER: u16 = 0xC100;
 }
 
 /// Zero page locations for temporary storage.
-/// We use locations $FB-$FE which are free for user programs.
+/// We use $22-$23 for string pointer (BASIC text pointer, safe in ML).
+/// $FB-$FE may be used by KERNAL CHROUT!
 #[allow(dead_code)]
 pub mod zeropage {
-    /// Temporary storage 1 (word).
-    pub const TMP1: u8 = 0xFB;
-    pub const TMP1_HI: u8 = 0xFC;
+    /// Temporary storage 1 (word) - using $22/$23 instead of $FB/$FC.
+    pub const TMP1: u8 = 0x22;
+    pub const TMP1_HI: u8 = 0x23;
 
     /// Temporary storage 2 (word).
     pub const TMP2: u8 = 0xFD;
