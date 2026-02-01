@@ -31,7 +31,7 @@ fn test_all_conformance_files_compile() {
         .expect("Failed to read conformance directory")
         .filter_map(|e| e.ok())
         .map(|e| e.path())
-        .filter(|p| p.extension().map_or(false, |e| e == "cb64"))
+        .filter(|p| p.extension().is_some_and(|e| e == "cb64"))
         .collect();
 
     files.sort();
@@ -202,7 +202,7 @@ fn test_conformance_generates_valid_prg() {
     let load_addr = u16::from_le_bytes([code[0], code[1]]);
     // Load address should be in the BASIC/program area ($0801-$9FFF)
     assert!(
-        load_addr >= 0x0801 && load_addr <= 0x9FFF,
+        (0x0801..=0x9FFF).contains(&load_addr),
         "Load address ${:04X} should be in valid C64 program area",
         load_addr
     );

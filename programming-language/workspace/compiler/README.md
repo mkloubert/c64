@@ -1316,6 +1316,130 @@ The generated PRG and D64 files should work with any C64 emulator that supports 
 
 ---
 
+## Compiler Architecture
+
+The Cobra64 compiler is written in Rust and organized into focused modules following best practices for maintainability. The codebase uses the **Extension Trait Pattern** to split large modules into smaller, cohesive files while maintaining a unified API.
+
+### Module Overview
+
+```
+src/
+├── lib.rs              # Public API entry point
+├── error.rs            # Error types and spans
+├── ast/                # Abstract Syntax Tree
+│   ├── mod.rs          # Re-exports
+│   ├── expr.rs         # Expression nodes
+│   ├── stmt.rs         # Statement nodes
+│   └── types.rs        # Type definitions
+├── lexer/              # Tokenization
+│   ├── mod.rs          # Main lexer logic
+│   ├── tokens.rs       # Token definitions
+│   ├── helpers.rs      # Character navigation
+│   ├── numbers.rs      # Number literal scanning
+│   ├── strings.rs      # String/char scanning
+│   ├── identifiers.rs  # Identifier/keyword scanning
+│   ├── operators.rs    # Operator scanning
+│   └── indentation.rs  # INDENT/DEDENT handling
+├── parser/             # Syntax Analysis
+│   ├── mod.rs          # Entry point, parse()
+│   ├── blocks.rs       # Block/function parsing (BlockParser trait)
+│   ├── control_flow.rs # If/while/for parsing (ControlFlowParser trait)
+│   ├── expressions.rs  # Expression parsing (ExpressionParser trait)
+│   ├── helpers.rs      # Token navigation (ParserHelpers trait)
+│   ├── statements.rs   # Statement parsing (StatementParser trait)
+│   └── types.rs        # Type parsing (TypeParser trait)
+├── analyzer/           # Semantic Analysis
+│   ├── mod.rs          # Entry point, analyze()
+│   ├── builtins.rs     # Built-in functions (BuiltinRegistry trait)
+│   ├── context.rs      # Analysis context state
+│   ├── control_flow.rs # Control flow analysis (ControlFlowAnalyzer trait)
+│   ├── expressions.rs  # Expression analysis (ExpressionAnalyzer trait)
+│   ├── functions.rs    # Function analysis (FunctionAnalyzer trait)
+│   ├── operators.rs    # Operator checking (OperatorChecker trait)
+│   ├── scope.rs        # Scope management
+│   ├── statements.rs   # Statement analysis (StatementAnalyzer trait)
+│   ├── symbol.rs       # Symbol definitions
+│   ├── symbol_table.rs # Symbol table with nested scopes
+│   └── type_check.rs   # Type inference/checking (TypeChecker trait)
+└── codegen/            # Code Generation
+    ├── mod.rs          # Entry point, generate()
+    ├── assignments.rs  # Assignment generation (AssignmentEmitter trait)
+    ├── binary_ops.rs   # Binary operations (BinaryOpsEmitter trait)
+    ├── comparisons.rs  # Comparison helpers
+    ├── constants.rs    # Memory layout constants
+    ├── control_flow.rs # Control flow generation (ControlFlowEmitter trait)
+    ├── conversions.rs  # Type conversions (TypeConversions trait)
+    ├── declarations.rs # Declaration generation (DeclarationEmitter trait)
+    ├── emit.rs         # Byte emission helpers
+    ├── expressions.rs  # Expression generation (ExpressionEmitter trait)
+    ├── float_runtime.rs # Float operations runtime
+    ├── functions.rs    # Function call generation (FunctionCallEmitter trait)
+    ├── labels.rs       # Label management
+    ├── mos6510.rs      # 6510 instruction encoding
+    ├── runtime.rs      # Runtime library
+    ├── strings.rs      # String handling
+    ├── type_inference.rs # Type inference (TypeInference trait)
+    ├── types.rs        # Type conversions
+    ├── unary_ops.rs    # Unary operations (UnaryOpsEmitter trait)
+    └── variables.rs    # Variable allocation
+```
+
+### Compilation Pipeline
+
+```
+Source Code (.cb64)
+       │
+       ▼
+   ┌───────┐
+   │ Lexer │  Tokenizes source into tokens
+   └───┬───┘
+       │
+       ▼
+   ┌────────┐
+   │ Parser │  Builds Abstract Syntax Tree
+   └───┬────┘
+       │
+       ▼
+   ┌──────────┐
+   │ Analyzer │  Type checking, semantic analysis
+   └────┬─────┘
+        │
+        ▼
+   ┌─────────┐
+   │ Codegen │  Generates 6510 machine code
+   └────┬────┘
+        │
+        ▼
+    PRG/D64 File
+```
+
+### Key Design Patterns
+
+- **Extension Trait Pattern**: Each submodule defines a trait (e.g., `ExpressionParser`, `TypeChecker`) implemented for the main struct (`Parser`, `Analyzer`, `CodeGenerator`). This enables:
+  - Clean separation of concerns into focused files
+  - Methods available via `self.method()` across all trait modules
+  - Cross-module method calls through the shared receiver type
+  - Easy maintenance with smaller, cohesive modules
+
+  Example:
+
+  ```rust
+  // In expressions.rs
+  pub trait ExpressionParser {
+      fn parse_expression(&mut self) -> Result<Expr, CompileError>;
+  }
+  impl<'a> ExpressionParser for Parser<'a> { ... }
+
+  // In mod.rs - import trait to make methods available
+  use expressions::ExpressionParser;
+  ```
+
+- **Visitor Pattern**: AST traversal is separated from operations, making it easy to add new analysis or transformation passes.
+
+- **Single Responsibility**: Each module has a clear, focused purpose with ~100-500 lines of code. Large modules are split when they exceed ~600 lines.
+
+---
+
 ## License
 
 Cobra64 - A concept for a modern Python-like compiler creating C64 binaries

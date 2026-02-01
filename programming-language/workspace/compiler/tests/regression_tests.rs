@@ -66,9 +66,8 @@ fn assert_compiles(filename: &str) {
 /// Check that a regression test file fails to compile (for known bugs).
 #[allow(dead_code)]
 fn assert_fails_to_compile(filename: &str) {
-    match compile_regression_test(filename) {
-        Ok(_) => panic!("{} should fail to compile but succeeded", filename),
-        Err(_) => {}
+    if compile_regression_test(filename).is_ok() {
+        panic!("{} should fail to compile but succeeded", filename);
     }
 }
 
@@ -191,7 +190,7 @@ fn test_all_regression_files_compile() {
         .expect("Failed to read regression directory")
         .filter_map(|e| e.ok())
         .map(|e| e.path())
-        .filter(|p| p.extension().map_or(false, |e| e == "cb64"))
+        .filter(|p| p.extension().is_some_and(|e| e == "cb64"))
         .collect();
 
     assert!(!files.is_empty(), "No regression test files found");

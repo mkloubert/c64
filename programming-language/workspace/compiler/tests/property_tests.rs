@@ -221,7 +221,7 @@ proptest! {
 
             let load_addr = u16::from_le_bytes([code[0], code[1]]);
             prop_assert!(
-                load_addr >= 0x0801 && load_addr <= 0x9FFF,
+                (0x0801..=0x9FFF).contains(&load_addr),
                 "Load address ${:04X} out of valid range", load_addr
             );
         }

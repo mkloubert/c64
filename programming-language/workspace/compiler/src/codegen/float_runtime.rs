@@ -50,6 +50,8 @@
 //! - $22-$23: FP_ARG1 (first operand)
 //! - $FD-$FE: Additional temp space
 
+use super::emit::EmitHelpers;
+use super::labels::LabelManager;
 use super::mos6510::{opcodes, zeropage};
 use super::CodeGenerator;
 

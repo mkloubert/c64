@@ -61,7 +61,7 @@ fn test_runtime_files_compile() {
         .expect("Failed to read runtime directory")
         .filter_map(|e| e.ok())
         .map(|e| e.path())
-        .filter(|p| p.extension().map_or(false, |e| e == "cb64"))
+        .filter(|p| p.extension().is_some_and(|e| e == "cb64"))
         .collect();
 
     assert!(!files.is_empty(), "No runtime test files found");
@@ -89,7 +89,7 @@ fn test_runtime_expected_files_exist() {
         .expect("Failed to read runtime directory")
         .filter_map(|e| e.ok())
         .map(|e| e.path())
-        .filter(|p| p.extension().map_or(false, |e| e == "cb64"))
+        .filter(|p| p.extension().is_some_and(|e| e == "cb64"))
         .collect();
 
     for path in &cb64_files {
@@ -114,7 +114,7 @@ fn test_runtime_prg_structure() {
     // Check load address is valid
     let load_addr = u16::from_le_bytes([code[0], code[1]]);
     assert!(
-        load_addr >= 0x0801 && load_addr <= 0x9FFF,
+        (0x0801..=0x9FFF).contains(&load_addr),
         "Invalid load address: ${:04X}",
         load_addr
     );

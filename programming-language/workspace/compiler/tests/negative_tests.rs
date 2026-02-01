@@ -567,7 +567,7 @@ fn test_all_invalid_fixtures_fail() {
         let entry = entry.unwrap();
         let path = entry.path();
 
-        if path.extension().map_or(false, |e| e == "cb64") {
+        if path.extension().is_some_and(|e| e == "cb64") {
             let source = std::fs::read_to_string(&path).unwrap();
             let result = cobra64::compile(&source);
 
@@ -589,7 +589,7 @@ fn test_all_valid_fixtures_compile() {
         let entry = entry.unwrap();
         let path = entry.path();
 
-        if path.extension().map_or(false, |e| e == "cb64") {
+        if path.extension().is_some_and(|e| e == "cb64") {
             let source = std::fs::read_to_string(&path).unwrap();
             let result = cobra64::compile(&source);
 
