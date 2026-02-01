@@ -179,9 +179,10 @@ struct Variable {
 struct Function {
     /// Address where the function code starts.
     address: u16,
-    /// Parameter types (reserved for future use).
-    #[allow(dead_code)]
+    /// Parameter types.
     params: Vec<Type>,
+    /// Parameter addresses (memory locations for each parameter).
+    param_addresses: Vec<u16>,
     /// Return type (reserved for future use).
     #[allow(dead_code)]
     return_type: Option<Type>,
@@ -489,12 +490,19 @@ impl CodeGenerator {
         for item in &program.items {
             match item {
                 TopLevelItem::Function(func) => {
-                    // We'll set the address when we emit the function
+                    // Allocate parameter addresses and register function
+                    let mut param_addresses = Vec::new();
+                    for param in &func.params {
+                        let addr =
+                            self.allocate_variable(&param.name, &param.param_type, false);
+                        param_addresses.push(addr);
+                    }
                     self.functions.insert(
                         func.name.clone(),
                         Function {
                             address: 0,
                             params: func.params.iter().map(|p| p.param_type.clone()).collect(),
+                            param_addresses,
                             return_type: func.return_type.clone(),
                         },
                     );
@@ -2061,10 +2069,8 @@ impl CodeGenerator {
             f.address = self.current_address;
         }
 
-        // Allocate local variables for parameters
-        for param in &func.params {
-            self.allocate_variable(&param.name, &param.param_type, false);
-        }
+        // Note: Parameters are already allocated in the first pass.
+        // The variables table already contains entries for parameter names.
 
         // Generate function body
         self.generate_block(&func.body)?;
@@ -3973,13 +3979,21 @@ impl CodeGenerator {
             }
             _ => {
                 // User-defined function
-                // Push arguments (simplified: just first arg in A)
-                for arg in args {
-                    self.generate_expression(arg)?;
-                    // For multiple args, we'd need to push to stack or use memory
-                }
-                // Call function
-                if self.functions.contains_key(name) {
+                if let Some(func_info) = self.functions.get(name).cloned() {
+                    // Store arguments in parameter memory locations
+                    for (i, arg) in args.iter().enumerate() {
+                        if i < func_info.param_addresses.len() {
+                            let param_type = &func_info.params[i];
+                            let param_addr = func_info.param_addresses[i];
+
+                            // Generate the argument value (result in A, or A/X for 16-bit)
+                            self.generate_expression(arg)?;
+
+                            // Store the value at the parameter address
+                            self.emit_store_to_address(param_addr, param_type);
+                        }
+                    }
+                    // Call function
                     self.emit_jsr_label(name);
                 } else {
                     return Err(CompileError::new(
