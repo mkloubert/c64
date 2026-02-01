@@ -231,7 +231,7 @@ mod tests {
         let value = Expr::new(ExprKind::IntegerLiteral(100), Span::new(12, 15));
         let decl = ConstDecl::new("MAX".to_string(), value, span);
         let item = TopLevelItem::Constant(decl);
-        assert_eq!(format!("{}", item), "const MAX = 100");
+        assert_eq!(format!("{}", item), "MAX = 100");
     }
 
     #[test]
@@ -257,7 +257,7 @@ mod tests {
         program.add_item(TopLevelItem::Function(func));
 
         let output = format!("{}", program);
-        assert!(output.contains("const MAX = 255"));
+        assert!(output.contains("MAX = 255"));
         assert!(output.contains("def main():"));
     }
 }

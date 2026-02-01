@@ -1,0 +1,33 @@
+# Cobra64 - Bool array operations test
+# Tests: boolean array operations
+
+def main():
+    # Bool array with initializer
+    flags: bool[] = [true, false, true, false, true]
+
+    # Read bool elements
+    a: bool = flags[0]
+    b: bool = flags[1]
+    c: bool = flags[4]
+
+    # Write bool elements
+    flags[1] = true
+    flags[3] = true
+
+    # Sized bool array
+    bits: bool[8]
+    bits[0] = true
+    bits[7] = false
+
+    # All false (zero optimization)
+    alloff: bool[] = [false, false, false, false]
+
+    # All true
+    allon: bool[] = [true, true, true, true]
+
+    # Bool array in conditionals
+    i: byte = 0
+    while i < 5:
+        if flags[i]:
+            x: byte = 1
+        i = i + 1

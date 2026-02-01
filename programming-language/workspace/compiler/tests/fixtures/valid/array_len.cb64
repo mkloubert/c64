@@ -1,0 +1,36 @@
+# Cobra64 - Array length function test fixture
+# Tests the len() built-in function
+
+def main():
+    # len() on byte array
+    data: byte[] = [10, 20, 30, 40, 50]
+    size1: word = len(data)
+
+    # len() on word array
+    scores: word[] = [1000, 2000, 3000]
+    size2: word = len(scores)
+
+    # len() on bool array
+    flags: bool[] = [true, false, true, false]
+    size3: word = len(flags)
+
+    # len() on signed arrays
+    temps: sbyte[] = [-10, 0, 10]
+    size4: word = len(temps)
+
+    offsets: sword[] = [-500, 500]
+    size5: word = len(offsets)
+
+    # len() on sized array
+    buffer: byte[100]
+    size6: word = len(buffer)
+
+    # len() in loop condition
+    arr: byte[] = [1, 2, 3, 4, 5]
+    i: byte = 0
+    while i < len(arr):
+        x: byte = arr[i]
+        i = i + 1
+
+    # len() with print
+    println(len(data))

@@ -1,8 +1,10 @@
-# Top-Level comment
+def add(a: byte, b: byte) -> byte:
+    return a + b
+
+def greet(name: string):
+    print("HELLO ")
+    println(name)
 
 def main():
-    # first line in block comment
-    cls()
-    a: byte = 42 + 2  # inline comment
-    println(a)
-    # last line comment
+    result: byte = add(10, 20)
+    greet("PLAYER")

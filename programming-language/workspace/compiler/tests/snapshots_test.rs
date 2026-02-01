@@ -242,6 +242,54 @@ fn test_error_snapshot_wrong_argument_count() {
 }
 
 // ============================================================================
+// Array Snapshot Tests
+// ============================================================================
+
+#[test]
+fn test_ast_snapshot_arrays_basic() {
+    let source = include_str!("fixtures/valid/arrays_basic.cb64");
+    let tokens = lexer::tokenize(source).unwrap();
+    let ast = parser::parse(&tokens).unwrap();
+    insta::assert_snapshot!("ast_arrays_basic", format!("{:#?}", ast));
+}
+
+#[test]
+fn test_ast_snapshot_arrays_word() {
+    let source = include_str!("fixtures/valid/arrays_word.cb64");
+    let tokens = lexer::tokenize(source).unwrap();
+    let ast = parser::parse(&tokens).unwrap();
+    insta::assert_snapshot!("ast_arrays_word", format!("{:#?}", ast));
+}
+
+#[test]
+fn test_codegen_snapshot_arrays_basic() {
+    let source = include_str!("fixtures/valid/arrays_basic.cb64");
+    let code = cobra64::compile(source).unwrap();
+    insta::assert_snapshot!("codegen_arrays_basic", format_hex_dump(&code));
+}
+
+#[test]
+fn test_error_snapshot_array_type_mismatch() {
+    let source = include_str!("fixtures/invalid/array_type_mismatch.cb64");
+    let error = get_error_message(source, "array_type_mismatch.cb64");
+    insta::assert_snapshot!("error_array_type_mismatch", error);
+}
+
+#[test]
+fn test_error_snapshot_array_size_mismatch() {
+    let source = include_str!("fixtures/invalid/array_size_mismatch.cb64");
+    let error = get_error_message(source, "array_size_mismatch.cb64");
+    insta::assert_snapshot!("error_array_size_mismatch", error);
+}
+
+#[test]
+fn test_error_snapshot_array_index_type() {
+    let source = include_str!("fixtures/invalid/array_index_type.cb64");
+    let error = get_error_message(source, "array_index_type.cb64");
+    insta::assert_snapshot!("error_array_index_type", error);
+}
+
+// ============================================================================
 // Token Position Verification Tests
 // ============================================================================
 

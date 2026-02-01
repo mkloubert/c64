@@ -1,13 +1,13 @@
 # Conformance Test: Constant Declarations
-# Tests: const keyword, constant usage in expressions
+# Tests: uppercase naming convention for constants, constant usage in expressions
 # Expected: Compiles without errors, constants work in expressions
 
-# Global constants
-const MAX_VALUE = 255
-const SCREEN_WIDTH = 40
-const SCREEN_HEIGHT = 25
-const VIC_BASE = $D000
-const SPRITE_ENABLE = $D015
+# Global constants (UPPERCASE names without 'const' keyword)
+MAX_VALUE = 255
+SCREEN_WIDTH = 40
+SCREEN_HEIGHT = 25
+VIC_BASE = $D000
+SPRITE_ENABLE = $D015
 
 def main():
     x: byte = MAX_VALUE  # Use constants in expressions

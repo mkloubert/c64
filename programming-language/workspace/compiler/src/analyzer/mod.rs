@@ -476,16 +476,44 @@ impl Analyzer {
 
     /// Analyze a variable declaration.
     fn analyze_var_decl(&mut self, decl: &VarDecl) {
+        // Determine the variable type (explicit or inferred)
+        let var_type = if let Some(ref explicit_type) = decl.var_type {
+            // Explicit type provided
+            explicit_type.clone()
+        } else {
+            // Type inference - infer from initializer
+            if let Some(init) = &decl.initializer {
+                let init_type = self.analyze_expression(init);
+                if let Some(inferred) = init_type {
+                    self.infer_type_from_expr(init, &inferred)
+                } else {
+                    self.error(CompileError::new(
+                        ErrorCode::TypeMismatch,
+                        "Cannot infer type from expression",
+                        decl.span.clone(),
+                    ));
+                    Type::Byte // Fallback
+                }
+            } else {
+                self.error(CompileError::new(
+                    ErrorCode::TypeMismatch,
+                    "Variable declaration without type requires an initializer for type inference",
+                    decl.span.clone(),
+                ));
+                Type::Byte // Fallback
+            }
+        };
+
         // Check initializer type if present
         if let Some(init) = &decl.initializer {
             let init_type = self.analyze_expression(init);
             if let Some(init_type) = init_type {
-                if !self.is_expr_assignable_to(&init.kind, &init_type, &decl.var_type) {
+                if !self.is_expr_assignable_to(&init.kind, &init_type, &var_type) {
                     self.error(CompileError::new(
                         ErrorCode::TypeMismatch,
                         format!(
                             "Cannot assign {} to variable of type {}",
-                            init_type, decl.var_type
+                            init_type, var_type
                         ),
                         init.span.clone(),
                     ));
@@ -493,20 +521,23 @@ impl Analyzer {
             }
 
             // Check compile-time range for integer types
-            if decl.var_type.is_integer() {
+            if var_type.is_integer() {
                 if let Some(value) = self.try_eval_constant(init) {
-                    self.check_value_in_range(value, &decl.var_type, &init.span);
+                    self.check_value_in_range(value, &var_type, &init.span);
+                }
+            }
+
+            // Check array literal size matches declared size
+            if var_type.is_array() {
+                if let ExprKind::ArrayLiteral { elements } = &init.kind {
+                    self.check_array_literal_size(&var_type, elements.len(), &init.span);
+                    self.check_array_literal_elements(&var_type, elements);
                 }
             }
         }
 
         // Add to symbol table
-        let symbol = Symbol::variable(
-            decl.name.clone(),
-            decl.var_type.clone(),
-            false,
-            decl.span.clone(),
-        );
+        let symbol = Symbol::variable(decl.name.clone(), var_type, false, decl.span.clone());
         if let Err(existing) = self.symbols.define(symbol) {
             self.error(
                 CompileError::new(
@@ -527,8 +558,30 @@ impl Analyzer {
         // Analyze the value expression
         let value_type = self.analyze_expression(&decl.value);
 
-        // Infer type from value
-        let const_type = value_type.unwrap_or(Type::Word);
+        // Determine the constant type (explicit or inferred)
+        let const_type = if let Some(ref explicit_type) = decl.const_type {
+            // Explicit type provided - check compatibility
+            if let Some(ref val_type) = value_type {
+                if !self.is_expr_assignable_to(&decl.value.kind, val_type, explicit_type) {
+                    self.error(CompileError::new(
+                        ErrorCode::TypeMismatch,
+                        format!(
+                            "Cannot assign {} to constant of type {}",
+                            val_type, explicit_type
+                        ),
+                        decl.value.span.clone(),
+                    ));
+                }
+            }
+            explicit_type.clone()
+        } else {
+            // Type inference from value
+            if let Some(ref val_type) = value_type {
+                self.infer_type_from_expr(&decl.value, val_type)
+            } else {
+                Type::Word // Fallback
+            }
+        };
 
         // Add to symbol table
         let symbol = Symbol::variable(decl.name.clone(), const_type, true, decl.span.clone());
@@ -890,6 +943,262 @@ impl Analyzer {
                 Some(Type::Float)
             }
             ExprKind::Grouped(inner) => self.analyze_expression(inner),
+            ExprKind::ArrayLiteral { elements } => self.analyze_array_literal(elements, &expr.span),
+        }
+    }
+
+    /// Analyze an array literal and infer its type.
+    ///
+    /// This function:
+    /// 1. Analyzes each element expression
+    /// 2. Determines if all elements are compatible
+    /// 3. Infers the appropriate array type based on element values
+    ///
+    /// Type inference rules:
+    /// - All booleans → `bool[]`
+    /// - All integers 0-255 → `byte[]`
+    /// - Any integer 256-65535 → `word[]`
+    /// - Mixed bools and integers → error
+    /// - Negative values → error (until signed arrays in Phase 6)
+    /// - Float/string elements → error
+    fn analyze_array_literal(&mut self, elements: &[Expr], span: &Span) -> Option<Type> {
+        if elements.is_empty() {
+            self.error(CompileError::new(
+                ErrorCode::CannotInferArrayType,
+                "Empty array literal requires explicit type annotation",
+                span.clone(),
+            ));
+            return None;
+        }
+
+        // Track element info for type inference
+        let mut has_bool = false;
+        let mut has_integer = false;
+        let mut has_negative = false;
+        let mut max_value: i64 = 0;
+        let mut min_value: i64 = 0;
+        let mut has_error = false;
+
+        for elem in elements {
+            if let Some(elem_type) = self.analyze_expression(elem) {
+                match elem_type {
+                    Type::Bool => {
+                        has_bool = true;
+                    }
+                    Type::Byte => {
+                        has_integer = true;
+                        // Try to get the actual value for better inference
+                        if let Some(val) = self.try_eval_constant(elem) {
+                            if val < 0 {
+                                has_negative = true;
+                                min_value = min_value.min(val);
+                            } else {
+                                max_value = max_value.max(val);
+                            }
+                        }
+                    }
+                    Type::Word => {
+                        has_integer = true;
+                        if let Some(val) = self.try_eval_constant(elem) {
+                            if val < 0 {
+                                has_negative = true;
+                                min_value = min_value.min(val);
+                            } else {
+                                max_value = max_value.max(val);
+                            }
+                        } else {
+                            // Assume word-sized if we can't evaluate
+                            max_value = max_value.max(256);
+                        }
+                    }
+                    Type::Sbyte | Type::Sword => {
+                        has_integer = true;
+                        if let Some(val) = self.try_eval_constant(elem) {
+                            if val < 0 {
+                                has_negative = true;
+                                min_value = min_value.min(val);
+                            } else {
+                                max_value = max_value.max(val);
+                            }
+                        } else {
+                            has_negative = true; // Assume might be negative
+                        }
+                    }
+                    Type::Fixed | Type::Float => {
+                        self.error(CompileError::new(
+                            ErrorCode::ArrayElementTypeMismatch,
+                            format!("Array literals do not support {} elements", elem_type),
+                            elem.span.clone(),
+                        ));
+                        has_error = true;
+                    }
+                    Type::String => {
+                        self.error(CompileError::new(
+                            ErrorCode::ArrayElementTypeMismatch,
+                            "Array literals do not support string elements",
+                            elem.span.clone(),
+                        ));
+                        has_error = true;
+                    }
+                    _ => {
+                        self.error(CompileError::new(
+                            ErrorCode::ArrayElementTypeMismatch,
+                            format!("Unsupported element type in array literal: {}", elem_type),
+                            elem.span.clone(),
+                        ));
+                        has_error = true;
+                    }
+                }
+            } else {
+                has_error = true;
+            }
+        }
+
+        if has_error {
+            return None;
+        }
+
+        // Check for mixed types (bools and integers)
+        if has_bool && has_integer {
+            self.error(CompileError::new(
+                ErrorCode::ArrayElementTypeMismatch,
+                "Cannot mix boolean and integer elements in array literal",
+                span.clone(),
+            ));
+            return None;
+        }
+
+        let array_len = elements.len() as u16;
+
+        // Determine array type based on value ranges
+        if has_bool {
+            Some(Type::BoolArray(Some(array_len)))
+        } else if has_negative {
+            // Signed array type inference:
+            // - All values fit in sbyte (-128 to 127) → sbyte[]
+            // - Otherwise → sword[]
+            if min_value >= -128 && max_value <= 127 {
+                Some(Type::SbyteArray(Some(array_len)))
+            } else if min_value >= -32768 && max_value <= 32767 {
+                Some(Type::SwordArray(Some(array_len)))
+            } else {
+                self.error(CompileError::new(
+                    ErrorCode::ArrayElementTypeMismatch,
+                    format!(
+                        "Array literal values out of range: {} to {} (max sword range is -32768 to 32767)",
+                        min_value, max_value
+                    ),
+                    span.clone(),
+                ));
+                None
+            }
+        } else if max_value <= 255 {
+            Some(Type::ByteArray(Some(array_len)))
+        } else if max_value <= 65535 {
+            Some(Type::WordArray(Some(array_len)))
+        } else {
+            self.error(CompileError::new(
+                ErrorCode::ArrayElementTypeMismatch,
+                format!(
+                    "Array literal value {} exceeds maximum word value (65535)",
+                    max_value
+                ),
+                span.clone(),
+            ));
+            None
+        }
+    }
+
+    /// Check that array literal size matches declared array size.
+    fn check_array_literal_size(&mut self, array_type: &Type, literal_len: usize, span: &Span) {
+        let declared_size = match array_type {
+            Type::ByteArray(Some(n))
+            | Type::WordArray(Some(n))
+            | Type::BoolArray(Some(n))
+            | Type::SbyteArray(Some(n))
+            | Type::SwordArray(Some(n)) => Some(*n as usize),
+            _ => None,
+        };
+
+        if let Some(declared) = declared_size {
+            if literal_len > declared {
+                self.error(CompileError::new(
+                    ErrorCode::ArrayInitTooManyElements,
+                    format!(
+                        "Array literal has {} elements but array is declared with size {}",
+                        literal_len, declared
+                    ),
+                    span.clone(),
+                ));
+            } else if literal_len < declared {
+                self.error(CompileError::new(
+                    ErrorCode::ArrayInitTooFewElements,
+                    format!(
+                        "Array literal has {} elements but array is declared with size {}",
+                        literal_len, declared
+                    ),
+                    span.clone(),
+                ));
+            }
+        }
+    }
+
+    /// Check that array literal elements are compatible with declared element type.
+    fn check_array_literal_elements(&mut self, array_type: &Type, elements: &[Expr]) {
+        let element_type = match array_type.element_type() {
+            Some(t) => t,
+            None => return,
+        };
+
+        for elem in elements {
+            // Get the value if it's a constant
+            if let Some(val) = self.try_eval_constant(elem) {
+                match element_type {
+                    Type::Byte => {
+                        if !(0..=255).contains(&val) {
+                            self.error(CompileError::new(
+                                ErrorCode::ConstantValueOutOfRange,
+                                format!("Value {} is out of range for byte (0-255)", val),
+                                elem.span.clone(),
+                            ));
+                        }
+                    }
+                    Type::Word => {
+                        if !(0..=65535).contains(&val) {
+                            self.error(CompileError::new(
+                                ErrorCode::ConstantValueOutOfRange,
+                                format!("Value {} is out of range for word (0-65535)", val),
+                                elem.span.clone(),
+                            ));
+                        }
+                    }
+                    Type::Sbyte => {
+                        if !(-128..=127).contains(&val) {
+                            self.error(CompileError::new(
+                                ErrorCode::ConstantValueOutOfRange,
+                                format!("Value {} is out of range for sbyte (-128 to 127)", val),
+                                elem.span.clone(),
+                            ));
+                        }
+                    }
+                    Type::Sword => {
+                        if !(-32768..=32767).contains(&val) {
+                            self.error(CompileError::new(
+                                ErrorCode::ConstantValueOutOfRange,
+                                format!(
+                                    "Value {} is out of range for sword (-32768 to 32767)",
+                                    val
+                                ),
+                                elem.span.clone(),
+                            ));
+                        }
+                    }
+                    Type::Bool => {
+                        // Bool elements should already be validated by type checking
+                    }
+                    _ => {}
+                }
+            }
         }
     }
 
@@ -1085,6 +1394,60 @@ impl Analyzer {
         }
     }
 
+    /// Infer the best type for a variable/constant from its initializer expression.
+    ///
+    /// This implements the type inference rules:
+    /// - Integer 0-255 → byte
+    /// - Integer 256-65535 → word
+    /// - Negative integer -128 to -1 → sbyte
+    /// - Negative integer -32768 to -129 → sword
+    /// - Decimal literal → float (default)
+    /// - Boolean → bool
+    /// - String → string
+    fn infer_type_from_expr(&self, expr: &Expr, expr_type: &Type) -> Type {
+        match &expr.kind {
+            ExprKind::IntegerLiteral(v) => {
+                // Apply type inference rules based on value range
+                if *v <= 255 {
+                    Type::Byte
+                } else {
+                    Type::Word
+                }
+            }
+            ExprKind::UnaryOp {
+                op: UnaryOp::Negate,
+                operand,
+            } => {
+                // Handle negative literals
+                if let ExprKind::IntegerLiteral(v) = &operand.kind {
+                    let neg_value = -(*v as i32);
+                    if neg_value >= -128 {
+                        Type::Sbyte
+                    } else {
+                        Type::Sword
+                    }
+                } else if let ExprKind::DecimalLiteral(_) = &operand.kind {
+                    // Negative decimal → float
+                    Type::Float
+                } else {
+                    // For other negated expressions, use the analyzed type
+                    expr_type.clone()
+                }
+            }
+            ExprKind::DecimalLiteral(_) => {
+                // Decimal literals default to float for type inference
+                Type::Float
+            }
+            ExprKind::BoolLiteral(_) => Type::Bool,
+            ExprKind::StringLiteral(_) => Type::String,
+            ExprKind::CharLiteral(_) => Type::Byte,
+            _ => {
+                // For complex expressions, use the analyzed type
+                expr_type.clone()
+            }
+        }
+    }
+
     /// Check if an expression can be assigned to a target type.
     ///
     /// This handles the special case of `DecimalLiteral` which can be
@@ -1121,6 +1484,11 @@ impl Analyzer {
 
     /// Analyze a function call.
     fn analyze_function_call(&mut self, name: &str, args: &[Expr], span: &Span) -> Option<Type> {
+        // Handle built-in len() function specially
+        if name == "len" {
+            return self.analyze_len_call(args, span);
+        }
+
         let symbol = self.symbols.lookup(name).cloned();
 
         match symbol {
@@ -1197,6 +1565,41 @@ impl Analyzer {
                 None
             }
         }
+    }
+
+    /// Analyze the built-in len() function call.
+    /// Returns the length of an array as a word (16-bit).
+    fn analyze_len_call(&mut self, args: &[Expr], span: &Span) -> Option<Type> {
+        // len() requires exactly one argument
+        if args.len() != 1 {
+            self.error(CompileError::new(
+                ErrorCode::WrongNumberOfArguments,
+                format!(
+                    "Function 'len' expects 1 argument, but {} were provided",
+                    args.len()
+                ),
+                span.clone(),
+            ));
+            return None;
+        }
+
+        // Analyze the argument and check it's an array type
+        let arg_type = self.analyze_expression(&args[0])?;
+
+        if !arg_type.is_array() {
+            self.error(CompileError::new(
+                ErrorCode::TypeMismatch,
+                format!(
+                    "Function 'len' expects an array argument, found {}",
+                    arg_type
+                ),
+                span.clone(),
+            ));
+            return None;
+        }
+
+        // Return type is word (16-bit to support arrays up to 65535 elements)
+        Some(Type::Word)
     }
 
     /// Add an error to the error list.
@@ -1424,7 +1827,7 @@ mod tests {
 
     #[test]
     fn test_valid_constant_declaration() {
-        let result = analyze_source("const MAX = 100\ndef main():\n    pass");
+        let result = analyze_source("MAX = 100\ndef main():\n    pass");
         assert!(result.is_ok());
     }
 
@@ -1572,7 +1975,7 @@ mod tests {
 
     #[test]
     fn test_error_assign_to_constant() {
-        let result = analyze_source("const X = 5\ndef main():\n    X = 10");
+        let result = analyze_source("X = 5\ndef main():\n    X = 10");
         assert!(has_error_code(&result, ErrorCode::CannotAssignToConstant));
     }
 
@@ -1661,6 +2064,140 @@ mod tests {
     fn test_error_array_index_not_integer() {
         let result = analyze_source("def main():\n    arr: byte[10]\n    x: byte = arr[true]");
         assert!(has_error_code(&result, ErrorCode::ArrayIndexMustBeInteger));
+    }
+
+    #[test]
+    fn test_array_literal_byte_inference() {
+        // All values 0-255 should infer byte[]
+        let result = analyze_source("def main():\n    arr: byte[] = [1, 2, 255]");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_array_literal_word_inference() {
+        // Any value > 255 should infer word[]
+        let result = analyze_source("def main():\n    arr: word[] = [1, 1000, 3]");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_array_literal_bool_inference() {
+        // All booleans should infer bool[]
+        let result = analyze_source("def main():\n    flags: bool[] = [true, false, true]");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_error_array_literal_empty() {
+        // Empty array should require type annotation
+        let result = analyze_source("def main():\n    arr = []");
+        assert!(has_error_code(&result, ErrorCode::CannotInferArrayType));
+    }
+
+    #[test]
+    fn test_error_array_literal_mixed_types() {
+        // Mixing bools and integers should fail
+        let result = analyze_source("def main():\n    arr: byte[] = [1, true]");
+        assert!(has_error_code(&result, ErrorCode::ArrayElementTypeMismatch));
+    }
+
+    #[test]
+    fn test_error_array_literal_float_element() {
+        // Float elements should fail
+        let result = analyze_source("def main():\n    arr: byte[] = [1.5, 2.0]");
+        assert!(has_error_code(&result, ErrorCode::ArrayElementTypeMismatch));
+    }
+
+    #[test]
+    fn test_error_array_literal_string_element() {
+        // String elements should fail
+        let result = analyze_source("def main():\n    arr: byte[] = [\"hello\"]");
+        assert!(has_error_code(&result, ErrorCode::ArrayElementTypeMismatch));
+    }
+
+    #[test]
+    fn test_error_array_size_too_many() {
+        // Array literal with more elements than declared
+        let result = analyze_source("def main():\n    arr: byte[2] = [1, 2, 3]");
+        assert!(has_error_code(&result, ErrorCode::ArrayInitTooManyElements));
+    }
+
+    #[test]
+    fn test_error_array_size_too_few() {
+        // Array literal with fewer elements than declared
+        let result = analyze_source("def main():\n    arr: byte[5] = [1, 2]");
+        assert!(has_error_code(&result, ErrorCode::ArrayInitTooFewElements));
+    }
+
+    #[test]
+    fn test_array_size_exact_match() {
+        // Array literal size matches declaration
+        let result = analyze_source("def main():\n    arr: byte[3] = [1, 2, 3]");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_error_array_byte_value_out_of_range() {
+        // Value > 255 in byte array
+        let result = analyze_source("def main():\n    arr: byte[2] = [1, 1000]");
+        assert!(has_error_code(&result, ErrorCode::ConstantValueOutOfRange));
+    }
+
+    #[test]
+    fn test_error_array_negative_value_in_byte_array() {
+        // Negative values in explicitly typed byte[] should fail
+        let result = analyze_source("def main():\n    arr: byte[] = [-1, 2]");
+        // Type mismatch: inferred sbyte[] cannot be assigned to byte[]
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_array_word_large_values() {
+        // Word array with values > 255
+        let result = analyze_source("def main():\n    arr: word[3] = [1000, 2000, 65535]");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_array_sbyte_inference() {
+        // Negative values in sbyte range should infer sbyte[]
+        let result = analyze_source("def main():\n    arr: sbyte[] = [-50, 0, 100]");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_array_sword_inference() {
+        // Negative values outside sbyte range should infer sword[]
+        let result = analyze_source("def main():\n    arr: sword[] = [-1000, 500]");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_array_sbyte_sized() {
+        // Sized sbyte array
+        let result = analyze_source("def main():\n    arr: sbyte[5]");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_array_sword_sized() {
+        // Sized sword array
+        let result = analyze_source("def main():\n    arr: sword[10]");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_error_sbyte_array_value_out_of_range() {
+        // Value outside sbyte range (-128 to 127)
+        let result = analyze_source("def main():\n    arr: sbyte[2] = [-129, 0]");
+        assert!(has_error_code(&result, ErrorCode::ConstantValueOutOfRange));
+    }
+
+    #[test]
+    fn test_error_sword_array_value_out_of_range() {
+        // Value outside sword range
+        let result = analyze_source("def main():\n    arr: sword[2] = [-40000, 0]");
+        assert!(has_error_code(&result, ErrorCode::ConstantValueOutOfRange));
     }
 
     // ========================================
@@ -1907,7 +2444,7 @@ mod tests {
 
     #[test]
     fn test_valid_const_negative() {
-        let result = analyze_source("const MIN = -128\ndef main():\n    pass");
+        let result = analyze_source("MIN = -128\ndef main():\n    pass");
         assert!(result.is_ok());
     }
 
@@ -2200,5 +2737,212 @@ mod tests {
             "def main():\n    x: fixed = 1.5\n    y: float = 2.5\n    z: float = x + y",
         );
         assert!(result.is_ok());
+    }
+
+    // ========================================
+    // Type Inference Tests
+    // ========================================
+
+    #[test]
+    fn test_type_inference_var_byte() {
+        // Value 0-255 should infer to byte
+        let result = analyze_source("x = 10\ndef main():\n    pass");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_type_inference_var_byte_max() {
+        // Value 255 should infer to byte
+        let result = analyze_source("x = 255\ndef main():\n    pass");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_type_inference_var_word() {
+        // Value 256-65535 should infer to word
+        let result = analyze_source("x = 1000\ndef main():\n    pass");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_type_inference_var_word_boundary() {
+        // Value 256 should infer to word (first value over byte range)
+        let result = analyze_source("x = 256\ndef main():\n    pass");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_type_inference_var_negative_sbyte() {
+        // Negative value -128 to -1 should infer to sbyte
+        let result = analyze_source("x = -50\ndef main():\n    pass");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_type_inference_var_negative_sword() {
+        // Negative value below -128 should infer to sword
+        let result = analyze_source("x = -1000\ndef main():\n    pass");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_type_inference_var_float() {
+        // Decimal literal should infer to float
+        let result = analyze_source("x = 3.14\ndef main():\n    pass");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_type_inference_var_bool() {
+        // Boolean literal should infer to bool
+        let result = analyze_source("x = true\ndef main():\n    pass");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_type_inference_var_string() {
+        // String literal should infer to string
+        let result = analyze_source("x = \"hello\"\ndef main():\n    pass");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_type_inference_const_explicit_type() {
+        // Constant with explicit type
+        let result = analyze_source("MAX: word = 255\ndef main():\n    pass");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_type_inference_const_fixed() {
+        // Constant with explicit fixed type
+        let result = analyze_source("PI: fixed = 3.14\ndef main():\n    pass");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_type_inference_const_float() {
+        // Constant with explicit float type
+        let result = analyze_source("E: float = 2.718\ndef main():\n    pass");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_type_inference_const_inferred() {
+        // Constant with inferred type (existing behavior)
+        let result = analyze_source("MIN = 0\ndef main():\n    pass");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_type_inference_var_use_inferred_type() {
+        // Use an inferred variable in an expression
+        let result = analyze_source("x = 10\ndef main():\n    y: byte = x + 5");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_type_inference_const_use_explicit_type() {
+        // Use a constant with explicit type in an expression
+        let result = analyze_source("MAX: word = 1000\ndef main():\n    y: word = MAX + 1");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_type_inference_mixed_declarations() {
+        // Mix of explicit and inferred types
+        let result = analyze_source(
+            "MAX: word = 255\ncount = 0\nPI: fixed = 3.14\nE = 2.718\ndef main():\n    pass",
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_type_inference_error_without_init() {
+        // Variable without type and without initializer should fail
+        // Note: This is caught by the parser, not the analyzer
+        let result = analyze_source("x\ndef main():\n    pass");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_type_inference_const_type_mismatch() {
+        // Constant with explicit type that doesn't match value type
+        let result = analyze_source("PI: byte = 3.14\ndef main():\n    pass");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_type_inference_negative_decimal() {
+        // Negative decimal should infer to float
+        let result = analyze_source("x = -3.14\ndef main():\n    pass");
+        assert!(result.is_ok());
+    }
+
+    // ========================================================================
+    // len() function tests
+    // ========================================================================
+
+    #[test]
+    fn test_len_byte_array() {
+        let result =
+            analyze_source("def main():\n    arr: byte[] = [1, 2, 3]\n    x: word = len(arr)");
+        assert!(result.is_ok(), "len() on byte array should work");
+    }
+
+    #[test]
+    fn test_len_word_array() {
+        let result =
+            analyze_source("def main():\n    arr: word[] = [1000, 2000]\n    x: word = len(arr)");
+        assert!(result.is_ok(), "len() on word array should work");
+    }
+
+    #[test]
+    fn test_len_bool_array() {
+        let result = analyze_source(
+            "def main():\n    flags: bool[] = [true, false]\n    x: word = len(flags)",
+        );
+        assert!(result.is_ok(), "len() on bool array should work");
+    }
+
+    #[test]
+    fn test_len_sbyte_array() {
+        let result =
+            analyze_source("def main():\n    arr: sbyte[] = [-10, 20]\n    x: word = len(arr)");
+        assert!(result.is_ok(), "len() on sbyte array should work");
+    }
+
+    #[test]
+    fn test_len_sword_array() {
+        let result =
+            analyze_source("def main():\n    arr: sword[] = [-1000, 500]\n    x: word = len(arr)");
+        assert!(result.is_ok(), "len() on sword array should work");
+    }
+
+    #[test]
+    fn test_len_sized_array() {
+        let result =
+            analyze_source("def main():\n    buffer: byte[100]\n    x: word = len(buffer)");
+        assert!(result.is_ok(), "len() on sized array should work");
+    }
+
+    #[test]
+    fn test_len_non_array_error() {
+        let result = analyze_source("def main():\n    x: byte = 5\n    y: word = len(x)");
+        assert!(result.is_err(), "len() on non-array should fail");
+    }
+
+    #[test]
+    fn test_len_wrong_arg_count_zero() {
+        let result = analyze_source("def main():\n    x: word = len()");
+        assert!(result.is_err(), "len() with no arguments should fail");
+    }
+
+    #[test]
+    fn test_len_wrong_arg_count_two() {
+        let result = analyze_source(
+            "def main():\n    a: byte[] = [1, 2]\n    b: byte[] = [3, 4]\n    x: word = len(a, b)",
+        );
+        assert!(result.is_err(), "len() with two arguments should fail");
     }
 }

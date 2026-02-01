@@ -1,7 +1,7 @@
 # Medium benchmark program (~100 lines)
-const MAX = 255
-const SCREEN_W = 40
-const SCREEN_H = 25
+MAX = 255
+SCREEN_W = 40
+SCREEN_H = 25
 
 def add(a: byte, b: byte) -> byte:
     return a + b

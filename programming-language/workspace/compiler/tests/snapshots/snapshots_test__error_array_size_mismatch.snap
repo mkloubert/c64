@@ -1,0 +1,9 @@
+---
+source: tests/snapshots_test.rs
+expression: error
+---
+error[E210]: Cannot assign byte[5] to variable of type byte[3]
+  --> array_size_mismatch.cb64:5:20
+  |
+5 |     arr: byte[3] = [1, 2, 3, 4, 5]
+  |                    ^^^^^^^^^^^^^^^

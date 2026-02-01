@@ -96,6 +96,8 @@ pub enum ErrorCode {
     InvalidHexDigit,
     EmptyNumberLiteral,
     InvalidDecimalLiteral,
+    InvalidIdentifierNaming,
+    IdentifierOnlyUnderscore,
 
     // Syntax errors (E100-E146)
     UnexpectedToken,
@@ -157,6 +159,10 @@ pub enum ErrorCode {
     ArrayIndexOutOfBounds,
     ArrayInitTooManyElements,
     ArrayInitTooFewElements,
+    NotImplemented,
+    ArrayElementTypeMismatch,
+    CannotInferArrayType,
+    ArrayNegativeValueRequiresSignedType,
 }
 
 impl std::fmt::Display for ErrorCode {
@@ -186,6 +192,8 @@ impl ErrorCode {
             ErrorCode::InvalidHexDigit => "E023",
             ErrorCode::EmptyNumberLiteral => "E024",
             ErrorCode::InvalidDecimalLiteral => "E025",
+            ErrorCode::InvalidIdentifierNaming => "E026",
+            ErrorCode::IdentifierOnlyUnderscore => "E027",
 
             // Syntax errors
             ErrorCode::UnexpectedToken => "E100",
@@ -247,6 +255,10 @@ impl ErrorCode {
             ErrorCode::ArrayIndexOutOfBounds => "E240",
             ErrorCode::ArrayInitTooManyElements => "E241",
             ErrorCode::ArrayInitTooFewElements => "E242",
+            ErrorCode::NotImplemented => "E243",
+            ErrorCode::ArrayElementTypeMismatch => "E244",
+            ErrorCode::CannotInferArrayType => "E245",
+            ErrorCode::ArrayNegativeValueRequiresSignedType => "E246",
         }
     }
 }

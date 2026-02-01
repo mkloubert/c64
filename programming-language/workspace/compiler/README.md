@@ -15,7 +15,9 @@ A modern programming language and compiler for the Commodore 64.
    - [Data Types](#data-types)
    - [Variables](#variables)
    - [Constants](#constants)
+   - [Arrays](#arrays)
    - [Operators](#operators)
+   - [Type Casting](#type-casting)
    - [Control Flow](#control-flow)
    - [Functions](#functions)
    - [Comments](#comments)
@@ -106,6 +108,26 @@ Every Cobra64 program needs a `main()` function as the entry point:
 def main():
     # Your code here
     pass
+```
+
+### Using Arrays
+
+Arrays store multiple values of the same type:
+
+```python
+def main():
+    # Create and initialize an array
+    scores: word[] = [100, 250, 500]
+
+    # Access elements by index
+    first: word = scores[0]
+    scores[1] = 300
+
+    # Use arrays in loops
+    i: byte = 0
+    while i < 3:
+        poke(1024 + i, byte(scores[i]))
+        i = i + 1
 ```
 
 ---
@@ -240,35 +262,234 @@ g: float = 3.14    # float (default for decimals)
 
 ### Variables
 
-Variables must be declared with a type:
+Variables can be declared with an explicit type or use type inference:
 
 ```python
-def main():
-    # Variable declaration with initial value
-    x: byte = 10
-    name: string = "PLAYER"
+# Top-level variables with explicit type
+counter: byte = 0
+score: word = 1000
 
-    # Multiple variables
+# Top-level variables with type inference
+x = 10          # Inferred as byte (0-255)
+y = 1000        # Inferred as word (256-65535)
+z = -50         # Inferred as sbyte (-128 to -1)
+big = -1000     # Inferred as sword (-32768 to -129)
+pi = 3.14       # Inferred as float
+flag = true     # Inferred as bool
+
+def main():
+    # Inside functions, explicit type is required
     a: byte = 1
     b: byte = 2
     c: byte = a + b
 ```
 
+**Note:** Type inference for variables is only available at top-level. Inside functions, explicit type annotation is required.
+
 ### Constants
 
-Constants are declared at the top level with `const`:
+Constants are identified by their **naming convention**: names that start with an uppercase letter and have ALL letters in uppercase are constants.
+
+Constants support both type inference and explicit type annotation:
 
 ```python
-const MAX_SCORE = 255
-const SCREEN_WIDTH = 40
-const SCREEN_HEIGHT = 25
-const VIC_BORDER = $D020
+# Constants with type inference (type determined from value)
+MAX_SCORE = 255         # Inferred as byte
+SCREEN_WIDTH = 40       # Inferred as byte
+LARGE_VALUE = 1000      # Inferred as word
+NEGATIVE = -100         # Inferred as sbyte
+E = 2.718               # Inferred as float
+
+# Constants with explicit type (can override inference)
+MAX: word = 255         # Force word type for small value
+PI: fixed = 3.14159     # Use fixed instead of float
+GOLDEN: float = 1.618   # Explicitly float
 
 def main():
     x: byte = MAX_SCORE
+    y: word = MAX + 1
 ```
 
-Constants must be numeric values (byte or word).
+#### Naming Rules
+
+| Type         | Rule                                                   | Examples                     |
+| ------------ | ------------------------------------------------------ | ---------------------------- |
+| **Constant** | First letter uppercase → ALL letters must be uppercase | `MAX`, `SCREEN_WIDTH`, `_4K` |
+| **Variable** | First letter lowercase                                 | `myVar`, `counter`, `_temp`  |
+| **Invalid**  | First letter uppercase but mixed case                  | `MyConst`, `MaxValue`        |
+
+```python
+# Valid constants
+MAX_VALUE = 255        # All uppercase letters
+VIC_BASE = $D000       # All uppercase letters
+_SPRITE_COUNT = 8      # Underscore prefix, all letters uppercase
+_4K = 4096             # First letter is 'K' (uppercase)
+
+# Valid variables
+counter: byte = 0      # First letter 'c' is lowercase
+myScore: word = 1000   # First letter 'm' is lowercase
+_temp: byte = 5        # First letter 't' is lowercase
+
+# INVALID - will cause compile error
+# MaxValue = 100       # Error: Mixed case (first uppercase, but not all)
+# _MyConst = 50        # Error: Mixed case
+```
+
+**Important:**
+
+- Constants are declared at **top-level only** (not inside functions)
+- Constants are **immutable** - they cannot be reassigned
+- Constants can have any type (byte, word, sbyte, sword, fixed, float, bool, string)
+
+### Type Inference
+
+When declaring variables or constants without an explicit type, the compiler infers the type from the value:
+
+| Value                 | Inferred Type |
+| --------------------- | ------------- |
+| `0` to `255`          | `byte`        |
+| `256` to `65535`      | `word`        |
+| `-128` to `-1`        | `sbyte`       |
+| `-32768` to `-129`    | `sword`       |
+| Decimal (e.g. `3.14`) | `float`       |
+| `true` / `false`      | `bool`        |
+| `"text"`              | `string`      |
+
+```python
+# Type inference examples
+small = 10          # byte (value fits in 0-255)
+medium = 1000       # word (value fits in 256-65535)
+negative = -50      # sbyte (value fits in -128 to -1)
+big_neg = -1000     # sword (value fits in -32768 to -129)
+decimal = 3.14      # float (decimal values default to float)
+flag = true         # bool
+text = "hello"      # string
+
+# Use explicit type to override inference
+MAX: word = 255     # Force word instead of byte
+PI: fixed = 3.14    # Force fixed instead of float
+```
+
+**When to use explicit types:**
+
+- When you need a larger type than inferred (e.g., `word` for value `100`)
+- When you want `fixed` instead of the default `float` for decimals
+- Inside functions (type inference only works at top-level)
+
+### Arrays
+
+Arrays allow storing multiple values of the same type in contiguous memory.
+
+#### Array Types
+
+| Type      | Element Size | Element Range   | Description           |
+| --------- | ------------ | --------------- | --------------------- |
+| `byte[]`  | 1 byte       | 0-255           | Unsigned 8-bit array  |
+| `word[]`  | 2 bytes      | 0-65535         | Unsigned 16-bit array |
+| `bool[]`  | 1 byte       | true/false      | Boolean array         |
+| `sbyte[]` | 1 byte       | -128 to 127     | Signed 8-bit array    |
+| `sword[]` | 2 bytes      | -32768 to 32767 | Signed 16-bit array   |
+
+#### Array Declaration
+
+```python
+def main():
+    # Array with initializer (size inferred from elements)
+    data: byte[] = [10, 20, 30, 40, 50]
+
+    # Sized array without initializer
+    buffer: byte[100]
+
+    # Word array for larger values
+    scores: word[] = [1000, 2500, 5000]
+
+    # Bool array
+    flags: bool[] = [true, false, true]
+
+    # Signed arrays (type inferred from negative values)
+    temps: sbyte[] = [-10, 0, 25, 50]
+    offsets: sword[] = [-1000, 500, 2000]
+```
+
+#### Array Access
+
+```python
+def main():
+    arr: byte[] = [10, 20, 30]
+
+    # Read element
+    x: byte = arr[0]    # x = 10
+    y: byte = arr[2]    # y = 30
+
+    # Write element
+    arr[1] = 25         # arr is now [10, 25, 30]
+
+    # Index can be a variable
+    i: byte = 1
+    z: byte = arr[i]    # z = 25
+```
+
+#### Array Type Inference
+
+Array literal types are inferred from element values:
+
+```python
+def main():
+    # All values 0-255: byte[]
+    a: byte[] = [1, 2, 255]
+
+    # Any value > 255: word[]
+    b: word[] = [1000, 50, 3]
+
+    # Boolean values: bool[]
+    c: bool[] = [true, false]
+```
+
+#### Arrays in Loops
+
+```python
+def main():
+    # Initialize array with loop
+    arr: byte[10]
+    i: byte = 0
+    while i < len(arr):
+        arr[i] = i * 2
+        i = i + 1
+
+    # Sum array elements
+    total: word = 0
+    j: byte = 0
+    while j < len(arr):
+        total = total + arr[j]
+        j = j + 1
+```
+
+#### Array Function Parameters
+
+Arrays can be passed to functions:
+
+```python
+def sum_array(arr: byte[], size: byte) -> word:
+    total: word = 0
+    i: byte = 0
+    while i < size:
+        total = total + arr[i]
+        i = i + 1
+    return total
+
+def main():
+    data: byte[] = [10, 20, 30]
+    result: word = sum_array(data, 3)
+```
+
+#### Array Limitations
+
+- **No nested arrays** - Multi-dimensional arrays not supported
+- **No dynamic sizing** - Size must be known at compile time
+- **No bounds checking** - Accessing out-of-bounds indices is undefined
+- **Maximum size** - Limited by available memory (~38KB)
+- **Index type** - Index must be `byte` or `word` (integer types only)
+- **len() on parameters** - `len()` only works on local arrays, not function parameters (size unknown)
 
 ### Operators
 
@@ -330,6 +551,42 @@ Constants must be numeric values (byte or word).
 10. `and` - Logical AND
 11. `or` - Logical OR
 
+### Type Casting
+
+Convert values between types using the type name as a function:
+
+```python
+def main():
+    # Integer conversions
+    w: word = 1000
+    b: byte = byte(w)     # word to byte (truncates to low byte)
+
+    s: sbyte = -50
+    w2: word = word(s)    # sbyte to word (sign-extends)
+
+    # Decimal conversions
+    f: float = 3.14
+    fx: fixed = fixed(f)  # float to fixed
+    i: word = word(f)     # float to word (truncates decimal)
+
+    # Array element conversion
+    scores: word[] = [1000, 2000]
+    low_byte: byte = byte(scores[0])
+```
+
+**Available casts:**
+
+| From    | To      | Notes                      |
+| ------- | ------- | -------------------------- |
+| `word`  | `byte`  | Truncates to low 8 bits    |
+| `sbyte` | `word`  | Sign-extends to 16 bits    |
+| `sbyte` | `sword` | Sign-extends to 16 bits    |
+| `float` | `fixed` | May lose precision         |
+| `float` | `word`  | Truncates decimal part     |
+| `fixed` | `word`  | Truncates fractional part  |
+| `fixed` | `float` | Converts to floating-point |
+| `byte`  | `word`  | Zero-extends to 16 bits    |
+
 ### Control Flow
 
 #### If Statement
@@ -344,7 +601,7 @@ def main():
         println("SMALL")
 ```
 
-#### Nested If (instead of elif)
+#### Elif Branches
 
 ```python
 def main():
@@ -352,11 +609,12 @@ def main():
 
     if x > 100:
         println("LARGE")
+    elif x > 50:
+        println("MEDIUM")
+    elif x > 25:
+        println("SMALL")
     else:
-        if x > 25:
-            println("MEDIUM")
-        else:
-            println("SMALL")
+        println("TINY")
 ```
 
 #### While Loop
@@ -369,6 +627,19 @@ def main():
         i = i + 1
 ```
 
+#### For Loop
+
+```python
+def main():
+    # Count up: for variable in start to end
+    for i in 0 to 9:
+        println(i)
+
+    # Count down: for variable in start downto end
+    for i in 10 downto 1:
+        println(i)
+```
+
 #### Break Statement
 
 ```python
@@ -379,6 +650,16 @@ def main():
         i = i + 1
         if i >= 5:
             break
+```
+
+#### Continue Statement
+
+```python
+def main():
+    for i in 0 to 9:
+        if i % 2 == 0:
+            continue  # Skip even numbers
+        println(i)    # Only prints 1, 3, 5, 7, 9
 ```
 
 #### Pass Statement
@@ -555,6 +836,29 @@ def main():
     println(border)
 ```
 
+### Array Functions
+
+#### `len(array) -> word`
+
+Returns the length (number of elements) of an array.
+
+```python
+def main():
+    data: byte[] = [10, 20, 30, 40, 50]
+    size: word = len(data)
+    println(size)  # Prints: 5
+
+    # Use in loop condition
+    i: byte = 0
+    while i < len(data):
+        println(data[i])
+        i = i + 1
+
+    # Works with all array types
+    buffer: byte[100]
+    println(len(buffer))  # Prints: 100
+```
+
 ---
 
 ## Example Programs
@@ -598,8 +902,9 @@ def main():
 ### Color Cycler
 
 ```python
-const BORDER = $D020
-const BACKGROUND = $D021
+# Constants use UPPERCASE names (no 'const' keyword needed)
+BORDER = $D020
+BACKGROUND = $D021
 
 def main():
     cls()
@@ -722,8 +1027,9 @@ def main():
 
 ```python
 # Example using fixed-point for smooth sprite movement
+# Constants use UPPERCASE names
 
-const SCREEN_WIDTH = 320
+SCREEN_WIDTH = 320
 
 def main():
     cls()
@@ -812,19 +1118,61 @@ def main():
     println(as_int)
 ```
 
+### Array Operations
+
+```python
+# Example demonstrating array usage
+
+def main():
+    cls()
+    println("ARRAY DEMO")
+
+    # Byte array with values
+    data: byte[] = [10, 20, 30, 40, 50]
+
+    # Sum all elements
+    total: word = 0
+    i: byte = 0
+    while i < 5:
+        total = total + data[i]
+        i = i + 1
+
+    # Word array for high scores
+    scores: word[5]
+    scores[0] = 9500
+    scores[1] = 7200
+    scores[2] = 5800
+    scores[3] = 4100
+    scores[4] = 2500
+
+    # Find if score qualifies
+    new_score: word = 6000
+    pos: byte = find_rank(scores, new_score)
+
+def find_rank(scores: word[], new_score: word) -> byte:
+    i: byte = 0
+    while i < 5:
+        if new_score > scores[i]:
+            return i
+        i = i + 1
+    return 5
+```
+
 ---
 
 ## Error Messages
 
 ### Lexer Errors
 
-| Error                     | Description                              |
-| ------------------------- | ---------------------------------------- |
-| `Invalid character`       | Source contains an unsupported character |
-| `Unterminated string`     | String literal missing closing quote     |
-| `Invalid escape sequence` | Unknown escape like `\x`                 |
-| `Number overflow`         | Number too large for type                |
-| `Tabs not allowed`        | Use 4 spaces for indentation             |
+| Error                        | Description                                                          |
+| ---------------------------- | -------------------------------------------------------------------- |
+| `Invalid character`          | Source contains an unsupported character                             |
+| `Unterminated string`        | String literal missing closing quote                                 |
+| `Invalid escape sequence`    | Unknown escape like `\x`                                             |
+| `Number overflow`            | Number too large for type                                            |
+| `Tabs not allowed`           | Use 4 spaces for indentation                                         |
+| `Invalid identifier naming`  | Mixed case like `MyConst` (must be all uppercase or start lowercase) |
+| `Identifier only underscore` | Identifier cannot be just `_` or `__`                                |
 
 ### Parser Errors
 
@@ -876,7 +1224,7 @@ def main():
 
 ### Not Supported
 
-- Arrays (planned for future)
+- Multi-dimensional arrays
 - Structs/records
 - Pointers
 - Inline assembly
@@ -922,6 +1270,26 @@ The generated PRG and D64 files should work with any C64 emulator that supports 
 ---
 
 ## Version History
+
+- **1.4.0** - Array support
+  - Added `byte[]`, `word[]`, `bool[]` array types
+  - Added `sbyte[]`, `sword[]` signed array types
+  - Array literals with type inference: `[1, 2, 3]`, `[-10, 20, 30]`
+  - Sized array declarations: `buffer: byte[100]`
+  - Array element read/write: `arr[i]`, `arr[i] = value`
+  - Built-in `len(array)` function returns array length
+  - Arrays as function parameters
+  - Zero-initialization optimization for arrays
+  - Signed array type inference from negative values
+  - Array-specific error messages
+
+- **1.3.0** - Naming convention for constants
+  - Removed `const` keyword
+  - Constants are now identified by UPPERCASE naming convention
+  - First letter uppercase + all letters uppercase = constant
+  - First letter lowercase = variable
+  - Added compile-time validation for naming rules
+  - New error codes: E026 (InvalidIdentifierNaming), E027 (IdentifierOnlyUnderscore)
 
 - **1.2.0** - Decimal number types
   - Added `fixed` type (12.4 fixed-point, -2048.0 to +2047.9375)

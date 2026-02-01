@@ -1,0 +1,27 @@
+# Cobra64 - Signed array test fixture
+# Tests sbyte[] and sword[] array operations
+
+def main():
+    # sbyte array with negative values
+    temps: sbyte[] = [-10, 0, 25, 100, -128]
+
+    # sword array with large values
+    offsets: sword[] = [-1000, 500, 32767, -32768]
+
+    # Sized signed arrays
+    buffer: sbyte[10]
+
+    # Read from sbyte array
+    t: sbyte = temps[0]
+
+    # Read from sword array
+    o: sword = offsets[1]
+
+    # Write to sbyte array
+    temps[2] = -50
+
+    # Write to sword array
+    offsets[0] = 12345
+
+    # Use signed values in expressions
+    result: sword = offsets[2] + 100

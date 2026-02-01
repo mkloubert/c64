@@ -1,0 +1,6 @@
+# Cobra64 - Array index type mismatch test
+# Expected error: Array index must be an integer type
+
+def main():
+    arr: byte[] = [1, 2, 3]
+    x: byte = arr[true]

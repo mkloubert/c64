@@ -1,0 +1,5 @@
+# Cobra64 - Array type mismatch test
+# Expected error: Type mismatch - assigning word to byte array
+
+def main():
+    arr: byte[] = [1000, 2000]

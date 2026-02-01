@@ -1,0 +1,20 @@
+# Cobra64 - Basic array operations test
+# Tests: declaration, initialization, read, write
+
+def main():
+    # Byte array with initializer
+    data: byte[] = [10, 20, 30, 40, 50]
+
+    # Read array elements
+    x: byte = data[0]
+    y: byte = data[2]
+    z: byte = data[4]
+
+    # Write array elements
+    data[1] = 25
+    data[3] = 45
+
+    # Sized array without initializer
+    buffer: byte[10]
+    buffer[0] = 1
+    buffer[9] = 255

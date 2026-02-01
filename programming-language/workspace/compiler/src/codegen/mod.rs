@@ -500,11 +500,23 @@ impl CodeGenerator {
                     );
                 }
                 TopLevelItem::Variable(decl) => {
-                    self.allocate_variable(&decl.name, &decl.var_type, false);
+                    // Use explicit type or infer from initializer
+                    let var_type = if let Some(ref t) = decl.var_type {
+                        t.clone()
+                    } else if let Some(ref init) = decl.initializer {
+                        self.infer_type_from_expr(init)
+                    } else {
+                        Type::Byte // Fallback (analyzer should have caught this)
+                    };
+                    self.allocate_variable(&decl.name, &var_type, false);
                 }
                 TopLevelItem::Constant(decl) => {
-                    // For constants, infer type from value (default to byte)
-                    let const_type = self.infer_type_from_expr(&decl.value);
+                    // Use explicit type or infer from value
+                    let const_type = if let Some(ref t) = decl.const_type {
+                        t.clone()
+                    } else {
+                        self.infer_type_from_expr(&decl.value)
+                    };
                     self.allocate_variable(&decl.name, &const_type, true);
                 }
             }
@@ -2093,11 +2105,158 @@ impl CodeGenerator {
 
     /// Generate code for a variable declaration.
     fn generate_var_decl(&mut self, decl: &VarDecl) -> Result<(), CompileError> {
-        let address = self.allocate_variable(&decl.name, &decl.var_type, false);
+        // Use explicit type or infer from initializer
+        let mut var_type = if let Some(ref t) = decl.var_type {
+            t.clone()
+        } else if let Some(ref init) = decl.initializer {
+            self.infer_type_from_expr(init)
+        } else {
+            Type::Byte // Fallback
+        };
+
+        // If the type is an array without a size but we have an array literal,
+        // update the type to include the size from the literal
+        if let Some(init) = &decl.initializer {
+            if let ExprKind::ArrayLiteral { elements } = &init.kind {
+                let len = elements.len() as u16;
+                var_type = match var_type {
+                    Type::ByteArray(None) => Type::ByteArray(Some(len)),
+                    Type::WordArray(None) => Type::WordArray(Some(len)),
+                    Type::BoolArray(None) => Type::BoolArray(Some(len)),
+                    Type::SbyteArray(None) => Type::SbyteArray(Some(len)),
+                    Type::SwordArray(None) => Type::SwordArray(Some(len)),
+                    _ => var_type,
+                };
+            }
+        }
+
+        let address = self.allocate_variable(&decl.name, &var_type, false);
 
         if let Some(init) = &decl.initializer {
-            self.generate_expression(init)?;
-            self.emit_store_to_address(address, &decl.var_type);
+            // Check if initializer is an array literal
+            if let ExprKind::ArrayLiteral { elements } = &init.kind {
+                self.generate_array_literal_init(address, &var_type, elements)?;
+            } else {
+                self.generate_expression(init)?;
+                self.emit_store_to_address(address, &var_type);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Generate code to initialize an array from a literal.
+    fn generate_array_literal_init(
+        &mut self,
+        base_address: u16,
+        array_type: &Type,
+        elements: &[Expr],
+    ) -> Result<(), CompileError> {
+        let element_type = array_type.element_type().unwrap_or(Type::Byte);
+        let element_size = match element_type {
+            Type::Word | Type::Sword => 2,
+            _ => 1, // Byte, Sbyte, Bool
+        };
+
+        // Optimization: check if all elements are zero
+        if self.all_elements_are_zero(elements) {
+            let total_bytes = elements.len() * element_size;
+            self.generate_zero_memory(base_address, total_bytes)?;
+            return Ok(());
+        }
+
+        for (i, elem) in elements.iter().enumerate() {
+            let elem_address = base_address.wrapping_add((i * element_size) as u16);
+
+            // Generate the element value
+            self.generate_expression(elem)?;
+
+            // Store the value at the element address
+            match element_type {
+                Type::Word | Type::Sword => {
+                    // Store 16-bit value (A=low, X=high)
+                    self.emit_abs(opcodes::STA_ABS, elem_address);
+                    self.emit_byte(opcodes::STX_ABS);
+                    self.emit_word(elem_address.wrapping_add(1));
+                }
+                _ => {
+                    // Store 8-bit value (Byte, Sbyte, Bool)
+                    self.emit_abs(opcodes::STA_ABS, elem_address);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Check if all array elements are zero (or false for bools).
+    fn all_elements_are_zero(&self, elements: &[Expr]) -> bool {
+        elements.iter().all(|elem| match &elem.kind {
+            ExprKind::IntegerLiteral(v) => *v == 0,
+            ExprKind::BoolLiteral(b) => !b,
+            _ => false,
+        })
+    }
+
+    /// Generate efficient code to zero a block of memory.
+    fn generate_zero_memory(
+        &mut self,
+        base_address: u16,
+        byte_count: usize,
+    ) -> Result<(), CompileError> {
+        if byte_count == 0 {
+            return Ok(());
+        }
+
+        // For small arrays (< 8 bytes), use individual stores
+        if byte_count < 8 {
+            self.emit_imm(opcodes::LDA_IMM, 0);
+            for i in 0..byte_count {
+                self.emit_abs(opcodes::STA_ABS, base_address.wrapping_add(i as u16));
+            }
+            return Ok(());
+        }
+
+        // For larger arrays, use a loop with X register as counter
+        // Limit to 256 bytes per loop iteration
+        let chunks = byte_count.div_ceil(256);
+        let mut remaining = byte_count;
+
+        for chunk in 0..chunks {
+            let chunk_base = base_address.wrapping_add((chunk * 256) as u16);
+            let chunk_size = remaining.min(256);
+
+            // LDA #$00
+            self.emit_imm(opcodes::LDA_IMM, 0);
+
+            if chunk_size == 256 {
+                // LDX #$00 (will wrap from 0 to 255, then to 0)
+                self.emit_imm(opcodes::LDX_IMM, 0);
+            } else {
+                // LDX #(chunk_size - 1)
+                self.emit_imm(opcodes::LDX_IMM, (chunk_size - 1) as u8);
+            }
+
+            // loop: STA base,X
+            let loop_addr = self.current_address();
+            self.emit_abs(opcodes::STA_ABX, chunk_base);
+
+            // DEX
+            self.emit_byte(opcodes::DEX);
+
+            if chunk_size == 256 {
+                // BNE loop (branch if X != 0 after wrapping)
+                self.emit_byte(opcodes::BNE);
+                let offset = loop_addr.wrapping_sub(self.current_address().wrapping_add(1)) as i8;
+                self.emit_byte(offset as u8);
+            } else {
+                // BPL loop (branch while X >= 0)
+                self.emit_byte(opcodes::BPL);
+                let offset = loop_addr.wrapping_sub(self.current_address().wrapping_add(1)) as i8;
+                self.emit_byte(offset as u8);
+            }
+
+            remaining -= chunk_size;
         }
 
         Ok(())
@@ -2105,7 +2264,13 @@ impl CodeGenerator {
 
     /// Generate code for a constant declaration.
     fn generate_const_decl(&mut self, decl: &ConstDecl) -> Result<(), CompileError> {
-        let const_type = self.infer_type_from_expr(&decl.value);
+        // Use explicit type or infer from value
+        let const_type = if let Some(ref t) = decl.const_type {
+            t.clone()
+        } else {
+            self.infer_type_from_expr(&decl.value)
+        };
+
         let address = self.allocate_variable(&decl.name, &const_type, true);
 
         self.generate_expression(&decl.value)?;
@@ -2160,6 +2325,34 @@ impl CodeGenerator {
                 Type::binary_result_type(&left_type, &right_type).unwrap_or(Type::Byte)
             }
             ExprKind::TypeCast { target_type, .. } => target_type.clone(),
+            ExprKind::ArrayLiteral { elements } => {
+                // Infer array type from elements
+                if elements.is_empty() {
+                    Type::ByteArray(Some(0))
+                } else {
+                    let first_type = self.infer_type_from_expr(&elements[0]);
+                    let len = elements.len() as u16;
+                    match first_type {
+                        Type::Bool => Type::BoolArray(Some(len)),
+                        Type::Word => Type::WordArray(Some(len)),
+                        Type::Sbyte => Type::SbyteArray(Some(len)),
+                        Type::Sword => Type::SwordArray(Some(len)),
+                        _ => Type::ByteArray(Some(len)),
+                    }
+                }
+            }
+            ExprKind::ArrayIndex { array, .. } => {
+                // Return the element type of the array
+                if let ExprKind::Identifier(name) = &array.kind {
+                    if let Some(var) = self.variables.get(name) {
+                        var.var_type.element_type().unwrap_or(Type::Byte)
+                    } else {
+                        Type::Byte
+                    }
+                } else {
+                    Type::Byte
+                }
+            }
             _ => Type::Byte, // Default to byte
         }
     }
@@ -2180,6 +2373,53 @@ impl CodeGenerator {
     /// Check if a type is floating-point.
     fn is_float_type(&self, var_type: &Type) -> bool {
         matches!(var_type, Type::Float)
+    }
+
+    /// Get the length of an array from an expression.
+    /// Returns the array size as a u16.
+    fn get_array_length(&self, expr: &Expr, span: &Span) -> Result<u16, CompileError> {
+        // The argument should be an identifier referencing an array variable
+        if let ExprKind::Identifier(name) = &expr.kind {
+            if let Some(var) = self.variables.get(name) {
+                // Get the size from the array type
+                match &var.var_type {
+                    Type::ByteArray(Some(size))
+                    | Type::WordArray(Some(size))
+                    | Type::BoolArray(Some(size))
+                    | Type::SbyteArray(Some(size))
+                    | Type::SwordArray(Some(size)) => Ok(*size),
+                    Type::ByteArray(None)
+                    | Type::WordArray(None)
+                    | Type::BoolArray(None)
+                    | Type::SbyteArray(None)
+                    | Type::SwordArray(None) => {
+                        // Array without known size - should not happen after analysis
+                        Err(CompileError::new(
+                            ErrorCode::TypeMismatch,
+                            format!("Cannot determine size of array '{}'", name),
+                            span.clone(),
+                        ))
+                    }
+                    _ => Err(CompileError::new(
+                        ErrorCode::TypeMismatch,
+                        format!("'{}' is not an array", name),
+                        span.clone(),
+                    )),
+                }
+            } else {
+                Err(CompileError::new(
+                    ErrorCode::UndefinedVariable,
+                    format!("Undefined variable '{}'", name),
+                    span.clone(),
+                ))
+            }
+        } else {
+            Err(CompileError::new(
+                ErrorCode::TypeMismatch,
+                "len() requires an array variable".to_string(),
+                span.clone(),
+            ))
+        }
     }
 
     /// Emit signed less-than comparison.
@@ -2450,15 +2690,39 @@ impl CodeGenerator {
                     )
                 })?;
 
-                // Generate value first
+                let is_word_array =
+                    matches!(var.var_type, Type::WordArray(_) | Type::SwordArray(_));
+
+                // Only simple assignment is supported for arrays currently
+                if assign.op != AssignOp::Assign {
+                    return Err(CompileError::new(
+                        ErrorCode::NotImplemented,
+                        "Compound assignment operators on array elements not yet supported",
+                        assign.span.clone(),
+                    ));
+                }
+
+                // Generate value first and save it
                 self.generate_expression(&assign.value)?;
-                self.emit_byte(opcodes::PHA); // Save value
+                if is_word_array {
+                    // Save both bytes (A=low, X=high)
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP2);
+                    self.emit_byte(opcodes::STX_ZP);
+                    self.emit_byte(zeropage::TMP2_HI);
+                } else {
+                    self.emit_byte(opcodes::PHA); // Save 8-bit value
+                }
 
                 // Generate index
                 self.generate_expression(index)?;
-                self.emit_byte(opcodes::TAY); // Y = index
+                if is_word_array {
+                    // Multiply index by 2 for word arrays
+                    self.emit_byte(opcodes::ASL_ACC);
+                }
+                self.emit_byte(opcodes::TAY); // Y = index (or index*2)
 
-                // Load base address
+                // Load base address into TMP1
                 self.emit_imm(opcodes::LDA_IMM, (var.address & 0xFF) as u8);
                 self.emit_byte(opcodes::STA_ZP);
                 self.emit_byte(zeropage::TMP1);
@@ -2466,10 +2730,23 @@ impl CodeGenerator {
                 self.emit_byte(opcodes::STA_ZP);
                 self.emit_byte(zeropage::TMP1_HI);
 
-                // Restore value and store
-                self.emit_byte(opcodes::PLA);
-                self.emit_byte(opcodes::STA_IZY);
-                self.emit_byte(zeropage::TMP1);
+                if is_word_array {
+                    // Store 16-bit value
+                    self.emit_byte(opcodes::LDA_ZP);
+                    self.emit_byte(zeropage::TMP2);
+                    self.emit_byte(opcodes::STA_IZY);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_byte(opcodes::INY);
+                    self.emit_byte(opcodes::LDA_ZP);
+                    self.emit_byte(zeropage::TMP2_HI);
+                    self.emit_byte(opcodes::STA_IZY);
+                    self.emit_byte(zeropage::TMP1);
+                } else {
+                    // Store 8-bit value
+                    self.emit_byte(opcodes::PLA);
+                    self.emit_byte(opcodes::STA_IZY);
+                    self.emit_byte(zeropage::TMP1);
+                }
             }
         }
 
@@ -2729,9 +3006,18 @@ impl CodeGenerator {
                         )
                     })?;
 
-                    // Calculate address: base + index
+                    let is_word_array =
+                        matches!(var.var_type, Type::WordArray(_) | Type::SwordArray(_));
+
+                    // Generate index expression
                     self.generate_expression(index)?;
-                    self.emit_byte(opcodes::TAY); // Y = index
+
+                    if is_word_array {
+                        // For word arrays, multiply index by 2 (ASL A)
+                        self.emit_byte(opcodes::ASL_ACC);
+                    }
+
+                    self.emit_byte(opcodes::TAY); // Y = index (or index*2 for word arrays)
 
                     // Load base address into TMP1
                     self.emit_imm(opcodes::LDA_IMM, (var.address & 0xFF) as u8);
@@ -2741,9 +3027,21 @@ impl CodeGenerator {
                     self.emit_byte(opcodes::STA_ZP);
                     self.emit_byte(zeropage::TMP1_HI);
 
-                    // Load value at (TMP1),Y
-                    self.emit_byte(opcodes::LDA_IZY);
-                    self.emit_byte(zeropage::TMP1);
+                    if is_word_array {
+                        // Load 16-bit value: low byte to A, high byte to X
+                        self.emit_byte(opcodes::LDA_IZY);
+                        self.emit_byte(zeropage::TMP1);
+                        self.emit_byte(opcodes::PHA); // Save low byte
+                        self.emit_byte(opcodes::INY); // Point to high byte
+                        self.emit_byte(opcodes::LDA_IZY);
+                        self.emit_byte(zeropage::TMP1);
+                        self.emit_byte(opcodes::TAX); // X = high byte
+                        self.emit_byte(opcodes::PLA); // A = low byte
+                    } else {
+                        // Load 8-bit value (byte, bool)
+                        self.emit_byte(opcodes::LDA_IZY);
+                        self.emit_byte(zeropage::TMP1);
+                    }
                 } else {
                     return Err(CompileError::new(
                         ErrorCode::InvalidAssignmentTarget,
@@ -2770,6 +3068,17 @@ impl CodeGenerator {
             }
             ExprKind::Grouped(inner) => {
                 self.generate_expression(inner)?;
+            }
+            ExprKind::ArrayLiteral { .. } => {
+                // Array literals are handled during variable initialization.
+                // If we reach here, it means the array literal is used in an
+                // expression context that isn't supported yet.
+                // Full implementation will be done in Phase 3.
+                return Err(CompileError::new(
+                    ErrorCode::NotImplemented,
+                    "Array literals in expression context not yet implemented",
+                    expr.span.clone(),
+                ));
             }
         }
         Ok(())
@@ -3651,6 +3960,15 @@ impl CodeGenerator {
                     self.emit_imm(opcodes::LDY_IMM, 0);
                     self.emit_byte(opcodes::LDA_IZY);
                     self.emit_byte(zeropage::TMP1);
+                }
+            }
+            "len" => {
+                // Get array length as a word (16-bit) value
+                // Result: A = low byte, X = high byte
+                if !args.is_empty() {
+                    let array_size = self.get_array_length(&args[0], span)?;
+                    self.emit_imm(opcodes::LDA_IMM, (array_size & 0xFF) as u8);
+                    self.emit_imm(opcodes::LDX_IMM, ((array_size >> 8) & 0xFF) as u8);
                 }
             }
             _ => {

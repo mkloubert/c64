@@ -180,6 +180,12 @@ conformance_test!(
     "Integer overflow wrapping behavior"
 );
 
+conformance_test!(
+    test_26_type_inference,
+    "26_type_inference.cb64",
+    "Type inference for variables and constants"
+);
+
 // ============================================================================
 // Code Generation Verification Tests
 // ============================================================================

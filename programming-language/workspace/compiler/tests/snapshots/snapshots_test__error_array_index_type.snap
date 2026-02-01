@@ -1,0 +1,9 @@
+---
+source: tests/snapshots_test.rs
+expression: error
+---
+error[E214]: Array index must be an integer, found bool
+  --> array_index_type.cb64:6:19
+  |
+6 |     x: byte = arr[true]
+  |                   ^^^^

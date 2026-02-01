@@ -1,0 +1,9 @@
+---
+source: tests/snapshots_test.rs
+expression: error
+---
+error[E210]: Cannot assign word[2] to variable of type byte[]
+  --> array_type_mismatch.cb64:5:19
+  |
+5 |     arr: byte[] = [1000, 2000]
+  |                   ^^^^^^^^^^^^

@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc c6c346b97146787f3bda46209490db33df3526410a7ad2e217c1ac7d7264faa5 # shrinks to count = 1
+cc 836453071e259186779aa8247df41b1d4e7401ac65b0b895c2b00dfb624aa8e6 # shrinks to keyword = "const"

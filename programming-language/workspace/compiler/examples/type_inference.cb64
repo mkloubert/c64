@@ -1,0 +1,85 @@
+# Type Inference Example
+# Demonstrates optional type annotation with automatic type inference
+
+# ============================================
+# Variables with Type Inference
+# ============================================
+
+# Integer values - type inferred from range
+small = 10              # byte (0-255)
+medium = 1000           # word (256-65535)
+negative = -50          # sbyte (-128 to -1)
+big_negative = -1000    # sword (-32768 to -129)
+
+# Decimal values - default to float
+pi_approx = 3.14
+speed = 0.5
+
+# Boolean values
+is_ready = true
+is_done = false
+
+# ============================================
+# Constants with Explicit Type
+# ============================================
+
+# Force specific type even for small values
+MAX_ITEMS: word = 100       # word instead of byte
+BUFFER_SIZE: word = 256     # word for 256
+
+# Fixed-point for game calculations
+GRAVITY: fixed = 0.5
+FRICTION: fixed = 0.95
+PLAYER_SPEED: fixed = 2.5
+
+# Float for scientific values
+PI: float = 3.14159
+E: float = 2.71828
+
+# ============================================
+# Constants with Type Inference
+# ============================================
+
+SCREEN_WIDTH = 40       # byte
+SCREEN_HEIGHT = 25      # byte
+SPRITE_COUNT = 8        # byte
+MAX_SCORE = 9999        # word
+MIN_TEMP = -40          # sbyte
+DEEP_VALUE = -500       # sword
+
+# ============================================
+# Main Program
+# ============================================
+
+def main():
+    cls()
+    println("TYPE INFERENCE DEMO")
+    println("")
+
+    # Use inferred variables
+    println("Inferred variables:")
+    print("  small = ")
+    println(small)
+    print("  medium = ")
+    println(medium)
+    print("  negative = ")
+    println(negative)
+    println("")
+
+    # Use explicit-typed constants
+    println("Explicit constants:")
+    print("  MAX_ITEMS = ")
+    println(MAX_ITEMS)
+    println("")
+
+    # Use inferred constants
+    println("Inferred constants:")
+    print("  SCREEN_WIDTH = ")
+    println(SCREEN_WIDTH)
+    print("  MAX_SCORE = ")
+    println(MAX_SCORE)
+
+    # Calculations with mixed types
+    total: word = medium + small
+    print("  total = ")
+    println(total)

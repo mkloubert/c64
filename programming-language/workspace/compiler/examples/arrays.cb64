@@ -1,0 +1,59 @@
+# Arrays Demo for Cobra64
+# Demonstrates array declaration, initialization, and access
+
+def main():
+    cls()
+    println("ARRAYS DEMO")
+    println("")
+
+    # Byte array with initializer
+    data: byte[] = [10, 20, 30, 40, 50]
+
+    # Access and modify array elements
+    println("BYTE ARRAY VALUES:")
+    x: byte = data[0]
+    y: byte = data[2]
+    z: byte = data[4]
+
+    # Modify an element
+    data[1] = 25
+
+    # Word array for larger values
+    scores: word[] = [1000, 2500, 5000]
+
+    # Calculate sum of scores
+    total: word = 0
+    i: byte = 0
+    while i < 3:
+        total = total + scores[i]
+        i = i + 1
+
+    # Bool array for flags
+    flags: bool[] = [true, false, true]
+
+    # Count true flags
+    count: byte = 0
+    j: byte = 0
+    while j < 3:
+        if flags[j]:
+            count = count + 1
+        j = j + 1
+
+    # Sized array without initializer
+    buffer: byte[10]
+
+    # Fill buffer with pattern
+    k: byte = 0
+    while k < 10:
+        buffer[k] = k * 10
+        k = k + 1
+
+    # Copy to screen memory to show result
+    # Screen starts at $0400 (1024)
+    m: byte = 0
+    while m < 10:
+        poke(1024 + m, buffer[m])
+        m = m + 1
+
+    println("ARRAY VALUES SHOWN ON SCREEN")
+    println("(TOP-LEFT CORNER)")

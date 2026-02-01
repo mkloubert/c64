@@ -365,7 +365,7 @@ proptest! {
     fn prop_keywords_reserved(
         keyword in prop::sample::select(vec![
             "def", "if", "else", "while", "return", "break", "continue",
-            "pass", "true", "false", "and", "or", "not", "const",
+            "pass", "true", "false", "and", "or", "not",
             "byte", "word", "bool", "sbyte", "sword",
         ])
     ) {

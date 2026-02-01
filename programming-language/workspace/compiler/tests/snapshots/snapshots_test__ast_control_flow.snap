@@ -15,7 +15,9 @@ Program {
                             kind: VarDecl(
                                 VarDecl {
                                     name: "x",
-                                    var_type: Byte,
+                                    var_type: Some(
+                                        Byte,
+                                    ),
                                     initializer: Some(
                                         Expr {
                                             kind: IntegerLiteral(
@@ -247,7 +249,9 @@ Program {
                             kind: VarDecl(
                                 VarDecl {
                                     name: "i",
-                                    var_type: Byte,
+                                    var_type: Some(
+                                        Byte,
+                                    ),
                                     initializer: Some(
                                         Expr {
                                             kind: IntegerLiteral(

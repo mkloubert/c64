@@ -1,0 +1,21 @@
+# Cobra64 - Array initialization test
+# Tests: various initialization patterns
+
+def main():
+    # Single element
+    single: byte[] = [42]
+
+    # Multiple elements
+    multi: byte[] = [1, 2, 3, 4, 5]
+
+    # Max byte values
+    maxes: byte[] = [0, 128, 255]
+
+    # Zero-initialized (uses optimization)
+    zeros: byte[] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+    # Sized without init
+    unset: byte[5]
+
+    # Trailing comma allowed
+    trailing: byte[] = [1, 2, 3,]

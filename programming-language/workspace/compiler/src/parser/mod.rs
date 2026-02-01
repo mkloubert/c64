@@ -25,7 +25,7 @@ use crate::ast::{
     UnaryOp, VarDecl, WhileStatement,
 };
 use crate::error::{CompileError, ErrorCode, Span};
-use crate::lexer::Token;
+use crate::lexer::{is_constant_name, Token};
 
 /// The parser state.
 pub struct Parser<'a> {
@@ -168,26 +168,40 @@ impl<'a> Parser<'a> {
                 let func = self.parse_function_def()?;
                 Ok(TopLevelItem::Function(func))
             }
-            Some(Token::Const) => {
-                let decl = self.parse_const_decl()?;
-                Ok(TopLevelItem::Constant(decl))
-            }
-            Some(Token::Identifier(_)) => {
-                // Could be a variable declaration (name: type) or a statement
-                // Look ahead to check for colon
-                if matches!(self.peek_ahead(1), Some(Token::Colon)) {
-                    let decl = self.parse_var_decl()?;
-                    Ok(TopLevelItem::Variable(decl))
+            Some(Token::Identifier(name)) => {
+                let name = name.clone();
+                // Check if it's a constant (UPPERCASE name) or variable (lowercase name)
+                if is_constant_name(&name) {
+                    // Constant: NAME = value OR NAME: type = value
+                    if matches!(self.peek_ahead(1), Some(Token::Equal))
+                        || matches!(self.peek_ahead(1), Some(Token::Colon))
+                    {
+                        let decl = self.parse_const_decl()?;
+                        Ok(TopLevelItem::Constant(decl))
+                    } else {
+                        Err(self.error(
+                            ErrorCode::UnexpectedToken,
+                            "Expected '=' or ':' after constant name",
+                        ))
+                    }
                 } else {
-                    Err(self.error(
-                        ErrorCode::UnexpectedToken,
-                        "Expected function definition, constant, or variable declaration at top level",
-                    ))
+                    // Variable: name: type = value OR name = value
+                    if matches!(self.peek_ahead(1), Some(Token::Colon))
+                        || matches!(self.peek_ahead(1), Some(Token::Equal))
+                    {
+                        let decl = self.parse_var_decl()?;
+                        Ok(TopLevelItem::Variable(decl))
+                    } else {
+                        Err(self.error(
+                            ErrorCode::UnexpectedToken,
+                            "Expected function definition, constant, or variable declaration at top level",
+                        ))
+                    }
                 }
             }
             Some(t) if t.is_type() => Err(self.error(
                 ErrorCode::UnexpectedToken,
-                "Variable declarations should use 'name: type' syntax",
+                "Variable declarations should use 'name: type' or 'name = value' syntax",
             )),
             _ => Err(self.error(
                 ErrorCode::UnexpectedToken,
@@ -331,9 +345,12 @@ impl<'a> Parser<'a> {
             match base_type {
                 Type::Byte => Ok(Type::ByteArray(size)),
                 Type::Word => Ok(Type::WordArray(size)),
+                Type::Bool => Ok(Type::BoolArray(size)),
+                Type::Sbyte => Ok(Type::SbyteArray(size)),
+                Type::Sword => Ok(Type::SwordArray(size)),
                 _ => Err(self.error(
                     ErrorCode::InvalidType,
-                    "Only byte and word arrays are supported",
+                    "Only byte, word, bool, sbyte, and sword arrays are supported",
                 )),
             }
         } else {
@@ -425,11 +442,6 @@ impl<'a> Parser<'a> {
                 let span = start_span;
                 Ok(Statement::new(StatementKind::Pass, span))
             }
-            Some(Token::Const) => {
-                let decl = self.parse_const_decl()?;
-                let span = decl.span.clone();
-                Ok(Statement::new(StatementKind::ConstDecl(decl), span))
-            }
             Some(Token::Identifier(_)) => {
                 // Could be variable declaration, assignment, or expression
                 self.parse_identifier_statement()
@@ -446,6 +458,10 @@ impl<'a> Parser<'a> {
     /// Parse a statement starting with an identifier.
     fn parse_identifier_statement(&mut self) -> Result<Statement, CompileError> {
         let start_span = self.peek_span().unwrap();
+
+        // Note: Constant declarations (NAME = value) are only allowed at top-level,
+        // not inside function bodies. Inside functions, NAME = value is always
+        // an assignment (which will be rejected by the analyzer if NAME is a constant).
 
         // Check if it's a variable declaration (name: type)
         if matches!(self.peek_ahead(1), Some(Token::Colon)) {
@@ -536,6 +552,9 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse a variable declaration.
+    /// Syntax: name: type = value (explicit type)
+    ///         name: type (explicit type, no initializer)
+    ///         name = value (type inference)
     fn parse_var_decl(&mut self) -> Result<VarDecl, CompileError> {
         let start_span = self.peek_span().unwrap();
 
@@ -544,33 +563,51 @@ impl<'a> Parser<'a> {
             _ => return Err(self.error(ErrorCode::ExpectedIdentifier, "Expected variable name")),
         };
 
-        self.expect(&Token::Colon, "Expected ':' after variable name")?;
-        let var_type = self.parse_type()?;
+        // Optional type annotation
+        let var_type = if self.match_token(&Token::Colon) {
+            Some(self.parse_type()?)
+        } else {
+            None
+        };
 
-        // Check for array size in declaration
-        let array_size = if matches!(
-            var_type,
-            Type::ByteArray(Some(_)) | Type::WordArray(Some(_))
-        ) {
-            match &var_type {
-                Type::ByteArray(Some(n)) | Type::WordArray(Some(n)) => Some(*n),
-                _ => None,
+        // Check for array size in declaration (only if type is specified)
+        let array_size = if let Some(ref vt) = var_type {
+            if matches!(vt, Type::ByteArray(Some(_)) | Type::WordArray(Some(_))) {
+                match vt {
+                    Type::ByteArray(Some(n)) | Type::WordArray(Some(n)) => Some(*n),
+                    _ => None,
+                }
+            } else {
+                None
             }
         } else {
             None
         };
 
-        // Optional initializer
+        // Initializer (required for type inference, optional for explicit type)
         let initializer = if self.match_token(&Token::Equal) {
             Some(self.parse_expression()?)
         } else {
             None
         };
 
+        // Type inference requires initializer
+        if var_type.is_none() && initializer.is_none() {
+            return Err(self.error(
+                ErrorCode::TypeMismatch,
+                "Variable declaration without type requires an initializer for type inference",
+            ));
+        }
+
         let end_span = self.previous_span();
         let span = start_span.merge(&end_span);
 
-        let mut decl = VarDecl::new(name, var_type, span);
+        let mut decl = if let Some(t) = var_type {
+            VarDecl::new(name, t, span)
+        } else {
+            VarDecl::new_inferred(name, span)
+        };
+
         if let Some(init) = initializer {
             decl = decl.with_initializer(init);
         }
@@ -582,13 +619,21 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse a constant declaration.
+    /// Syntax: NAME = value (type inference)
+    ///         NAME: type = value (explicit type)
     fn parse_const_decl(&mut self) -> Result<ConstDecl, CompileError> {
         let start_span = self.peek_span().unwrap();
-        self.expect(&Token::Const, "Expected 'const'")?;
 
         let name = match self.advance() {
             Some((Token::Identifier(name), _)) => name,
             _ => return Err(self.error(ErrorCode::ExpectedIdentifier, "Expected constant name")),
+        };
+
+        // Optional type annotation
+        let const_type = if self.match_token(&Token::Colon) {
+            Some(self.parse_type()?)
+        } else {
+            None
         };
 
         self.expect(&Token::Equal, "Expected '=' after constant name")?;
@@ -597,7 +642,11 @@ impl<'a> Parser<'a> {
         let end_span = value.span.clone();
         let span = start_span.merge(&end_span);
 
-        Ok(ConstDecl::new(name, value, span))
+        if let Some(t) = const_type {
+            Ok(ConstDecl::new_typed(name, t, value, span))
+        } else {
+            Ok(ConstDecl::new(name, value, span))
+        }
     }
 
     /// Parse an if statement.
@@ -1155,6 +1204,30 @@ impl<'a> Parser<'a> {
                 Ok(Expr::new(ExprKind::Grouped(Box::new(inner)), full_span))
             }
 
+            // Array literal
+            Token::LeftBracket => {
+                let mut elements = Vec::new();
+
+                // Check for empty array
+                if !self.check(&Token::RightBracket) {
+                    // Parse first element
+                    elements.push(self.parse_expression()?);
+
+                    // Parse remaining elements
+                    while self.match_token(&Token::Comma) {
+                        // Allow trailing comma
+                        if self.check(&Token::RightBracket) {
+                            break;
+                        }
+                        elements.push(self.parse_expression()?);
+                    }
+                }
+
+                let (_, end_span) = self.expect(&Token::RightBracket, "Expected ']'")?;
+                let full_span = span.merge(&end_span);
+                Ok(Expr::new(ExprKind::ArrayLiteral { elements }, full_span))
+            }
+
             _ => Err(CompileError::new(
                 ErrorCode::UnexpectedToken,
                 format!("Unexpected token in expression: {}", token),
@@ -1370,6 +1443,157 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_array_literal_integers() {
+        let program = parse_source("def main():\n    x: byte[] = [1, 2, 3]").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
+            assert_eq!(decl.name, "x");
+            if let Some(init) = &decl.initializer {
+                if let ExprKind::ArrayLiteral { elements } = &init.kind {
+                    assert_eq!(elements.len(), 3);
+                } else {
+                    panic!("Expected array literal");
+                }
+            } else {
+                panic!("Expected initializer");
+            }
+        } else {
+            panic!("Expected var decl");
+        }
+    }
+
+    #[test]
+    fn test_parse_array_literal_bools() {
+        let program = parse_source("def main():\n    flags: bool[] = [true, false, true]").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
+            assert_eq!(decl.name, "flags");
+            assert_eq!(decl.var_type, Some(Type::BoolArray(None)));
+            if let Some(init) = &decl.initializer {
+                if let ExprKind::ArrayLiteral { elements } = &init.kind {
+                    assert_eq!(elements.len(), 3);
+                } else {
+                    panic!("Expected array literal");
+                }
+            } else {
+                panic!("Expected initializer");
+            }
+        } else {
+            panic!("Expected var decl");
+        }
+    }
+
+    #[test]
+    fn test_parse_array_literal_empty() {
+        let program = parse_source("def main():\n    x: byte[] = []").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
+            if let Some(init) = &decl.initializer {
+                if let ExprKind::ArrayLiteral { elements } = &init.kind {
+                    assert!(elements.is_empty());
+                } else {
+                    panic!("Expected array literal");
+                }
+            } else {
+                panic!("Expected initializer");
+            }
+        } else {
+            panic!("Expected var decl");
+        }
+    }
+
+    #[test]
+    fn test_parse_array_literal_trailing_comma() {
+        let program = parse_source("def main():\n    x: byte[] = [1, 2, 3,]").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
+            if let Some(init) = &decl.initializer {
+                if let ExprKind::ArrayLiteral { elements } = &init.kind {
+                    assert_eq!(elements.len(), 3);
+                } else {
+                    panic!("Expected array literal");
+                }
+            } else {
+                panic!("Expected initializer");
+            }
+        } else {
+            panic!("Expected var decl");
+        }
+    }
+
+    #[test]
+    fn test_parse_array_type_with_size() {
+        let program = parse_source("def main():\n    buffer: byte[100]").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
+            assert_eq!(decl.name, "buffer");
+            assert_eq!(decl.var_type, Some(Type::ByteArray(Some(100))));
+        } else {
+            panic!("Expected var decl");
+        }
+    }
+
+    #[test]
+    fn test_parse_bool_array_type() {
+        let program = parse_source("def main():\n    flags: bool[8]").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
+            assert_eq!(decl.name, "flags");
+            assert_eq!(decl.var_type, Some(Type::BoolArray(Some(8))));
+        } else {
+            panic!("Expected var decl");
+        }
+    }
+
+    #[test]
+    fn test_parse_sbyte_array_type() {
+        let program = parse_source("def main():\n    temps: sbyte[10]").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
+            assert_eq!(decl.name, "temps");
+            assert_eq!(decl.var_type, Some(Type::SbyteArray(Some(10))));
+        } else {
+            panic!("Expected var decl");
+        }
+    }
+
+    #[test]
+    fn test_parse_sword_array_type() {
+        let program = parse_source("def main():\n    values: sword[5]").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
+            assert_eq!(decl.name, "values");
+            assert_eq!(decl.var_type, Some(Type::SwordArray(Some(5))));
+        } else {
+            panic!("Expected var decl");
+        }
+    }
+
+    #[test]
+    fn test_parse_sbyte_array_unsized() {
+        let program = parse_source("def main():\n    arr: sbyte[] = [-10, 0, 10]").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
+            assert_eq!(decl.name, "arr");
+            assert_eq!(decl.var_type, Some(Type::SbyteArray(None)));
+        } else {
+            panic!("Expected var decl");
+        }
+    }
+
+    #[test]
+    fn test_parse_sword_array_unsized() {
+        let program = parse_source("def main():\n    arr: sword[] = [-1000, 500]").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
+            assert_eq!(decl.name, "arr");
+            assert_eq!(decl.var_type, Some(Type::SwordArray(None)));
+        } else {
+            panic!("Expected var decl");
+        }
+    }
+
+    #[test]
     fn test_parse_type_cast() {
         let program = parse_source("def main():\n    byte(256)").unwrap();
         let main = program.main_function().unwrap();
@@ -1417,7 +1641,7 @@ mod tests {
         let main = program.main_function().unwrap();
         if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
             assert_eq!(decl.name, "x");
-            assert_eq!(decl.var_type, Type::Byte);
+            assert_eq!(decl.var_type, Some(Type::Byte));
             assert!(decl.initializer.is_some());
         } else {
             panic!("Expected var decl");
@@ -1430,7 +1654,7 @@ mod tests {
         let main = program.main_function().unwrap();
         if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
             assert_eq!(decl.name, "x");
-            assert_eq!(decl.var_type, Type::Word);
+            assert_eq!(decl.var_type, Some(Type::Word));
             assert!(decl.initializer.is_none());
         } else {
             panic!("Expected var decl");
@@ -1439,12 +1663,12 @@ mod tests {
 
     #[test]
     fn test_parse_const_decl() {
-        let program = parse_source("def main():\n    const MAX = 100").unwrap();
-        let main = program.main_function().unwrap();
-        if let StatementKind::ConstDecl(decl) = &main.body.statements[0].kind {
+        // Constant declarations are only allowed at top-level
+        let program = parse_source("MAX = 100\ndef main():\n    pass").unwrap();
+        if let TopLevelItem::Constant(decl) = &program.items[0] {
             assert_eq!(decl.name, "MAX");
         } else {
-            panic!("Expected const decl");
+            panic!("Expected const decl at top-level");
         }
     }
 
@@ -1618,7 +1842,7 @@ mod tests {
 
     #[test]
     fn test_parse_top_level_const() {
-        let program = parse_source("const MAX = 255\ndef main():\n    pass").unwrap();
+        let program = parse_source("MAX = 255\ndef main():\n    pass").unwrap();
         assert_eq!(program.items.len(), 2);
         assert!(matches!(program.items[0], TopLevelItem::Constant(_)));
     }
@@ -1775,7 +1999,7 @@ mod tests {
         let main = program.main_function().unwrap();
         if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
             assert_eq!(decl.name, "x");
-            assert_eq!(decl.var_type, Type::Sbyte);
+            assert_eq!(decl.var_type, Some(Type::Sbyte));
             assert!(decl.initializer.is_some());
             // The initializer should be a unary negation of 100
             if let Some(init) = &decl.initializer {
@@ -1798,7 +2022,7 @@ mod tests {
         let main = program.main_function().unwrap();
         if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
             assert_eq!(decl.name, "y");
-            assert_eq!(decl.var_type, Type::Sword);
+            assert_eq!(decl.var_type, Some(Type::Sword));
             assert!(decl.initializer.is_some());
         } else {
             panic!("Expected var decl");
@@ -1811,7 +2035,7 @@ mod tests {
         let program = parse_source("def main():\n    x: sbyte = -128").unwrap();
         let main = program.main_function().unwrap();
         if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
-            assert_eq!(decl.var_type, Type::Sbyte);
+            assert_eq!(decl.var_type, Some(Type::Sbyte));
             if let Some(init) = &decl.initializer {
                 if let ExprKind::UnaryOp { op, operand } = &init.kind {
                     assert_eq!(*op, UnaryOp::Negate);
@@ -1831,7 +2055,7 @@ mod tests {
         let program = parse_source("def main():\n    y: sword = -32768").unwrap();
         let main = program.main_function().unwrap();
         if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
-            assert_eq!(decl.var_type, Type::Sword);
+            assert_eq!(decl.var_type, Some(Type::Sword));
             if let Some(init) = &decl.initializer {
                 if let ExprKind::UnaryOp { op, operand } = &init.kind {
                     assert_eq!(*op, UnaryOp::Negate);
@@ -1885,7 +2109,7 @@ mod tests {
 
     #[test]
     fn test_parse_const_negative_value() {
-        let program = parse_source("const MIN_SBYTE = -128\ndef main():\n    pass").unwrap();
+        let program = parse_source("MIN_SBYTE = -128\ndef main():\n    pass").unwrap();
         if let TopLevelItem::Constant(decl) = &program.items[0] {
             assert_eq!(decl.name, "MIN_SBYTE");
             assert!(matches!(
@@ -2038,7 +2262,7 @@ mod tests {
         let main = program.main_function().unwrap();
         if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
             assert_eq!(decl.name, "x");
-            assert_eq!(decl.var_type, Type::Fixed);
+            assert_eq!(decl.var_type, Some(Type::Fixed));
             assert!(decl.initializer.is_some());
             if let Some(init) = &decl.initializer {
                 assert!(matches!(init.kind, ExprKind::DecimalLiteral(ref s) if s == "3.75"));
@@ -2054,7 +2278,7 @@ mod tests {
         let main = program.main_function().unwrap();
         if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
             assert_eq!(decl.name, "y");
-            assert_eq!(decl.var_type, Type::Float);
+            assert_eq!(decl.var_type, Some(Type::Float));
             assert!(decl.initializer.is_some());
             if let Some(init) = &decl.initializer {
                 assert!(matches!(init.kind, ExprKind::DecimalLiteral(ref s) if s == "3.14"));
@@ -2070,7 +2294,7 @@ mod tests {
         let main = program.main_function().unwrap();
         if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
             assert_eq!(decl.name, "x");
-            assert_eq!(decl.var_type, Type::Fixed);
+            assert_eq!(decl.var_type, Some(Type::Fixed));
             assert!(decl.initializer.is_none());
         } else {
             panic!("Expected var decl");
@@ -2083,7 +2307,7 @@ mod tests {
         let main = program.main_function().unwrap();
         if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
             assert_eq!(decl.name, "y");
-            assert_eq!(decl.var_type, Type::Float);
+            assert_eq!(decl.var_type, Some(Type::Float));
             assert!(decl.initializer.is_none());
         } else {
             panic!("Expected var decl");
@@ -2154,7 +2378,7 @@ mod tests {
         let program = parse_source("def main():\n    x: float = 1.5e3").unwrap();
         let main = program.main_function().unwrap();
         if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
-            assert_eq!(decl.var_type, Type::Float);
+            assert_eq!(decl.var_type, Some(Type::Float));
             if let Some(init) = &decl.initializer {
                 assert!(matches!(init.kind, ExprKind::DecimalLiteral(ref s) if s == "1.5e3"));
             }
@@ -2168,7 +2392,7 @@ mod tests {
         let program = parse_source("def main():\n    x: float = 2.0e-5").unwrap();
         let main = program.main_function().unwrap();
         if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
-            assert_eq!(decl.var_type, Type::Float);
+            assert_eq!(decl.var_type, Some(Type::Float));
             if let Some(init) = &decl.initializer {
                 assert!(matches!(init.kind, ExprKind::DecimalLiteral(ref s) if s == "2.0e-5"));
             }
@@ -2253,7 +2477,7 @@ mod tests {
         let program = parse_source("def main():\n    x: fixed = -3.5").unwrap();
         let main = program.main_function().unwrap();
         if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
-            assert_eq!(decl.var_type, Type::Fixed);
+            assert_eq!(decl.var_type, Some(Type::Fixed));
             if let Some(init) = &decl.initializer {
                 // Should be UnaryOp(Negate, DecimalLiteral("3.5"))
                 if let ExprKind::UnaryOp { op, operand } = &init.kind {
@@ -2273,7 +2497,7 @@ mod tests {
         let program = parse_source("def main():\n    x: float = 0.0").unwrap();
         let main = program.main_function().unwrap();
         if let StatementKind::VarDecl(decl) = &main.body.statements[0].kind {
-            assert_eq!(decl.var_type, Type::Float);
+            assert_eq!(decl.var_type, Some(Type::Float));
             if let Some(init) = &decl.initializer {
                 assert!(matches!(init.kind, ExprKind::DecimalLiteral(ref s) if s == "0.0"));
             }
@@ -2288,7 +2512,7 @@ mod tests {
         assert_eq!(program.items.len(), 2);
         if let TopLevelItem::Variable(decl) = &program.items[0] {
             assert_eq!(decl.name, "position");
-            assert_eq!(decl.var_type, Type::Fixed);
+            assert_eq!(decl.var_type, Some(Type::Fixed));
         } else {
             panic!("Expected variable");
         }
@@ -2300,7 +2524,7 @@ mod tests {
         assert_eq!(program.items.len(), 2);
         if let TopLevelItem::Variable(decl) = &program.items[0] {
             assert_eq!(decl.name, "temperature");
-            assert_eq!(decl.var_type, Type::Float);
+            assert_eq!(decl.var_type, Some(Type::Float));
         } else {
             panic!("Expected variable");
         }
@@ -2323,5 +2547,144 @@ mod tests {
         } else {
             panic!("Expected expression");
         }
+    }
+
+    // ========================================
+    // Type Inference Syntax Tests
+    // ========================================
+
+    #[test]
+    fn test_parse_var_decl_type_inference() {
+        // Variable at top-level with type inference: name = value
+        let program = parse_source("x = 10\ndef main():\n    pass").unwrap();
+        assert_eq!(program.items.len(), 2);
+        if let TopLevelItem::Variable(decl) = &program.items[0] {
+            assert_eq!(decl.name, "x");
+            assert_eq!(decl.var_type, None); // Type will be inferred
+            assert!(decl.initializer.is_some());
+        } else {
+            panic!("Expected variable declaration");
+        }
+    }
+
+    #[test]
+    fn test_parse_var_decl_type_inference_word_range() {
+        // Variable with value in word range
+        let program = parse_source("y = 1000\ndef main():\n    pass").unwrap();
+        if let TopLevelItem::Variable(decl) = &program.items[0] {
+            assert_eq!(decl.name, "y");
+            assert_eq!(decl.var_type, None);
+            if let Some(init) = &decl.initializer {
+                assert!(matches!(init.kind, ExprKind::IntegerLiteral(1000)));
+            } else {
+                panic!("Expected initializer");
+            }
+        } else {
+            panic!("Expected variable");
+        }
+    }
+
+    #[test]
+    fn test_parse_var_decl_type_inference_negative() {
+        // Variable with negative value
+        let program = parse_source("temp = -50\ndef main():\n    pass").unwrap();
+        if let TopLevelItem::Variable(decl) = &program.items[0] {
+            assert_eq!(decl.name, "temp");
+            assert_eq!(decl.var_type, None);
+            assert!(decl.initializer.is_some());
+        } else {
+            panic!("Expected variable");
+        }
+    }
+
+    #[test]
+    fn test_parse_const_decl_explicit_type() {
+        // Constant with explicit type: NAME: type = value
+        let program = parse_source("MAX: word = 255\ndef main():\n    pass").unwrap();
+        assert_eq!(program.items.len(), 2);
+        if let TopLevelItem::Constant(decl) = &program.items[0] {
+            assert_eq!(decl.name, "MAX");
+            assert_eq!(decl.const_type, Some(Type::Word));
+        } else {
+            panic!("Expected constant declaration");
+        }
+    }
+
+    #[test]
+    fn test_parse_const_decl_explicit_type_fixed() {
+        // Constant with explicit fixed type
+        let program = parse_source("PI: fixed = 3.14\ndef main():\n    pass").unwrap();
+        if let TopLevelItem::Constant(decl) = &program.items[0] {
+            assert_eq!(decl.name, "PI");
+            assert_eq!(decl.const_type, Some(Type::Fixed));
+        } else {
+            panic!("Expected constant");
+        }
+    }
+
+    #[test]
+    fn test_parse_const_decl_type_inference() {
+        // Constant with type inference (existing behavior)
+        let program = parse_source("MIN = 0\ndef main():\n    pass").unwrap();
+        if let TopLevelItem::Constant(decl) = &program.items[0] {
+            assert_eq!(decl.name, "MIN");
+            assert_eq!(decl.const_type, None); // Type will be inferred
+        } else {
+            panic!("Expected constant");
+        }
+    }
+
+    #[test]
+    fn test_parse_mixed_type_declarations() {
+        // Mix of explicit and inferred types
+        let source = r#"
+MAX: word = 255
+count = 0
+PI: fixed = 3.14
+E = 2.718
+def main():
+    pass
+"#;
+        let program = parse_source(source).unwrap();
+        assert_eq!(program.items.len(), 5);
+
+        // MAX: word = 255 (constant with explicit type)
+        if let TopLevelItem::Constant(decl) = &program.items[0] {
+            assert_eq!(decl.name, "MAX");
+            assert_eq!(decl.const_type, Some(Type::Word));
+        } else {
+            panic!("Expected constant MAX");
+        }
+
+        // count = 0 (variable with inferred type)
+        if let TopLevelItem::Variable(decl) = &program.items[1] {
+            assert_eq!(decl.name, "count");
+            assert_eq!(decl.var_type, None);
+        } else {
+            panic!("Expected variable count");
+        }
+
+        // PI: fixed = 3.14 (constant with explicit type)
+        if let TopLevelItem::Constant(decl) = &program.items[2] {
+            assert_eq!(decl.name, "PI");
+            assert_eq!(decl.const_type, Some(Type::Fixed));
+        } else {
+            panic!("Expected constant PI");
+        }
+
+        // E = 2.718 (constant with inferred type)
+        if let TopLevelItem::Constant(decl) = &program.items[3] {
+            assert_eq!(decl.name, "E");
+            assert_eq!(decl.const_type, None);
+        } else {
+            panic!("Expected constant E");
+        }
+    }
+
+    #[test]
+    fn test_parse_var_decl_type_inference_requires_init() {
+        // Variable without type and without initializer should fail
+        let result = parse_source("x\ndef main():\n    pass");
+        assert!(result.is_err());
     }
 }

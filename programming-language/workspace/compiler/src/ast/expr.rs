@@ -217,6 +217,9 @@ pub enum ExprKind {
     /// An array index access.
     ArrayIndex { array: Box<Expr>, index: Box<Expr> },
 
+    /// An array literal (e.g., `[1, 2, 3]`).
+    ArrayLiteral { elements: Vec<Expr> },
+
     /// A type cast expression (e.g., `byte(x)`).
     TypeCast {
         target_type: super::Type,
@@ -378,6 +381,16 @@ impl std::fmt::Display for ExprKind {
             ExprKind::ArrayIndex { array, index } => {
                 write!(f, "{}[{}]", array, index)
             }
+            ExprKind::ArrayLiteral { elements } => {
+                write!(f, "[")?;
+                for (i, elem) in elements.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", elem)?;
+                }
+                write!(f, "]")
+            }
             ExprKind::TypeCast { target_type, expr } => {
                 write!(f, "{}({})", target_type, expr)
             }
@@ -490,6 +503,34 @@ mod tests {
         let index = Box::new(Expr::new(ExprKind::IntegerLiteral(0), Span::new(4, 5)));
         let expr = Expr::new(ExprKind::ArrayIndex { array, index }, Span::new(0, 6));
         assert_eq!(format!("{}", expr), "arr[0]");
+    }
+
+    #[test]
+    fn test_display_array_literal() {
+        let elements = vec![
+            Expr::new(ExprKind::IntegerLiteral(1), Span::new(1, 2)),
+            Expr::new(ExprKind::IntegerLiteral(2), Span::new(4, 5)),
+            Expr::new(ExprKind::IntegerLiteral(3), Span::new(7, 8)),
+        ];
+        let expr = Expr::new(ExprKind::ArrayLiteral { elements }, Span::new(0, 9));
+        assert_eq!(format!("{}", expr), "[1, 2, 3]");
+    }
+
+    #[test]
+    fn test_display_array_literal_empty() {
+        let elements = vec![];
+        let expr = Expr::new(ExprKind::ArrayLiteral { elements }, Span::new(0, 2));
+        assert_eq!(format!("{}", expr), "[]");
+    }
+
+    #[test]
+    fn test_display_array_literal_bool() {
+        let elements = vec![
+            Expr::new(ExprKind::BoolLiteral(true), Span::new(1, 5)),
+            Expr::new(ExprKind::BoolLiteral(false), Span::new(7, 12)),
+        ];
+        let expr = Expr::new(ExprKind::ArrayLiteral { elements }, Span::new(0, 13));
+        assert_eq!(format!("{}", expr), "[true, false]");
     }
 
     #[test]

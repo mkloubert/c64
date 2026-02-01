@@ -230,7 +230,9 @@ Program {
                             kind: VarDecl(
                                 VarDecl {
                                     name: "result",
-                                    var_type: Byte,
+                                    var_type: Some(
+                                        Byte,
+                                    ),
                                     initializer: Some(
                                         Expr {
                                             kind: FunctionCall {
@@ -306,7 +308,9 @@ Program {
                             kind: VarDecl(
                                 VarDecl {
                                     name: "product",
-                                    var_type: Byte,
+                                    var_type: Some(
+                                        Byte,
+                                    ),
                                     initializer: Some(
                                         Expr {
                                             kind: FunctionCall {

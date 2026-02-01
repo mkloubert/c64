@@ -1,0 +1,52 @@
+# High Scores Demo for Cobra64
+# Shows practical array usage for a game scoreboard
+
+def main():
+    cls()
+    println("*** HIGH SCORES ***")
+    println("")
+
+    # Store top 5 high scores
+    scores: word[5]
+    scores[0] = 9500
+    scores[1] = 7200
+    scores[2] = 5800
+    scores[3] = 4100
+    scores[4] = 2500
+
+    # Display scores as bar graph using screen memory
+    draw_bar(0, scores[0])
+    draw_bar(1, scores[1])
+    draw_bar(2, scores[2])
+    draw_bar(3, scores[3])
+    draw_bar(4, scores[4])
+
+    cursor(0, 7)
+    println("SCORE BARS SHOWN ABOVE")
+
+    # Check if new score qualifies
+    new_score: word = 6000
+    pos: byte = find_position(scores, new_score)
+
+    if pos < 5:
+        println("NEW SCORE QUALIFIES!")
+    else:
+        println("NOT A HIGH SCORE")
+
+def draw_bar(row: byte, score: word):
+    # Draw horizontal bar at screen row
+    base: word = 1064 + row * 40
+    bar_len: byte = byte(score / 500)
+
+    i: byte = 0
+    while i < bar_len:
+        poke(base + i, 160)
+        i = i + 1
+
+def find_position(scores: word[], new_score: word) -> byte:
+    i: byte = 0
+    while i < 5:
+        if new_score > scores[i]:
+            return i
+        i = i + 1
+    return 5

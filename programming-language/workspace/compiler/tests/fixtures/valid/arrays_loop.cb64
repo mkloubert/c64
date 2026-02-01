@@ -1,0 +1,30 @@
+# Cobra64 - Arrays in loops test
+# Tests: array access with loop variables
+
+def main():
+    # Initialize array with loop
+    arr: byte[10]
+    i: byte = 0
+    while i < 10:
+        arr[i] = i * 2
+        i = i + 1
+
+    # Sum array elements
+    sum: word = 0
+    j: byte = 0
+    while j < 10:
+        sum = sum + arr[j]
+        j = j + 1
+
+    # Copy array
+    copy: byte[10]
+    k: byte = 0
+    while k < 10:
+        copy[k] = arr[k]
+        k = k + 1
+
+    # Reverse order access
+    m: byte = 9
+    while m > 0:
+        x: byte = arr[m]
+        m = m - 1

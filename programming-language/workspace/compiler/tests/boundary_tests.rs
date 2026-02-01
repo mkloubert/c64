@@ -400,7 +400,9 @@ fn test_single_char_identifier() {
 
 #[test]
 fn test_underscore_identifier() {
-    let source = "def main():\n    _x: byte = 1\n    _: byte = 2\n";
+    // Note: Single underscore '_' is now invalid (identifier cannot be only underscores)
+    // But '_x' is valid (variable, first letter is lowercase 'x')
+    let source = "def main():\n    _x: byte = 1\n    _y: byte = 2\n";
     let result = cobra64::compile(source);
     assert!(result.is_ok(), "underscore identifiers should be valid");
 }
@@ -421,19 +423,19 @@ fn test_long_identifier() {
 
 #[test]
 fn test_uppercase_constant() {
-    let source = "const MAX_VALUE = 255\n\ndef main():\n    x: byte = MAX_VALUE\n";
+    // Note: 'const' keyword is no longer used; uppercase names are automatically constants
+    let source = "MAX_VALUE = 255\n\ndef main():\n    x: byte = MAX_VALUE\n";
     let result = cobra64::compile(source);
     assert!(result.is_ok(), "uppercase constants should be valid");
 }
 
 #[test]
 fn test_mixed_case_identifier() {
-    let source = "def main():\n    myVariable: byte = 1\n    MyVariable: byte = 2\n";
+    // Note: Mixed case like 'MyVariable' is now INVALID
+    // Variables must start with lowercase, constants must be ALL_UPPERCASE
+    let source = "def main():\n    myVariable: byte = 1\n    anotherVar: byte = 2\n";
     let result = cobra64::compile(source);
-    assert!(
-        result.is_ok(),
-        "mixed case identifiers should be valid (case sensitive)"
-    );
+    assert!(result.is_ok(), "variables with camelCase should be valid");
 }
 
 #[test]

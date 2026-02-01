@@ -1,0 +1,97 @@
+# Conformance Test: Type Inference
+# Tests: optional type annotation with type inference for variables and constants
+# Expected: Compiles without errors, inferred types work correctly
+
+# ============================================
+# Variables with Type Inference (top-level)
+# ============================================
+
+# byte range (0-255)
+byte_val = 10
+byte_max = 255
+
+# word range (256-65535)
+word_val = 1000
+word_boundary = 256
+word_max = 65535
+
+# sbyte range (-128 to -1)
+sbyte_val = -50
+sbyte_min = -128
+
+# sword range (-32768 to -129)
+sword_val = -1000
+sword_min = -32768
+
+# float (decimal literals)
+float_val = 3.14
+float_neg = -2.718
+
+# bool
+bool_true = true
+bool_false = false
+
+# ============================================
+# Constants with Explicit Type (NEW)
+# ============================================
+
+# Force word type even for small value
+MAX_BYTE: word = 255
+MIN_WORD: word = 0
+
+# Fixed-point with explicit type
+PI: fixed = 3.14159
+HALF: fixed = 0.5
+
+# Float with explicit type
+E: float = 2.71828
+GOLDEN: float = 1.618
+
+# ============================================
+# Constants with Type Inference (existing)
+# ============================================
+
+MAX = 255          # → byte
+LARGE = 1000       # → word
+NEGATIVE = -100    # → sbyte
+BIG_NEG = -1000    # → sword
+DECIMAL = 2.5      # → float
+
+# ============================================
+# Mixed declarations
+# ============================================
+
+# Variables with explicit type (existing syntax)
+explicit_byte: byte = 42
+explicit_word: word = 1234
+
+def main():
+    # Use inferred variables
+    a: byte = byte_val + 5
+    b: word = word_val + 100
+
+    # Use inferred constants
+    c: byte = MAX - 10
+    d: word = LARGE * 2
+
+    # Use explicit-typed constants
+    e: word = MAX_BYTE + 1
+    f: fixed = PI * 2
+    g: float = E + 1.0
+
+    # Use inferred negative values
+    h: sbyte = sbyte_val + 10
+    i: sword = sword_val + 500
+
+    # Use inferred bool
+    if bool_true:
+        pass
+
+    # Use inferred float
+    j: float = float_val + 1.0
+
+    # Print some values
+    println("TYPE INFERENCE:")
+    println(a)
+    println(b)
+    println(c)

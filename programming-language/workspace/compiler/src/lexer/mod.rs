@@ -27,7 +27,9 @@
 
 mod tokens;
 
-pub use tokens::Token;
+pub use tokens::{
+    is_constant_name, is_variable_name, validate_identifier_naming, IdentifierKind, Token,
+};
 
 use crate::error::{CompileError, ErrorCode, Span};
 
@@ -179,7 +181,7 @@ impl<'source> Lexer<'source> {
 
         // Identifiers and keywords
         if c.is_ascii_alphabetic() || c == '_' {
-            return Ok(Some(self.scan_identifier()));
+            return self.scan_identifier().map(Some);
         }
 
         // Operators and punctuation
@@ -701,7 +703,7 @@ impl<'source> Lexer<'source> {
     }
 
     /// Scan an identifier or keyword.
-    fn scan_identifier(&mut self) -> (Token, Span) {
+    fn scan_identifier(&mut self) -> Result<(Token, Span), CompileError> {
         let start = self.position;
 
         while let Some(c) = self.peek() {
@@ -713,8 +715,36 @@ impl<'source> Lexer<'source> {
         }
 
         let text = &self.source[start..self.position];
+        let span = self.span_from(start);
+
+        // First check if it's a keyword
         let token = Token::from_keyword_or_identifier(text);
-        (token, self.span_from(start))
+
+        // If it's an identifier (not a keyword), validate the naming convention
+        if let Token::Identifier(ref name) = token {
+            // Check for underscore-only identifiers
+            if name.chars().all(|c| c == '_') {
+                return Err(CompileError::new(
+                    ErrorCode::IdentifierOnlyUnderscore,
+                    "Identifier cannot consist only of underscores",
+                    span,
+                ));
+            }
+
+            // Validate naming convention
+            if let Err(msg) = tokens::validate_identifier_naming(name) {
+                return Err(CompileError::new(
+                    ErrorCode::InvalidIdentifierNaming,
+                    msg,
+                    span,
+                )
+                .with_hint(
+                    "Constants must be ALL_UPPERCASE, variables must start with a lowercase letter",
+                ));
+            }
+        }
+
+        Ok((token, span))
     }
 
     /// Scan an operator or punctuation.
@@ -994,10 +1024,9 @@ mod tests {
 
     #[test]
     fn test_definition_keywords() {
-        let tokens = tokenize("const def").unwrap();
-        assert_eq!(tokens.len(), 2);
-        assert!(matches!(tokens[0].0, Token::Const));
-        assert!(matches!(tokens[1].0, Token::Def));
+        let tokens = tokenize("def").unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert!(matches!(tokens[0].0, Token::Def));
     }
 
     #[test]
@@ -1822,5 +1851,116 @@ def main():
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert_eq!(err.code, ErrorCode::InvalidDecimalLiteral);
+    }
+
+    // ========================================
+    // Identifier Naming Convention Tests
+    // ========================================
+
+    #[test]
+    fn test_constant_names_valid() {
+        // Valid constant names (first letter uppercase, all letters uppercase)
+        let tokens = tokenize("MY_CONST").unwrap();
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "MY_CONST"));
+
+        let tokens = tokenize("_MY_CONST").unwrap();
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "_MY_CONST"));
+
+        let tokens = tokenize("_3MY_CONST").unwrap();
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "_3MY_CONST"));
+
+        let tokens = tokenize("A").unwrap();
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "A"));
+
+        let tokens = tokenize("B2").unwrap();
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "B2"));
+
+        let tokens = tokenize("C_3").unwrap();
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "C_3"));
+
+        let tokens = tokenize("_______MY_CONST6").unwrap();
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "_______MY_CONST6"));
+    }
+
+    #[test]
+    fn test_variable_names_valid() {
+        // Valid variable names (first letter lowercase)
+        let tokens = tokenize("myVar").unwrap();
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "myVar"));
+
+        let tokens = tokenize("myVar_5").unwrap();
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "myVar_5"));
+
+        let tokens = tokenize("a").unwrap();
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "a"));
+
+        let tokens = tokenize("b2").unwrap();
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "b2"));
+
+        let tokens = tokenize("c_3").unwrap();
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "c_3"));
+
+        let tokens = tokenize("_4d").unwrap();
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "_4d"));
+
+        let tokens = tokenize("_e666").unwrap();
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "_e666"));
+
+        let tokens = tokenize("_f_777").unwrap();
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "_f_777"));
+    }
+
+    #[test]
+    fn test_mixed_case_constant_invalid() {
+        // Invalid: first letter uppercase but not all letters uppercase
+        let result = tokenize("MyConst");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidIdentifierNaming);
+
+        let result = tokenize("_My_Const");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidIdentifierNaming);
+
+        let result = tokenize("_3My_Const");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidIdentifierNaming);
+
+        let result = tokenize("MY_Const");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidIdentifierNaming);
+    }
+
+    #[test]
+    fn test_underscore_only_invalid() {
+        // Only underscores is invalid
+        let result = tokenize("_");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.code, ErrorCode::IdentifierOnlyUnderscore);
+
+        let result = tokenize("__");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.code, ErrorCode::IdentifierOnlyUnderscore);
+
+        let result = tokenize("___");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.code, ErrorCode::IdentifierOnlyUnderscore);
+    }
+
+    #[test]
+    fn test_identifier_with_leading_underscore_and_digit() {
+        // _4D is a constant (first letter D is uppercase, all letters uppercase)
+        let tokens = tokenize("_4D").unwrap();
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "_4D"));
+
+        // _4d is a variable (first letter d is lowercase)
+        let tokens = tokenize("_4d").unwrap();
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "_4d"));
     }
 }

@@ -1,0 +1,5 @@
+# Cobra64 - Array size mismatch test
+# Expected error: Array initializer has wrong number of elements
+
+def main():
+    arr: byte[3] = [1, 2, 3, 4, 5]

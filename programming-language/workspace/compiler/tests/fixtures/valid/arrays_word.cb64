@@ -1,0 +1,30 @@
+# Cobra64 - Word array operations test
+# Tests: 16-bit array operations
+
+def main():
+    # Word array with initializer
+    scores: word[] = [1000, 2000, 3000, 4000, 5000]
+
+    # Read word elements
+    first: word = scores[0]
+    third: word = scores[2]
+    last: word = scores[4]
+
+    # Write word elements
+    scores[1] = 2500
+    scores[3] = 4500
+
+    # Sized word array
+    buffer: word[5]
+    buffer[0] = 0
+    buffer[4] = 65535
+
+    # Large values
+    large: word[] = [256, 1024, 32767, 65535]
+
+    # Word array in loop
+    i: byte = 0
+    total: word = 0
+    while i < 5:
+        total = total + scores[i]
+        i = i + 1

@@ -249,7 +249,8 @@ fn test_semantic_duplicate_function() {
 /// Test constant reassignment errors.
 #[test]
 fn test_semantic_constant_reassignment() {
-    let source = "const X = 10\n\ndef main():\n    X = 20\n";
+    // Note: 'const' keyword removed - uppercase names are automatically constants
+    let source = "X = 10\n\ndef main():\n    X = 20\n";
     let err = compile_and_get_error(source);
     assert!(err.is_some(), "Expected error for constant reassignment");
     assert_eq!(err.unwrap(), ErrorCode::CannotAssignToConstant);
@@ -363,6 +364,194 @@ fn test_first_error_reported() {
     // Should report the first error
     let err = result.unwrap_err();
     assert_eq!(err.code, ErrorCode::UndefinedVariable);
+}
+
+// ============================================================================
+// Type Inference Error Tests
+// ============================================================================
+
+/// Test that constant with explicit type rejects mismatched value.
+#[test]
+fn test_const_explicit_type_mismatch_decimal_to_byte() {
+    // Cannot assign decimal to byte
+    let source = "PI: byte = 3.14\ndef main():\n    pass";
+    let result = cobra64::compile(source);
+    assert!(
+        result.is_err(),
+        "Expected error for decimal assigned to byte"
+    );
+}
+
+/// Test that constant with explicit type rejects mismatched value.
+#[test]
+fn test_const_explicit_type_mismatch_string_to_word() {
+    // Cannot assign string to word
+    let source = "MSG: word = \"hello\"\ndef main():\n    pass";
+    let result = cobra64::compile(source);
+    assert!(
+        result.is_err(),
+        "Expected error for string assigned to word"
+    );
+}
+
+/// Test that constant with explicit type rejects mismatched value.
+#[test]
+fn test_const_explicit_type_mismatch_bool_to_fixed() {
+    // Cannot assign bool to fixed
+    let source = "FLAG: fixed = true\ndef main():\n    pass";
+    let result = cobra64::compile(source);
+    assert!(result.is_err(), "Expected error for bool assigned to fixed");
+}
+
+/// Test that variable with type inference requires initializer.
+#[test]
+fn test_var_inference_requires_initializer() {
+    // Variable without type AND without initializer should fail
+    // Note: This is caught at parser level
+    let source = "x\ndef main():\n    pass";
+    let result = cobra64::compile(source);
+    assert!(
+        result.is_err(),
+        "Expected error for variable without type or initializer"
+    );
+}
+
+/// Test that out-of-range value for explicit type is rejected.
+#[test]
+fn test_const_explicit_type_out_of_range() {
+    // 256 is out of range for byte
+    let source = "MAX: byte = 256\ndef main():\n    pass";
+    let result = cobra64::compile(source);
+    assert!(
+        result.is_err(),
+        "Expected error for value out of byte range"
+    );
+}
+
+/// Test that negative value for unsigned type is rejected.
+#[test]
+fn test_const_explicit_type_negative_to_unsigned() {
+    // -1 is out of range for byte
+    let source = "NEG: byte = -1\ndef main():\n    pass";
+    let result = cobra64::compile(source);
+    assert!(
+        result.is_err(),
+        "Expected error for negative assigned to byte"
+    );
+}
+
+/// Test constant with type and mismatched expression.
+#[test]
+fn test_const_explicit_type_string_expression() {
+    // String expression cannot be assigned to word
+    let source = "VAL: word = \"hello\" + \"world\"\ndef main():\n    pass";
+    let result = cobra64::compile(source);
+    assert!(result.is_err(), "Expected error for string expr to word");
+}
+
+// ============================================================================
+// Array Error Tests
+// ============================================================================
+
+/// Test array index must be integer type.
+#[test_case("def main():\n    arr: byte[] = [1, 2, 3]\n    x: byte = arr[true]\n", ErrorCode::ArrayIndexMustBeInteger; "bool_index")]
+#[test_case("def main():\n    arr: byte[] = [1, 2, 3]\n    x: byte = arr[\"a\"]\n", ErrorCode::ArrayIndexMustBeInteger; "string_index")]
+fn test_array_invalid_index_type(source: &str, expected_code: ErrorCode) {
+    let err = compile_and_get_error(source);
+    assert!(err.is_some(), "Expected error for invalid array index type");
+    assert_eq!(err.unwrap(), expected_code);
+}
+
+/// Test array size mismatch.
+#[test_case("def main():\n    arr: byte[3] = [1, 2, 3, 4, 5]\n", ErrorCode::TypeMismatch; "too_many_elements")]
+#[test_case("def main():\n    arr: byte[5] = [1, 2]\n", ErrorCode::TypeMismatch; "too_few_elements")]
+fn test_array_size_mismatch(source: &str, expected_code: ErrorCode) {
+    let err = compile_and_get_error(source);
+    assert!(err.is_some(), "Expected error for array size mismatch");
+    assert_eq!(err.unwrap(), expected_code);
+}
+
+/// Test array element value out of range.
+#[test_case("def main():\n    arr: byte[] = [1000]\n", ErrorCode::TypeMismatch; "word_in_byte_array")]
+#[test_case("def main():\n    arr: byte[] = [256]\n", ErrorCode::TypeMismatch; "value_exceeds_byte")]
+fn test_array_element_value_out_of_range(source: &str, expected_code: ErrorCode) {
+    let err = compile_and_get_error(source);
+    assert!(
+        err.is_some(),
+        "Expected error for array element out of range"
+    );
+    assert_eq!(err.unwrap(), expected_code);
+}
+
+/// Test empty array without type annotation produces error.
+#[test]
+fn test_array_empty_literal_no_type() {
+    // Empty array without type annotation - variable is undefined
+    let source = "def main():\n    arr = []\n";
+    let err = compile_and_get_error(source);
+    assert!(err.is_some(), "Expected error for empty array without type");
+    // Empty array literal without context can't infer type
+    assert_eq!(err.unwrap(), ErrorCode::UndefinedVariable);
+}
+
+/// Test assigning signed array to unsigned array type.
+/// With signed array support, `[-1]` is inferred as `sbyte[]`, causing TypeMismatch.
+#[test]
+fn test_array_negative_value_unsigned_type() {
+    let source = "def main():\n    arr: byte[] = [-1]\n";
+    let err = compile_and_get_error(source);
+    assert!(
+        err.is_some(),
+        "Expected error for assigning sbyte[] to byte[]"
+    );
+    assert_eq!(err.unwrap(), ErrorCode::TypeMismatch);
+}
+
+/// Test mixed types in array literal.
+#[test]
+fn test_array_mixed_element_types() {
+    let source = "def main():\n    arr: byte[] = [true, 1]\n";
+    let err = compile_and_get_error(source);
+    assert!(
+        err.is_some(),
+        "Expected error for mixed types in array literal"
+    );
+    assert_eq!(err.unwrap(), ErrorCode::ArrayElementTypeMismatch);
+}
+
+// ============================================================================
+// len() Function Tests
+// ============================================================================
+
+/// Test len() on non-array type.
+#[test]
+fn test_len_on_non_array() {
+    let source = "def main():\n    x: byte = 5\n    y: word = len(x)\n";
+    let err = compile_and_get_error(source);
+    assert!(err.is_some(), "Expected error for len() on non-array");
+    assert_eq!(err.unwrap(), ErrorCode::TypeMismatch);
+}
+
+/// Test len() with no arguments.
+#[test]
+fn test_len_no_arguments() {
+    let source = "def main():\n    x: word = len()\n";
+    let err = compile_and_get_error(source);
+    assert!(err.is_some(), "Expected error for len() with no arguments");
+    assert_eq!(err.unwrap(), ErrorCode::WrongNumberOfArguments);
+}
+
+/// Test len() with too many arguments.
+#[test]
+fn test_len_too_many_arguments() {
+    let source =
+        "def main():\n    a: byte[] = [1, 2]\n    b: byte[] = [3, 4]\n    x: word = len(a, b)\n";
+    let err = compile_and_get_error(source);
+    assert!(
+        err.is_some(),
+        "Expected error for len() with too many arguments"
+    );
+    assert_eq!(err.unwrap(), ErrorCode::WrongNumberOfArguments);
 }
 
 // ============================================================================

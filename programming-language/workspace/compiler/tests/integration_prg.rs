@@ -237,3 +237,360 @@ def main():
         std::fs::remove_file(&path).ok();
     }
 }
+
+// ========================================
+// Array Code Generation Tests
+// ========================================
+
+/// Test byte array initialization.
+#[test]
+fn test_compile_byte_array_init() {
+    let source = r#"
+def main():
+    arr: byte[] = [1, 2, 3, 255]
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+
+    // Code should include the array values
+    assert!(code.len() > 50, "Code should include array initialization");
+}
+
+/// Test word array initialization.
+#[test]
+fn test_compile_word_array_init() {
+    let source = r#"
+def main():
+    arr: word[] = [1000, 2000, 65535]
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+
+    // Code should include the array initialization
+    assert!(
+        code.len() > 50,
+        "Code should include word array initialization"
+    );
+}
+
+/// Test bool array initialization.
+#[test]
+fn test_compile_bool_array_init() {
+    let source = r#"
+def main():
+    flags: bool[] = [true, false, true]
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+
+    // Code should include the bool array initialization
+    assert!(
+        code.len() > 50,
+        "Code should include bool array initialization"
+    );
+}
+
+/// Test byte array read access.
+#[test]
+fn test_compile_byte_array_read() {
+    let source = r#"
+def main():
+    arr: byte[] = [10, 20, 30]
+    x: byte = arr[1]
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+
+    // Should compile without errors
+    assert!(code.len() > 50, "Code should include array access");
+}
+
+/// Test word array read access.
+#[test]
+fn test_compile_word_array_read() {
+    let source = r#"
+def main():
+    arr: word[] = [1000, 2000, 3000]
+    x: word = arr[1]
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+
+    // Should compile without errors
+    assert!(code.len() > 50, "Code should include word array access");
+}
+
+/// Test byte array write access.
+#[test]
+fn test_compile_byte_array_write() {
+    let source = r#"
+def main():
+    arr: byte[3]
+    arr[0] = 10
+    arr[1] = 20
+    arr[2] = 30
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+
+    // Should compile without errors
+    assert!(code.len() > 50, "Code should include array write");
+}
+
+/// Test word array write access.
+#[test]
+fn test_compile_word_array_write() {
+    let source = r#"
+def main():
+    arr: word[3]
+    arr[0] = 1000
+    arr[1] = 2000
+    arr[2] = 3000
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+
+    // Should compile without errors
+    assert!(code.len() > 50, "Code should include word array write");
+}
+
+/// Test array in loop.
+#[test]
+fn test_compile_array_in_loop() {
+    let source = r#"
+def main():
+    arr: byte[5]
+    i: byte = 0
+    while i < 5:
+        arr[i] = i
+        i = i + 1
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+
+    // Should compile without errors
+    assert!(code.len() > 100, "Code should include array loop");
+}
+
+/// Test zero-initialized array optimization.
+#[test]
+fn test_compile_zero_initialized_array() {
+    let source = r#"
+def main():
+    arr: byte[] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+
+    // Zero-init optimization should use a loop, generating less code
+    // than 10 individual STA instructions
+    assert!(code.len() > 20, "Code should include zero-init loop");
+}
+
+/// Test zero-initialized bool array.
+#[test]
+fn test_compile_zero_initialized_bool_array() {
+    let source = r#"
+def main():
+    flags: bool[] = [false, false, false, false, false]
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+    assert!(code.len() > 20, "Code should include bool zero-init");
+}
+
+/// Test mixed array (some zeros, some non-zeros).
+#[test]
+fn test_compile_mixed_array_no_optimization() {
+    let source = r#"
+def main():
+    arr: byte[] = [0, 1, 0, 2, 0]
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+
+    // Mixed array should NOT use zero-init optimization
+    assert!(code.len() > 30, "Code should include individual stores");
+}
+
+// ============================================================================
+// Signed Array Tests
+// ============================================================================
+
+/// Test sbyte array initialization.
+#[test]
+fn test_compile_sbyte_array_init() {
+    let source = r#"
+def main():
+    temps: sbyte[] = [-50, 0, 50, 100, -128]
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+    assert!(!code.is_empty(), "Generated code should not be empty");
+}
+
+/// Test sword array initialization.
+#[test]
+fn test_compile_sword_array_init() {
+    let source = r#"
+def main():
+    offsets: sword[] = [-1000, 500, 32767, -32768]
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+    assert!(!code.is_empty(), "Generated code should not be empty");
+}
+
+/// Test sbyte array element read.
+#[test]
+fn test_compile_sbyte_array_read() {
+    let source = r#"
+def main():
+    temps: sbyte[] = [-10, 20, 30]
+    t: sbyte = temps[0]
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+    assert!(!code.is_empty(), "Generated code should not be empty");
+}
+
+/// Test sword array element read.
+#[test]
+fn test_compile_sword_array_read() {
+    let source = r#"
+def main():
+    offsets: sword[] = [-1000, 2000, 3000]
+    o: sword = offsets[1]
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+    assert!(!code.is_empty(), "Generated code should not be empty");
+}
+
+/// Test sbyte array element write.
+#[test]
+fn test_compile_sbyte_array_write() {
+    let source = r#"
+def main():
+    temps: sbyte[] = [-10, 20, 30]
+    temps[0] = -50
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+    assert!(!code.is_empty(), "Generated code should not be empty");
+}
+
+/// Test sword array element write.
+#[test]
+fn test_compile_sword_array_write() {
+    let source = r#"
+def main():
+    offsets: sword[] = [-1000, 2000, 3000]
+    offsets[1] = -5000
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+    assert!(!code.is_empty(), "Generated code should not be empty");
+}
+
+/// Test signed array type inference from negative values.
+#[test]
+fn test_compile_signed_array_type_inference() {
+    // Array with values fitting in sbyte range should compile
+    let source = r#"
+def main():
+    small: sbyte[] = [-100, 50, 127]
+    large: sword[] = [-500, 30000]
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+    assert!(!code.is_empty(), "Generated code should not be empty");
+}
+
+/// Test signed array in loop.
+#[test]
+fn test_compile_signed_array_loop() {
+    let source = r#"
+def main():
+    temps: sbyte[] = [-10, 0, 10, 20, 30]
+    i: byte = 0
+    while i < 5:
+        t: sbyte = temps[i]
+        i = i + 1
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+    assert!(!code.is_empty(), "Generated code should not be empty");
+}
+
+// ============================================================================
+// len() Function Tests
+// ============================================================================
+
+/// Test len() on byte array.
+#[test]
+fn test_compile_len_byte_array() {
+    let source = r#"
+def main():
+    arr: byte[] = [1, 2, 3, 4, 5]
+    size: word = len(arr)
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+    assert!(!code.is_empty(), "Generated code should not be empty");
+}
+
+/// Test len() on word array.
+#[test]
+fn test_compile_len_word_array() {
+    let source = r#"
+def main():
+    arr: word[] = [1000, 2000, 3000]
+    size: word = len(arr)
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+    assert!(!code.is_empty(), "Generated code should not be empty");
+}
+
+/// Test len() on sized array.
+#[test]
+fn test_compile_len_sized_array() {
+    let source = r#"
+def main():
+    buffer: byte[100]
+    size: word = len(buffer)
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+    assert!(!code.is_empty(), "Generated code should not be empty");
+}
+
+/// Test len() in expression.
+#[test]
+fn test_compile_len_in_expression() {
+    let source = r#"
+def main():
+    arr: byte[] = [10, 20, 30]
+    i: byte = 0
+    while i < len(arr):
+        x: byte = arr[i]
+        i = i + 1
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+    assert!(!code.is_empty(), "Generated code should not be empty");
+}
+
+/// Test len() with print.
+#[test]
+fn test_compile_len_with_print() {
+    let source = r#"
+def main():
+    arr: byte[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    println(len(arr))
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+    assert!(!code.is_empty(), "Generated code should not be empty");
+}

@@ -35,10 +35,16 @@ pub enum Type {
     Bool,
     /// Text string.
     String,
-    /// Byte array.
+    /// Byte array (unsigned 8-bit elements).
     ByteArray(Option<u16>),
-    /// Word array.
+    /// Word array (unsigned 16-bit elements).
     WordArray(Option<u16>),
+    /// Bool array (boolean elements).
+    BoolArray(Option<u16>),
+    /// Sbyte array (signed 8-bit elements).
+    SbyteArray(Option<u16>),
+    /// Sword array (signed 16-bit elements).
+    SwordArray(Option<u16>),
     /// Void (no value, for functions).
     Void,
 }
@@ -53,7 +59,13 @@ impl Type {
             Type::ByteArray(Some(n)) => *n as usize,
             Type::ByteArray(None) => 0, // Unknown size
             Type::WordArray(Some(n)) => (*n as usize) * 2,
-            Type::WordArray(None) => 0, // Unknown size
+            Type::WordArray(None) => 0,               // Unknown size
+            Type::BoolArray(Some(n)) => *n as usize,  // 1 byte per bool
+            Type::BoolArray(None) => 0,               // Unknown size
+            Type::SbyteArray(Some(n)) => *n as usize, // 1 byte per sbyte
+            Type::SbyteArray(None) => 0,              // Unknown size
+            Type::SwordArray(Some(n)) => (*n as usize) * 2, // 2 bytes per sword
+            Type::SwordArray(None) => 0,              // Unknown size
             Type::Void => 0,
         }
     }
@@ -85,7 +97,14 @@ impl Type {
 
     /// Check if this is an array type.
     pub fn is_array(&self) -> bool {
-        matches!(self, Type::ByteArray(_) | Type::WordArray(_))
+        matches!(
+            self,
+            Type::ByteArray(_)
+                | Type::WordArray(_)
+                | Type::BoolArray(_)
+                | Type::SbyteArray(_)
+                | Type::SwordArray(_)
+        )
     }
 
     /// Get the element type if this is an array.
@@ -93,6 +112,9 @@ impl Type {
         match self {
             Type::ByteArray(_) => Some(Type::Byte),
             Type::WordArray(_) => Some(Type::Word),
+            Type::BoolArray(_) => Some(Type::Bool),
+            Type::SbyteArray(_) => Some(Type::Sbyte),
+            Type::SwordArray(_) => Some(Type::Sword),
             _ => None,
         }
     }
@@ -133,6 +155,16 @@ impl Type {
 
             // Fixed to float: allowed (fixed range fits in float range)
             (Type::Fixed, Type::Float) => true,
+
+            // Array type compatibility:
+            // - byte[n] can be assigned to byte[] (unsized accepts any size)
+            // - byte[n] can be assigned to byte[n] (same size) - handled by == check above
+            // - byte[] cannot be assigned to byte[n] (unsized to sized is not allowed)
+            (Type::ByteArray(Some(_)), Type::ByteArray(None)) => true,
+            (Type::WordArray(Some(_)), Type::WordArray(None)) => true,
+            (Type::BoolArray(Some(_)), Type::BoolArray(None)) => true,
+            (Type::SbyteArray(Some(_)), Type::SbyteArray(None)) => true,
+            (Type::SwordArray(Some(_)), Type::SwordArray(None)) => true,
 
             // Float to fixed: requires explicit cast (potential precision/range loss)
             // Fixed to integer: requires explicit cast (truncation)
@@ -212,6 +244,9 @@ impl Type {
             Type::String => "string",
             Type::ByteArray(_) => "byte[]",
             Type::WordArray(_) => "word[]",
+            Type::BoolArray(_) => "bool[]",
+            Type::SbyteArray(_) => "sbyte[]",
+            Type::SwordArray(_) => "sword[]",
             Type::Void => "void",
         }
     }
@@ -224,6 +259,12 @@ impl std::fmt::Display for Type {
             Type::ByteArray(None) => write!(f, "byte[]"),
             Type::WordArray(Some(n)) => write!(f, "word[{}]", n),
             Type::WordArray(None) => write!(f, "word[]"),
+            Type::BoolArray(Some(n)) => write!(f, "bool[{}]", n),
+            Type::BoolArray(None) => write!(f, "bool[]"),
+            Type::SbyteArray(Some(n)) => write!(f, "sbyte[{}]", n),
+            Type::SbyteArray(None) => write!(f, "sbyte[]"),
+            Type::SwordArray(Some(n)) => write!(f, "sword[{}]", n),
+            Type::SwordArray(None) => write!(f, "sword[]"),
             _ => write!(f, "{}", self.name()),
         }
     }
@@ -252,6 +293,12 @@ mod tests {
         assert_eq!(Type::ByteArray(None).size(), 0);
         assert_eq!(Type::WordArray(Some(10)).size(), 20);
         assert_eq!(Type::WordArray(None).size(), 0);
+        assert_eq!(Type::BoolArray(Some(10)).size(), 10);
+        assert_eq!(Type::BoolArray(None).size(), 0);
+        assert_eq!(Type::SbyteArray(Some(10)).size(), 10);
+        assert_eq!(Type::SbyteArray(None).size(), 0);
+        assert_eq!(Type::SwordArray(Some(10)).size(), 20);
+        assert_eq!(Type::SwordArray(None).size(), 0);
     }
 
     #[test]
@@ -314,16 +361,28 @@ mod tests {
     fn test_is_array() {
         assert!(!Type::Byte.is_array());
         assert!(!Type::Word.is_array());
+        assert!(!Type::Bool.is_array());
+        assert!(!Type::Sbyte.is_array());
+        assert!(!Type::Sword.is_array());
         assert!(Type::ByteArray(Some(10)).is_array());
         assert!(Type::ByteArray(None).is_array());
         assert!(Type::WordArray(Some(10)).is_array());
         assert!(Type::WordArray(None).is_array());
+        assert!(Type::BoolArray(Some(10)).is_array());
+        assert!(Type::BoolArray(None).is_array());
+        assert!(Type::SbyteArray(Some(10)).is_array());
+        assert!(Type::SbyteArray(None).is_array());
+        assert!(Type::SwordArray(Some(10)).is_array());
+        assert!(Type::SwordArray(None).is_array());
     }
 
     #[test]
     fn test_element_type() {
         assert_eq!(Type::ByteArray(Some(10)).element_type(), Some(Type::Byte));
         assert_eq!(Type::WordArray(Some(10)).element_type(), Some(Type::Word));
+        assert_eq!(Type::BoolArray(Some(10)).element_type(), Some(Type::Bool));
+        assert_eq!(Type::SbyteArray(Some(10)).element_type(), Some(Type::Sbyte));
+        assert_eq!(Type::SwordArray(Some(10)).element_type(), Some(Type::Sword));
         assert_eq!(Type::Byte.element_type(), None);
         assert_eq!(Type::String.element_type(), None);
     }
@@ -482,6 +541,9 @@ mod tests {
         assert_eq!(Type::Void.name(), "void");
         assert_eq!(Type::ByteArray(None).name(), "byte[]");
         assert_eq!(Type::WordArray(None).name(), "word[]");
+        assert_eq!(Type::BoolArray(None).name(), "bool[]");
+        assert_eq!(Type::SbyteArray(None).name(), "sbyte[]");
+        assert_eq!(Type::SwordArray(None).name(), "sword[]");
     }
 
     #[test]
@@ -499,6 +561,12 @@ mod tests {
         assert_eq!(format!("{}", Type::ByteArray(None)), "byte[]");
         assert_eq!(format!("{}", Type::WordArray(Some(5))), "word[5]");
         assert_eq!(format!("{}", Type::WordArray(None)), "word[]");
+        assert_eq!(format!("{}", Type::BoolArray(Some(8))), "bool[8]");
+        assert_eq!(format!("{}", Type::BoolArray(None)), "bool[]");
+        assert_eq!(format!("{}", Type::SbyteArray(Some(10))), "sbyte[10]");
+        assert_eq!(format!("{}", Type::SbyteArray(None)), "sbyte[]");
+        assert_eq!(format!("{}", Type::SwordArray(Some(5))), "sword[5]");
+        assert_eq!(format!("{}", Type::SwordArray(None)), "sword[]");
     }
 
     #[test]
@@ -512,5 +580,27 @@ mod tests {
         assert_eq!(Type::ByteArray(Some(10)), Type::ByteArray(Some(10)));
         assert_ne!(Type::ByteArray(Some(10)), Type::ByteArray(Some(20)));
         assert_ne!(Type::ByteArray(Some(10)), Type::ByteArray(None));
+        assert_eq!(Type::BoolArray(Some(10)), Type::BoolArray(Some(10)));
+        assert_ne!(Type::BoolArray(Some(10)), Type::BoolArray(Some(20)));
+        assert_ne!(Type::BoolArray(Some(10)), Type::ByteArray(Some(10)));
+        // Signed array equality
+        assert_eq!(Type::SbyteArray(Some(10)), Type::SbyteArray(Some(10)));
+        assert_ne!(Type::SbyteArray(Some(10)), Type::SbyteArray(Some(20)));
+        assert_ne!(Type::SbyteArray(Some(10)), Type::ByteArray(Some(10)));
+        assert_eq!(Type::SwordArray(Some(10)), Type::SwordArray(Some(10)));
+        assert_ne!(Type::SwordArray(Some(10)), Type::WordArray(Some(10)));
+    }
+
+    #[test]
+    fn test_signed_array_assignable() {
+        // Sized to unsized is allowed
+        assert!(Type::SbyteArray(Some(10)).is_assignable_to(&Type::SbyteArray(None)));
+        assert!(Type::SwordArray(Some(10)).is_assignable_to(&Type::SwordArray(None)));
+        // Unsized to sized is not allowed
+        assert!(!Type::SbyteArray(None).is_assignable_to(&Type::SbyteArray(Some(10))));
+        assert!(!Type::SwordArray(None).is_assignable_to(&Type::SwordArray(Some(10))));
+        // Different array types are not compatible
+        assert!(!Type::SbyteArray(Some(10)).is_assignable_to(&Type::ByteArray(None)));
+        assert!(!Type::ByteArray(Some(10)).is_assignable_to(&Type::SbyteArray(None)));
     }
 }

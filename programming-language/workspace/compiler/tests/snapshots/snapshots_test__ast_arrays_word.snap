@@ -1,0 +1,701 @@
+---
+source: tests/snapshots_test.rs
+expression: "format!(\"{:#?}\", ast)"
+---
+Program {
+    items: [
+        Function(
+            FunctionDef {
+                name: "main",
+                params: [],
+                return_type: None,
+                body: Block {
+                    statements: [
+                        Statement {
+                            kind: VarDecl(
+                                VarDecl {
+                                    name: "scores",
+                                    var_type: Some(
+                                        WordArray(
+                                            None,
+                                        ),
+                                    ),
+                                    initializer: Some(
+                                        Expr {
+                                            kind: ArrayLiteral {
+                                                elements: [
+                                                    Expr {
+                                                        kind: IntegerLiteral(
+                                                            1000,
+                                                        ),
+                                                        span: Span {
+                                                            start: 141,
+                                                            end: 145,
+                                                        },
+                                                    },
+                                                    Expr {
+                                                        kind: IntegerLiteral(
+                                                            2000,
+                                                        ),
+                                                        span: Span {
+                                                            start: 147,
+                                                            end: 151,
+                                                        },
+                                                    },
+                                                    Expr {
+                                                        kind: IntegerLiteral(
+                                                            3000,
+                                                        ),
+                                                        span: Span {
+                                                            start: 153,
+                                                            end: 157,
+                                                        },
+                                                    },
+                                                    Expr {
+                                                        kind: IntegerLiteral(
+                                                            4000,
+                                                        ),
+                                                        span: Span {
+                                                            start: 159,
+                                                            end: 163,
+                                                        },
+                                                    },
+                                                    Expr {
+                                                        kind: IntegerLiteral(
+                                                            5000,
+                                                        ),
+                                                        span: Span {
+                                                            start: 165,
+                                                            end: 169,
+                                                        },
+                                                    },
+                                                ],
+                                            },
+                                            span: Span {
+                                                start: 140,
+                                                end: 170,
+                                            },
+                                        },
+                                    ),
+                                    array_size: None,
+                                    span: Span {
+                                        start: 123,
+                                        end: 170,
+                                    },
+                                },
+                            ),
+                            span: Span {
+                                start: 123,
+                                end: 170,
+                            },
+                        },
+                        Statement {
+                            kind: VarDecl(
+                                VarDecl {
+                                    name: "first",
+                                    var_type: Some(
+                                        Word,
+                                    ),
+                                    initializer: Some(
+                                        Expr {
+                                            kind: ArrayIndex {
+                                                array: Expr {
+                                                    kind: Identifier(
+                                                        "scores",
+                                                    ),
+                                                    span: Span {
+                                                        start: 215,
+                                                        end: 221,
+                                                    },
+                                                },
+                                                index: Expr {
+                                                    kind: IntegerLiteral(
+                                                        0,
+                                                    ),
+                                                    span: Span {
+                                                        start: 222,
+                                                        end: 223,
+                                                    },
+                                                },
+                                            },
+                                            span: Span {
+                                                start: 215,
+                                                end: 224,
+                                            },
+                                        },
+                                    ),
+                                    array_size: None,
+                                    span: Span {
+                                        start: 201,
+                                        end: 224,
+                                    },
+                                },
+                            ),
+                            span: Span {
+                                start: 201,
+                                end: 224,
+                            },
+                        },
+                        Statement {
+                            kind: VarDecl(
+                                VarDecl {
+                                    name: "third",
+                                    var_type: Some(
+                                        Word,
+                                    ),
+                                    initializer: Some(
+                                        Expr {
+                                            kind: ArrayIndex {
+                                                array: Expr {
+                                                    kind: Identifier(
+                                                        "scores",
+                                                    ),
+                                                    span: Span {
+                                                        start: 243,
+                                                        end: 249,
+                                                    },
+                                                },
+                                                index: Expr {
+                                                    kind: IntegerLiteral(
+                                                        2,
+                                                    ),
+                                                    span: Span {
+                                                        start: 250,
+                                                        end: 251,
+                                                    },
+                                                },
+                                            },
+                                            span: Span {
+                                                start: 243,
+                                                end: 252,
+                                            },
+                                        },
+                                    ),
+                                    array_size: None,
+                                    span: Span {
+                                        start: 229,
+                                        end: 252,
+                                    },
+                                },
+                            ),
+                            span: Span {
+                                start: 229,
+                                end: 252,
+                            },
+                        },
+                        Statement {
+                            kind: VarDecl(
+                                VarDecl {
+                                    name: "last",
+                                    var_type: Some(
+                                        Word,
+                                    ),
+                                    initializer: Some(
+                                        Expr {
+                                            kind: ArrayIndex {
+                                                array: Expr {
+                                                    kind: Identifier(
+                                                        "scores",
+                                                    ),
+                                                    span: Span {
+                                                        start: 270,
+                                                        end: 276,
+                                                    },
+                                                },
+                                                index: Expr {
+                                                    kind: IntegerLiteral(
+                                                        4,
+                                                    ),
+                                                    span: Span {
+                                                        start: 277,
+                                                        end: 278,
+                                                    },
+                                                },
+                                            },
+                                            span: Span {
+                                                start: 270,
+                                                end: 279,
+                                            },
+                                        },
+                                    ),
+                                    array_size: None,
+                                    span: Span {
+                                        start: 257,
+                                        end: 279,
+                                    },
+                                },
+                            ),
+                            span: Span {
+                                start: 257,
+                                end: 279,
+                            },
+                        },
+                        Statement {
+                            kind: Assignment(
+                                Assignment {
+                                    target: ArrayElement {
+                                        name: "scores",
+                                        index: Expr {
+                                            kind: IntegerLiteral(
+                                                1,
+                                            ),
+                                            span: Span {
+                                                start: 318,
+                                                end: 319,
+                                            },
+                                        },
+                                    },
+                                    op: Assign,
+                                    value: Expr {
+                                        kind: IntegerLiteral(
+                                            2500,
+                                        ),
+                                        span: Span {
+                                            start: 323,
+                                            end: 327,
+                                        },
+                                    },
+                                    span: Span {
+                                        start: 311,
+                                        end: 327,
+                                    },
+                                },
+                            ),
+                            span: Span {
+                                start: 311,
+                                end: 327,
+                            },
+                        },
+                        Statement {
+                            kind: Assignment(
+                                Assignment {
+                                    target: ArrayElement {
+                                        name: "scores",
+                                        index: Expr {
+                                            kind: IntegerLiteral(
+                                                3,
+                                            ),
+                                            span: Span {
+                                                start: 339,
+                                                end: 340,
+                                            },
+                                        },
+                                    },
+                                    op: Assign,
+                                    value: Expr {
+                                        kind: IntegerLiteral(
+                                            4500,
+                                        ),
+                                        span: Span {
+                                            start: 344,
+                                            end: 348,
+                                        },
+                                    },
+                                    span: Span {
+                                        start: 332,
+                                        end: 348,
+                                    },
+                                },
+                            ),
+                            span: Span {
+                                start: 332,
+                                end: 348,
+                            },
+                        },
+                        Statement {
+                            kind: VarDecl(
+                                VarDecl {
+                                    name: "buffer",
+                                    var_type: Some(
+                                        WordArray(
+                                            Some(
+                                                5,
+                                            ),
+                                        ),
+                                    ),
+                                    initializer: None,
+                                    array_size: Some(
+                                        5,
+                                    ),
+                                    span: Span {
+                                        start: 377,
+                                        end: 392,
+                                    },
+                                },
+                            ),
+                            span: Span {
+                                start: 377,
+                                end: 392,
+                            },
+                        },
+                        Statement {
+                            kind: Assignment(
+                                Assignment {
+                                    target: ArrayElement {
+                                        name: "buffer",
+                                        index: Expr {
+                                            kind: IntegerLiteral(
+                                                0,
+                                            ),
+                                            span: Span {
+                                                start: 404,
+                                                end: 405,
+                                            },
+                                        },
+                                    },
+                                    op: Assign,
+                                    value: Expr {
+                                        kind: IntegerLiteral(
+                                            0,
+                                        ),
+                                        span: Span {
+                                            start: 409,
+                                            end: 410,
+                                        },
+                                    },
+                                    span: Span {
+                                        start: 397,
+                                        end: 410,
+                                    },
+                                },
+                            ),
+                            span: Span {
+                                start: 397,
+                                end: 410,
+                            },
+                        },
+                        Statement {
+                            kind: Assignment(
+                                Assignment {
+                                    target: ArrayElement {
+                                        name: "buffer",
+                                        index: Expr {
+                                            kind: IntegerLiteral(
+                                                4,
+                                            ),
+                                            span: Span {
+                                                start: 422,
+                                                end: 423,
+                                            },
+                                        },
+                                    },
+                                    op: Assign,
+                                    value: Expr {
+                                        kind: IntegerLiteral(
+                                            65535,
+                                        ),
+                                        span: Span {
+                                            start: 427,
+                                            end: 432,
+                                        },
+                                    },
+                                    span: Span {
+                                        start: 415,
+                                        end: 432,
+                                    },
+                                },
+                            ),
+                            span: Span {
+                                start: 415,
+                                end: 432,
+                            },
+                        },
+                        Statement {
+                            kind: VarDecl(
+                                VarDecl {
+                                    name: "large",
+                                    var_type: Some(
+                                        WordArray(
+                                            None,
+                                        ),
+                                    ),
+                                    initializer: Some(
+                                        Expr {
+                                            kind: ArrayLiteral {
+                                                elements: [
+                                                    Expr {
+                                                        kind: IntegerLiteral(
+                                                            256,
+                                                        ),
+                                                        span: Span {
+                                                            start: 474,
+                                                            end: 477,
+                                                        },
+                                                    },
+                                                    Expr {
+                                                        kind: IntegerLiteral(
+                                                            1024,
+                                                        ),
+                                                        span: Span {
+                                                            start: 479,
+                                                            end: 483,
+                                                        },
+                                                    },
+                                                    Expr {
+                                                        kind: IntegerLiteral(
+                                                            32767,
+                                                        ),
+                                                        span: Span {
+                                                            start: 485,
+                                                            end: 490,
+                                                        },
+                                                    },
+                                                    Expr {
+                                                        kind: IntegerLiteral(
+                                                            65535,
+                                                        ),
+                                                        span: Span {
+                                                            start: 492,
+                                                            end: 497,
+                                                        },
+                                                    },
+                                                ],
+                                            },
+                                            span: Span {
+                                                start: 473,
+                                                end: 498,
+                                            },
+                                        },
+                                    ),
+                                    array_size: None,
+                                    span: Span {
+                                        start: 457,
+                                        end: 498,
+                                    },
+                                },
+                            ),
+                            span: Span {
+                                start: 457,
+                                end: 498,
+                            },
+                        },
+                        Statement {
+                            kind: VarDecl(
+                                VarDecl {
+                                    name: "i",
+                                    var_type: Some(
+                                        Byte,
+                                    ),
+                                    initializer: Some(
+                                        Expr {
+                                            kind: IntegerLiteral(
+                                                0,
+                                            ),
+                                            span: Span {
+                                                start: 539,
+                                                end: 540,
+                                            },
+                                        },
+                                    ),
+                                    array_size: None,
+                                    span: Span {
+                                        start: 529,
+                                        end: 540,
+                                    },
+                                },
+                            ),
+                            span: Span {
+                                start: 529,
+                                end: 540,
+                            },
+                        },
+                        Statement {
+                            kind: VarDecl(
+                                VarDecl {
+                                    name: "total",
+                                    var_type: Some(
+                                        Word,
+                                    ),
+                                    initializer: Some(
+                                        Expr {
+                                            kind: IntegerLiteral(
+                                                0,
+                                            ),
+                                            span: Span {
+                                                start: 559,
+                                                end: 560,
+                                            },
+                                        },
+                                    ),
+                                    array_size: None,
+                                    span: Span {
+                                        start: 545,
+                                        end: 560,
+                                    },
+                                },
+                            ),
+                            span: Span {
+                                start: 545,
+                                end: 560,
+                            },
+                        },
+                        Statement {
+                            kind: While(
+                                WhileStatement {
+                                    condition: Expr {
+                                        kind: BinaryOp {
+                                            left: Expr {
+                                                kind: Identifier(
+                                                    "i",
+                                                ),
+                                                span: Span {
+                                                    start: 571,
+                                                    end: 572,
+                                                },
+                                            },
+                                            op: Less,
+                                            right: Expr {
+                                                kind: IntegerLiteral(
+                                                    5,
+                                                ),
+                                                span: Span {
+                                                    start: 575,
+                                                    end: 576,
+                                                },
+                                            },
+                                        },
+                                        span: Span {
+                                            start: 571,
+                                            end: 576,
+                                        },
+                                    },
+                                    body: Block {
+                                        statements: [
+                                            Statement {
+                                                kind: Assignment(
+                                                    Assignment {
+                                                        target: Variable(
+                                                            "total",
+                                                        ),
+                                                        op: Assign,
+                                                        value: Expr {
+                                                            kind: BinaryOp {
+                                                                left: Expr {
+                                                                    kind: Identifier(
+                                                                        "total",
+                                                                    ),
+                                                                    span: Span {
+                                                                        start: 594,
+                                                                        end: 599,
+                                                                    },
+                                                                },
+                                                                op: Add,
+                                                                right: Expr {
+                                                                    kind: ArrayIndex {
+                                                                        array: Expr {
+                                                                            kind: Identifier(
+                                                                                "scores",
+                                                                            ),
+                                                                            span: Span {
+                                                                                start: 602,
+                                                                                end: 608,
+                                                                            },
+                                                                        },
+                                                                        index: Expr {
+                                                                            kind: Identifier(
+                                                                                "i",
+                                                                            ),
+                                                                            span: Span {
+                                                                                start: 609,
+                                                                                end: 610,
+                                                                            },
+                                                                        },
+                                                                    },
+                                                                    span: Span {
+                                                                        start: 602,
+                                                                        end: 611,
+                                                                    },
+                                                                },
+                                                            },
+                                                            span: Span {
+                                                                start: 594,
+                                                                end: 611,
+                                                            },
+                                                        },
+                                                        span: Span {
+                                                            start: 586,
+                                                            end: 611,
+                                                        },
+                                                    },
+                                                ),
+                                                span: Span {
+                                                    start: 586,
+                                                    end: 611,
+                                                },
+                                            },
+                                            Statement {
+                                                kind: Assignment(
+                                                    Assignment {
+                                                        target: Variable(
+                                                            "i",
+                                                        ),
+                                                        op: Assign,
+                                                        value: Expr {
+                                                            kind: BinaryOp {
+                                                                left: Expr {
+                                                                    kind: Identifier(
+                                                                        "i",
+                                                                    ),
+                                                                    span: Span {
+                                                                        start: 624,
+                                                                        end: 625,
+                                                                    },
+                                                                },
+                                                                op: Add,
+                                                                right: Expr {
+                                                                    kind: IntegerLiteral(
+                                                                        1,
+                                                                    ),
+                                                                    span: Span {
+                                                                        start: 628,
+                                                                        end: 629,
+                                                                    },
+                                                                },
+                                                            },
+                                                            span: Span {
+                                                                start: 624,
+                                                                end: 629,
+                                                            },
+                                                        },
+                                                        span: Span {
+                                                            start: 620,
+                                                            end: 629,
+                                                        },
+                                                    },
+                                                ),
+                                                span: Span {
+                                                    start: 620,
+                                                    end: 629,
+                                                },
+                                            },
+                                        ],
+                                        span: Span {
+                                            start: 578,
+                                            end: 630,
+                                        },
+                                    },
+                                    span: Span {
+                                        start: 565,
+                                        end: 630,
+                                    },
+                                },
+                            ),
+                            span: Span {
+                                start: 565,
+                                end: 630,
+                            },
+                        },
+                    ],
+                    span: Span {
+                        start: 119,
+                        end: 630,
+                    },
+                },
+                span: Span {
+                    start: 73,
+                    end: 630,
+                },
+            },
+        ),
+    ],
+}

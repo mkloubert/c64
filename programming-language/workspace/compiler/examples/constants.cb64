@@ -1,0 +1,66 @@
+# Constants Demo for Cobra64
+# Demonstrates the naming convention for constants vs variables
+#
+# Rules:
+# - UPPERCASE names (first letter uppercase, ALL letters uppercase) = Constants
+# - lowercase names (first letter lowercase) = Variables
+# - Constants are immutable after declaration
+# - Constants are declared at top-level only
+#
+# Type annotation is optional for constants:
+# - NAME = value          -> Type inferred from value
+# - NAME: type = value    -> Explicit type
+
+# Constants with type inference (type determined from value)
+MAX_VALUE = 255                 # byte (0-255)
+SCREEN_WIDTH = 40               # byte
+SCREEN_HEIGHT = 25              # byte
+VIC_BASE = $D000                # word (hex values > 255)
+BORDER_COLOR = $D020            # word
+BACKGROUND_COLOR = $D021        # word
+
+# Constants with explicit type (override inference)
+SMALL_AS_WORD: word = 100       # Force word type for small value
+PI: fixed = 3.14159             # Use fixed instead of float
+
+# Constants with underscore prefix
+_MAX_SPRITES = 8
+_4K = 4096
+
+def main():
+    cls()
+    println("CONSTANTS DEMO")
+    println("==============")
+    println("")
+
+    # Using constants in expressions
+    println("SCREEN SIZE:")
+    print("WIDTH: ")
+    println(SCREEN_WIDTH)
+    print("HEIGHT: ")
+    println(SCREEN_HEIGHT)
+    println("")
+
+    # Calculate total screen cells
+    total: word = SCREEN_WIDTH * SCREEN_HEIGHT
+    print("TOTAL CELLS: ")
+    println(total)
+    println("")
+
+    # Using hex constants
+    println("HARDWARE ADDRESSES:")
+    print("VIC BASE: $")
+    println(VIC_BASE)
+    print("BORDER: $")
+    println(BORDER_COLOR)
+    println("")
+
+    # Variables (lowercase) can be modified
+    counter: byte = 0
+    println("COUNTING TO 5:")
+    while counter < 5:
+        println(counter)
+        counter = counter + 1
+
+    println("")
+    println("DONE!")

@@ -78,8 +78,8 @@ pub enum StatementKind {
 pub struct VarDecl {
     /// The variable name.
     pub name: String,
-    /// The declared type.
-    pub var_type: Type,
+    /// The declared type (None if type inference is used).
+    pub var_type: Option<Type>,
     /// Optional initial value.
     pub initializer: Option<Expr>,
     /// Optional array size.
@@ -89,11 +89,22 @@ pub struct VarDecl {
 }
 
 impl VarDecl {
-    /// Create a new variable declaration.
+    /// Create a new variable declaration with explicit type.
     pub fn new(name: String, var_type: Type, span: Span) -> Self {
         Self {
             name,
-            var_type,
+            var_type: Some(var_type),
+            initializer: None,
+            array_size: None,
+            span,
+        }
+    }
+
+    /// Create a new variable declaration with type inference.
+    pub fn new_inferred(name: String, span: Span) -> Self {
+        Self {
+            name,
+            var_type: None,
             initializer: None,
             array_size: None,
             span,
@@ -123,6 +134,8 @@ impl VarDecl {
 pub struct ConstDecl {
     /// The constant name.
     pub name: String,
+    /// The optional explicit type (None means type inference).
+    pub const_type: Option<Type>,
     /// The constant value.
     pub value: Expr,
     /// The source span.
@@ -130,9 +143,24 @@ pub struct ConstDecl {
 }
 
 impl ConstDecl {
-    /// Create a new constant declaration.
+    /// Create a new constant declaration with type inference.
     pub fn new(name: String, value: Expr, span: Span) -> Self {
-        Self { name, value, span }
+        Self {
+            name,
+            const_type: None,
+            value,
+            span,
+        }
+    }
+
+    /// Create a new constant declaration with explicit type.
+    pub fn new_typed(name: String, const_type: Type, value: Expr, span: Span) -> Self {
+        Self {
+            name,
+            const_type: Some(const_type),
+            value,
+            span,
+        }
     }
 }
 
@@ -316,9 +344,13 @@ impl std::fmt::Display for StatementKind {
 
 impl std::fmt::Display for VarDecl {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.name, self.var_type)?;
-        if let Some(size) = self.array_size {
-            write!(f, "[{}]", size)?;
+        if let Some(ref var_type) = self.var_type {
+            write!(f, "{}: {}", self.name, var_type)?;
+            if let Some(size) = self.array_size {
+                write!(f, "[{}]", size)?;
+            }
+        } else {
+            write!(f, "{}", self.name)?;
         }
         if let Some(init) = &self.initializer {
             write!(f, " = {}", init)?;
@@ -329,7 +361,11 @@ impl std::fmt::Display for VarDecl {
 
 impl std::fmt::Display for ConstDecl {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "const {} = {}", self.name, self.value)
+        if let Some(ref const_type) = self.const_type {
+            write!(f, "{}: {} = {}", self.name, const_type, self.value)
+        } else {
+            write!(f, "{} = {}", self.name, self.value)
+        }
     }
 }
 
@@ -484,11 +520,27 @@ mod tests {
     }
 
     #[test]
+    fn test_display_var_decl_inferred() {
+        let span = Span::new(0, 10);
+        let init = Expr::new(ExprKind::IntegerLiteral(42), Span::new(4, 6));
+        let decl = VarDecl::new_inferred("x".to_string(), span).with_initializer(init);
+        assert_eq!(format!("{}", decl), "x = 42");
+    }
+
+    #[test]
     fn test_display_const_decl() {
         let span = Span::new(0, 15);
         let value = Expr::new(ExprKind::IntegerLiteral(100), Span::new(12, 15));
         let decl = ConstDecl::new("MAX".to_string(), value, span);
-        assert_eq!(format!("{}", decl), "const MAX = 100");
+        assert_eq!(format!("{}", decl), "MAX = 100");
+    }
+
+    #[test]
+    fn test_display_const_decl_typed() {
+        let span = Span::new(0, 20);
+        let value = Expr::new(ExprKind::IntegerLiteral(255), Span::new(16, 19));
+        let decl = ConstDecl::new_typed("MAX".to_string(), Type::Word, value, span);
+        assert_eq!(format!("{}", decl), "MAX: word = 255");
     }
 
     #[test]
