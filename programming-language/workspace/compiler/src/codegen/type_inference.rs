@@ -126,6 +126,30 @@ impl TypeInference for CodeGenerator {
                     Type::Byte
                 }
             }
+            ExprKind::FunctionCall { name, args } => {
+                // Return type for built-in functions
+                match name.as_str() {
+                    "rand" | "rand_fixed" => Type::Fixed,
+                    "rand_byte" | "peek" | "get_key" => Type::Byte,
+                    "rand_sbyte" => Type::Sbyte,
+                    "rand_word" | "peek_word" | "len" => Type::Word,
+                    "rand_sword" => Type::Sword,
+                    "read" | "readln" => Type::String,
+                    _ => {
+                        // For user-defined functions, check the function table
+                        if let Some(func) = self.functions.get(name) {
+                            func.return_type.clone().unwrap_or(Type::Byte)
+                        } else {
+                            // For functions with typed arguments, infer from first arg
+                            if !args.is_empty() {
+                                self.infer_type_from_expr(&args[0])
+                            } else {
+                                Type::Byte
+                            }
+                        }
+                    }
+                }
+            }
             _ => Type::Byte, // Default to byte
         }
     }

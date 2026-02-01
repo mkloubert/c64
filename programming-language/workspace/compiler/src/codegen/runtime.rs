@@ -67,6 +67,11 @@ pub trait RuntimeEmitter {
 
     // Input routines
     fn emit_readln_routine(&mut self);
+
+    // PRNG routines
+    fn emit_prng_init_routine(&mut self);
+    fn emit_prng_next_routine(&mut self);
+    fn emit_rand_routine(&mut self);
 }
 
 impl RuntimeEmitter for CodeGenerator {
@@ -110,6 +115,11 @@ impl RuntimeEmitter for CodeGenerator {
 
         // Input routine
         self.emit_readln_routine();
+
+        // PRNG routines
+        self.emit_prng_init_routine();
+        self.emit_prng_next_routine();
+        self.emit_rand_routine();
     }
 
     /// Emit print string routine.
@@ -524,6 +534,13 @@ impl RuntimeEmitter for CodeGenerator {
             self.emit_byte(zeropage::TMP3);
         }
 
+        // Extract fractional nibble BEFORE print_word (which corrupts TMP1)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x0F); // Get fractional nibble
+        self.emit_byte(opcodes::PHA); // Save on stack
+
         // Print integer part (TMP3/TMP3_HI)
         self.emit_byte(opcodes::LDA_ZP);
         self.emit_byte(zeropage::TMP3);
@@ -535,17 +552,12 @@ impl RuntimeEmitter for CodeGenerator {
         self.emit_imm(opcodes::LDA_IMM, b'.');
         self.emit_abs(opcodes::JSR, kernal::CHROUT);
 
-        // Fractional part = (value & 0x0F) * 625
-        self.emit_byte(opcodes::LDA_ZP);
-        self.emit_byte(zeropage::TMP1);
-        self.emit_byte(opcodes::AND_IMM);
-        self.emit_byte(0x0F); // Get fractional nibble
-
-        // Store frac in TMP3
+        // Restore fractional nibble from stack and store in TMP3
+        self.emit_byte(opcodes::PLA);
         self.emit_byte(opcodes::STA_ZP);
         self.emit_byte(zeropage::TMP3);
 
-        // Clear result
+        // Clear result for multiplication
         self.emit_imm(opcodes::LDA_IMM, 0);
         self.emit_byte(opcodes::STA_ZP);
         self.emit_byte(zeropage::TMP1);
@@ -557,16 +569,18 @@ impl RuntimeEmitter for CodeGenerator {
         self.emit_byte(zeropage::TMP3);
         self.emit_branch(opcodes::BEQ, "__pfix_print_frac");
 
-        // Multiply frac * 625
-        self.emit_imm(opcodes::LDY_IMM, 4); // 4 bits to check
+        // Multiply frac * 625 using direct bit checks
+        // bit 0 (1) -> add 625 (0x0271)
+        // bit 1 (2) -> add 1250 (0x04E2)
+        // bit 2 (4) -> add 2500 (0x09C4)
+        // bit 3 (8) -> add 5000 (0x1388)
 
-        self.define_label("__pfix_mul_loop");
+        // Check bit 0
         self.emit_byte(opcodes::LDA_ZP);
         self.emit_byte(zeropage::TMP3);
         self.emit_byte(opcodes::AND_IMM);
         self.emit_byte(0x01);
-        self.emit_branch(opcodes::BEQ, "__pfix_no_add");
-
+        self.emit_branch(opcodes::BEQ, "__pfix_bit1");
         // Add 625 (0x0271)
         self.emit_byte(opcodes::CLC);
         self.emit_byte(opcodes::LDA_ZP);
@@ -580,19 +594,65 @@ impl RuntimeEmitter for CodeGenerator {
         self.emit_byte(opcodes::STA_ZP);
         self.emit_byte(zeropage::TMP1_HI);
 
-        self.define_label("__pfix_no_add");
-        // Shift frac right
-        self.emit_byte(opcodes::LSR_ZP);
+        // Check bit 1
+        self.define_label("__pfix_bit1");
+        self.emit_byte(opcodes::LDA_ZP);
         self.emit_byte(zeropage::TMP3);
-
-        // Double the multiplier
-        self.emit_byte(opcodes::ASL_ZP);
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x02);
+        self.emit_branch(opcodes::BEQ, "__pfix_bit2");
+        // Add 1250 (0x04E2)
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::LDA_ZP);
         self.emit_byte(zeropage::TMP1);
-        self.emit_byte(opcodes::ROL_ZP);
+        self.emit_imm(opcodes::ADC_IMM, 0xE2);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_imm(opcodes::ADC_IMM, 0x04);
+        self.emit_byte(opcodes::STA_ZP);
         self.emit_byte(zeropage::TMP1_HI);
 
-        self.emit_byte(opcodes::DEY);
-        self.emit_branch(opcodes::BNE, "__pfix_mul_loop");
+        // Check bit 2
+        self.define_label("__pfix_bit2");
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x04);
+        self.emit_branch(opcodes::BEQ, "__pfix_bit3");
+        // Add 2500 (0x09C4)
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_imm(opcodes::ADC_IMM, 0xC4);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_imm(opcodes::ADC_IMM, 0x09);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+
+        // Check bit 3
+        self.define_label("__pfix_bit3");
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x08);
+        self.emit_branch(opcodes::BEQ, "__pfix_print_frac");
+        // Add 5000 (0x1388)
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_imm(opcodes::ADC_IMM, 0x88);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_imm(opcodes::ADC_IMM, 0x13);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
 
         self.define_label("__pfix_print_frac");
         // Print 4 digits
@@ -1424,6 +1484,118 @@ impl RuntimeEmitter for CodeGenerator {
         self.emit_imm(opcodes::LDA_IMM, (c64::INPUT_BUFFER & 0xFF) as u8);
         self.emit_imm(opcodes::LDX_IMM, (c64::INPUT_BUFFER >> 8) as u8);
 
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit PRNG initialization routine.
+    ///
+    /// Sets up SID voice 3 for hardware noise generation and seeds LFSR.
+    /// Called automatically at program start and by seed().
+    fn emit_prng_init_routine(&mut self) {
+        use super::mos6510::{cia, sid, vic};
+
+        self.define_label("__prng_init");
+        self.runtime_addresses
+            .insert("prng_init".to_string(), self.current_address);
+
+        // Setup SID voice 3 for noise - this is the most reliable
+        // random source on C64 and works in all emulators
+        // Set frequency to maximum for fast noise generation
+        self.emit_imm(opcodes::LDA_IMM, 0xFF);
+        self.emit_abs(opcodes::STA_ABS, sid::VOICE3_FREQ_LO);
+        self.emit_abs(opcodes::STA_ABS, sid::VOICE3_FREQ_HI);
+
+        // Set waveform to noise (bit 7 = noise waveform)
+        self.emit_imm(opcodes::LDA_IMM, 0x80);
+        self.emit_abs(opcodes::STA_ABS, sid::VOICE3_CTRL);
+
+        // Seed LFSR from multiple hardware sources
+        // Use SID noise XOR CIA timer XOR raster for entropy
+        self.emit_abs(opcodes::LDA_ABS, sid::VOICE3_OSC);
+        self.emit_abs(opcodes::EOR_ABS, cia::CIA1_TIMER_A_LO);
+        self.emit_abs(opcodes::EOR_ABS, vic::RASTER);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::PRNG_LO);
+
+        self.emit_abs(opcodes::LDA_ABS, sid::VOICE3_OSC);
+        self.emit_abs(opcodes::EOR_ABS, cia::CIA1_TIMER_A_HI);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::PRNG_HI);
+
+        // Ensure seed is not zero (LFSR would get stuck)
+        self.emit_byte(opcodes::ORA_ZP);
+        self.emit_byte(zeropage::PRNG_LO);
+        self.emit_branch(opcodes::BNE, "__prng_init_ok");
+        // If zero, use fixed non-zero seed
+        self.emit_imm(opcodes::LDA_IMM, 0xAC);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::PRNG_LO);
+        self.emit_imm(opcodes::LDA_IMM, 0xE1);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::PRNG_HI);
+        self.define_label("__prng_init_ok");
+
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit PRNG next routine.
+    ///
+    /// Uses SID hardware noise ($D41B) combined with software LFSR.
+    /// Returns random byte in accumulator.
+    /// IMPORTANT: Preserves TMP1-TMP5 (used by callers).
+    fn emit_prng_next_routine(&mut self) {
+        use super::mos6510::sid;
+
+        self.define_label("__prng_next");
+        self.runtime_addresses
+            .insert("prng_next".to_string(), self.current_address);
+
+        // Advance software LFSR first (16-bit Galois, polynomial $002D)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::PRNG_LO);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ROL_ZP);
+        self.emit_byte(zeropage::PRNG_HI);
+        self.emit_branch(opcodes::BCC, "__prng_no_xor");
+        self.emit_imm(opcodes::EOR_IMM, 0x2D);
+        self.define_label("__prng_no_xor");
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::PRNG_LO);
+
+        // XOR LFSR result with SID noise for final random value
+        self.emit_abs(opcodes::EOR_ABS, sid::VOICE3_OSC);
+
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit rand() routine.
+    ///
+    /// Returns a random fixed-point value between 0.0 and 0.9375 (15/16).
+    /// Uses the PRNG to generate a random byte and takes the upper 4 bits
+    /// as the fractional part of a 12.4 fixed-point number.
+    ///
+    /// Output: A = low byte, X = high byte of fixed 12.4
+    /// Values: 0x0000 (0.0) to 0x000F (0.9375)
+    fn emit_rand_routine(&mut self) {
+        self.define_label("__rand");
+        self.runtime_addresses
+            .insert("rand".to_string(), self.current_address);
+
+        // Get random byte (0-255)
+        self.emit_jsr_label("__prng_next");
+
+        // Convert to fixed 12.4 in range [0, 1)
+        // Take upper 4 bits as fractional part (0-15 -> 0.0 to 0.9375)
+        // Fixed 12.4: bits 3-0 are fractional (1/16 resolution)
+        //
+        // random >> 4 gives us 0-15 as the fractional value
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::LSR_ACC);
+        // A now contains 0-15 (the fractional part)
+        // X = 0 (integer part is always 0)
+        self.emit_imm(opcodes::LDX_IMM, 0);
         self.emit_byte(opcodes::RTS);
     }
 }

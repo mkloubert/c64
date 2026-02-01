@@ -1,0 +1,23 @@
+# Test for rand() and rand_* functions
+# Tests random number generation builtins
+
+def main():
+    # Test rand() - returns float between 0.0 and 1.0
+    r: float = rand()
+    println(r)
+
+    # Test rand_byte(from, to) - returns byte in range [from, to]
+    b: byte = rand_byte(1, 6)  # Dice roll
+    println(b)
+
+    # Test rand_sbyte(from, to) - returns sbyte in range [from, to]
+    sb: sbyte = rand_sbyte(-10, 10)
+    println(sb)
+
+    # Test rand_word(from, to) - returns word in range [from, to]
+    w: word = rand_word(100, 1000)
+    println(w)
+
+    # Test rand_sword(from, to) - returns sword in range [from, to]
+    sw: sword = rand_sword(-100, 100)
+    println(sw)

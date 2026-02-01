@@ -53,7 +53,8 @@ impl AssignmentEmitter for CodeGenerator {
 
                 match assign.op {
                     AssignOp::Assign => {
-                        self.generate_expression(&assign.value)?;
+                        // Use type-aware expression generation for proper literal conversion
+                        self.generate_expression_for_type(&assign.value, &var.var_type)?;
                     }
                     AssignOp::AddAssign => {
                         self.emit_load_from_address(var.address, &var.var_type);

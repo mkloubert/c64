@@ -165,7 +165,7 @@ conformance_test!(
 conformance_test!(
     test_14_builtin_input,
     "14_builtin_input.cb64",
-    "Built-in input functions (get_key, wait_for_key)"
+    "Built-in input functions (get_key, read)"
 );
 
 conformance_test!(
@@ -184,6 +184,12 @@ conformance_test!(
     test_26_type_inference,
     "26_type_inference.cb64",
     "Type inference for variables and constants"
+);
+
+conformance_test!(
+    test_27_builtin_rand,
+    "27_builtin_rand.cb64",
+    "Built-in random number functions (rand, rand_byte, rand_sbyte, rand_word, rand_sword)"
 );
 
 // ============================================================================
@@ -227,11 +233,11 @@ fn test_conformance_basic_stub_present() {
 #[test]
 fn test_conformance_code_size_reasonable() {
     // Test that generated code sizes are reasonable
-    // Note: sizes increased to accommodate fixed-point and float runtime routines
+    // Note: sizes increased to accommodate fixed-point, float, and PRNG runtime routines
     let test_cases = [
-        ("01_literals.cb64", 100, 2500),
-        ("02_variables.cb64", 100, 2500),
-        ("07_while.cb64", 100, 2500),
+        ("01_literals.cb64", 100, 3000),
+        ("02_variables.cb64", 100, 3000),
+        ("07_while.cb64", 100, 3000),
     ];
 
     for (file, min_size, max_size) in test_cases {

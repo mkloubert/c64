@@ -1,0 +1,18 @@
+# Test for seed() function
+# Tests reseeding of the random number generator
+
+def main():
+    # Generate some random numbers
+    b1: byte = rand_byte(1, 100)
+    b2: byte = rand_byte(1, 100)
+    println(b1)
+    println(b2)
+
+    # Reseed the PRNG from hardware entropy
+    seed()
+
+    # Generate more random numbers (should be different)
+    b3: byte = rand_byte(1, 100)
+    b4: byte = rand_byte(1, 100)
+    println(b3)
+    println(b4)

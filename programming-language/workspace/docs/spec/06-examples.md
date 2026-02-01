@@ -38,10 +38,10 @@ def main():
     text_color(YELLOW)
     print("PRESS ANY KEY...")
 
-    wait_key()
+    read()
 ```
 
-**Tests:** cls, screen_color, text_color, cursor, println, wait_key.
+**Tests:** cls, screen_color, text_color, cursor, println, read.
 
 ---
 
@@ -713,7 +713,7 @@ def main():
     text_color(WHITE)
     cursor(12, 16)
     println("PRESS ANY KEY...")
-    wait_key()
+    read()
 ```
 
 **Tests:** Complete program, multiple functions, game loop, all features combined.

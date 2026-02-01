@@ -1,5 +1,5 @@
 # Conformance Test: Input Built-in Functions
-# Tests: get_key(), wait_for_key(), readln()
+# Tests: get_key(), read(), readln()
 # Expected: Compiles without errors, handles input when run
 
 def main():
@@ -8,7 +8,7 @@ def main():
 
     # Test get_key (non-blocking)
     println("PRESS ANY KEY...")
-    k: byte = wait_for_key()
+    k: byte = read()
     print("YOU PRESSED: ")
     println(k)
 

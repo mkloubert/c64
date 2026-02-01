@@ -151,7 +151,7 @@ def game_loop():
 | Function         | Description                 |
 | ---------------- | --------------------------- |
 | `key()`          | Get pressed key (0 if none) |
-| `wait_key()`     | Wait for keypress           |
+| `read()`     | Wait for keypress           |
 | `joystick(port)` | Read joystick (1 or 2)      |
 
 ### Sound

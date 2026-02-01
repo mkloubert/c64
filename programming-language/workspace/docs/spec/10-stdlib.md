@@ -257,12 +257,12 @@ elif k == ' ':
 
 ---
 
-### wait_key
+### read
 
 Wait for a key press (blocking).
 
 ```
-wait_key() -> byte
+read() -> byte
 ```
 
 **Returns:** PETSCII code of pressed key.
@@ -273,7 +273,7 @@ wait_key() -> byte
 
 ```
 println("PRESS ANY KEY...")
-byte k = wait_key()
+byte k = read()
 println("YOU PRESSED A KEY!")
 ```
 
@@ -751,17 +751,154 @@ strlen(s: string) -> byte
 
 ---
 
-### random
+## Random Number Functions
 
-Generate pseudo-random number.
+The random number generator uses a 16-bit Galois LFSR (Linear Feedback Shift Register) with polynomial $0039. The seed is initialized at program start from the SID noise register and VIC raster line for unpredictable results.
+
+### rand
+
+Generate a random fixed-point number.
 
 ```
-random() -> byte
+rand() -> fixed
 ```
 
-**Returns:** Random value 0-255.
+**Returns:** Random value between 0.0 and 0.9375 (15/16).
 
-**Implementation:** Uses SID noise generator or software PRNG.
+**Implementation:** Takes upper 4 bits of a random byte as the fractional part, giving 16 possible values (0.0, 0.0625, 0.125, ..., 0.9375).
+
+**Example:**
+
+```
+fixed r = rand()
+if r < 0.5:
+    println("HEADS")
+else:
+    println("TAILS")
+```
+
+---
+
+### rand_byte
+
+Generate a random byte in a range.
+
+```
+rand_byte(from: byte, to: byte) -> byte
+```
+
+**Parameters:**
+
+- `from`: Minimum value (inclusive)
+- `to`: Maximum value (inclusive)
+
+**Returns:** Random byte in range [from, to].
+
+**Implementation:** Uses rejection sampling for uniform distribution.
+
+**Example:**
+
+```
+byte dice = rand_byte(1, 6)   # Dice roll
+byte card = rand_byte(1, 52)  # Random card
+```
+
+---
+
+### rand_sbyte
+
+Generate a random signed byte in a range.
+
+```
+rand_sbyte(from: sbyte, to: sbyte) -> sbyte
+```
+
+**Parameters:**
+
+- `from`: Minimum value (inclusive)
+- `to`: Maximum value (inclusive)
+
+**Returns:** Random signed byte in range [from, to].
+
+**Example:**
+
+```
+sbyte offset = rand_sbyte(-10, 10)  # Random offset
+```
+
+---
+
+### rand_word
+
+Generate a random word in a range.
+
+```
+rand_word(from: word, to: word) -> word
+```
+
+**Parameters:**
+
+- `from`: Minimum value (inclusive)
+- `to`: Maximum value (inclusive)
+
+**Returns:** Random word in range [from, to].
+
+**Example:**
+
+```
+word score = rand_word(100, 1000)    # Random score
+word addr = rand_word($0400, $07FF)  # Random screen address
+```
+
+---
+
+### rand_sword
+
+Generate a random signed word in a range.
+
+```
+rand_sword(from: sword, to: sword) -> sword
+```
+
+**Parameters:**
+
+- `from`: Minimum value (inclusive)
+- `to`: Maximum value (inclusive)
+
+**Returns:** Random signed word in range [from, to].
+
+**Example:**
+
+```
+sword velocity = rand_sword(-100, 100)  # Random velocity
+```
+
+---
+
+### seed
+
+Reseed the random number generator from hardware entropy.
+
+```
+seed() -> void
+```
+
+**Description:** Reseeds the PRNG from hardware entropy sources (SID noise register, CIA timers, raster line). This is useful when:
+- The emulator produces the same random sequence on each run
+- You want to refresh the random state during program execution
+
+**Example:**
+
+```
+# Generate some random numbers
+println(rand_byte(1, 100))
+
+# Reseed from hardware entropy
+seed()
+
+# Generate more random numbers with fresh entropy
+println(rand_byte(1, 100))
+```
 
 ---
 
@@ -790,11 +927,12 @@ memcpy(dest: word, src: word, count: word) -> void
 | Category      | Functions                                                                                                                                      |
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | Screen Output | cls, print, println, cursor, home, char_at, color_at, screen_color, text_color                                                                 |
-| Input         | key, wait_key, key_pressed, joystick                                                                                                           |
+| Input         | key, read, key_pressed, joystick                                                                                                           |
 | Sprites       | sprite_enable, sprite_pos, sprite_color, sprite_data, sprite_expand, sprite_multicolor, sprite_priority, sprite_collision, sprite_bg_collision |
 | Sound         | sound_init, volume, sound_off, voice, voice_on, voice_off, pulse_width                                                                         |
 | Timing        | wait, wait_ms, raster                                                                                                                          |
 | Memory        | peek, poke, peekw, pokew, memset, memcpy                                                                                                       |
-| Utility       | strlen, random                                                                                                                                 |
+| Random        | rand, rand_byte, rand_sbyte, rand_word, rand_sword, seed                                                                                       |
+| Utility       | strlen                                                                                                                                         |
 
-**Total: 37 functions**
+**Total: 42 functions**

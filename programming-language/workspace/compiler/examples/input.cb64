@@ -4,5 +4,5 @@
 def main():
     cls()
     println("PRESS ANY KEY...")
-    wait_for_key()
+    read()
     println("YOU PRESSED A KEY!")

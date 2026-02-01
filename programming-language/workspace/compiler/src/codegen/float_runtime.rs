@@ -1044,12 +1044,17 @@ impl CodeGenerator {
     ///
     /// Input: A/X = float (binary16)
     /// Output: A/X = word value
+    ///
+    /// Float16: sign(1) + exp(5) + mantissa(10)
+    /// Value = (1 + mantissa/1024) × 2^(exp - 15)
+    /// Integer = (1024 + mantissa) × 2^(exp - 25)
+    ///
+    /// For exp < 25: shift RIGHT by (25 - exp)
+    /// For exp >= 25: shift LEFT by (exp - 25)
     fn emit_float_to_word_routine(&mut self) {
         self.define_label("__float_to_word");
         self.runtime_addresses
             .insert("float_to_word".to_string(), self.current_address);
-
-        let done = self.make_label("f2w_done");
 
         // Store float
         self.emit_byte(opcodes::STA_ZP);
@@ -1057,12 +1062,14 @@ impl CodeGenerator {
         self.emit_byte(opcodes::STX_ZP);
         self.emit_byte(zeropage::TMP1_HI);
 
-        // Extract exponent
+        // Extract exponent: (high >> 2) & 0x1F
         self.emit_byte(opcodes::TXA);
         self.emit_byte(opcodes::LSR_ACC);
         self.emit_byte(opcodes::LSR_ACC);
         self.emit_byte(opcodes::AND_IMM);
         self.emit_byte(0x1F);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2); // TMP2 = exponent
 
         // Check if exponent < 15 (value < 1.0)
         self.emit_byte(opcodes::CMP_IMM);
@@ -1075,53 +1082,82 @@ impl CodeGenerator {
         self.emit_byte(opcodes::RTS);
 
         self.define_label("__f2w_valid");
-        // exponent in A, calculate shift = exponent - 15
-        self.emit_byte(opcodes::SEC);
-        self.emit_byte(opcodes::SBC_IMM);
-        self.emit_byte(15);
-        self.emit_byte(opcodes::TAY); // Y = shift amount
-
-        // Check if shift > 15 (overflow for word)
-        self.emit_byte(opcodes::CPY_IMM);
-        self.emit_byte(16);
-        self.emit_branch(opcodes::BCC, "__f2w_ok");
-
-        // Overflow, return 65535
-        self.emit_imm(opcodes::LDA_IMM, 0xFF);
-        self.emit_imm(opcodes::LDX_IMM, 0xFF);
-        self.emit_byte(opcodes::RTS);
-
-        self.define_label("__f2w_ok");
-        // Get mantissa with implicit 1 (11 bits total)
+        // Get mantissa with implicit 1 (11 bits: 0x400 + mantissa)
+        // mantissa low 8 bits in TMP1, high 2 bits in TMP1_HI & 0x03
         self.emit_byte(opcodes::LDA_ZP);
         self.emit_byte(zeropage::TMP1_HI);
         self.emit_byte(opcodes::AND_IMM);
         self.emit_byte(0x03);
         self.emit_byte(opcodes::ORA_IMM);
-        self.emit_byte(0x04); // add implicit 1
+        self.emit_byte(0x04); // add implicit 1 (0x400 >> 8 = 0x04)
         self.emit_byte(opcodes::STA_ZP);
-        self.emit_byte(zeropage::TMP3_HI);
+        self.emit_byte(zeropage::TMP3_HI); // TMP3_HI:TMP3 = 11-bit mantissa
 
         self.emit_byte(opcodes::LDA_ZP);
         self.emit_byte(zeropage::TMP1);
         self.emit_byte(opcodes::STA_ZP);
         self.emit_byte(zeropage::TMP3);
 
-        // Shift mantissa by Y positions
+        // Calculate shift: if exp < 25, shift right by (25 - exp)
+        //                  if exp >= 25, shift left by (exp - 25)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2); // exp
+        self.emit_byte(opcodes::CMP_IMM);
+        self.emit_byte(25);
+        self.emit_branch(opcodes::BCS, "__f2w_shift_left");
+
+        // exp < 25: shift RIGHT by (25 - exp)
+        self.emit_byte(opcodes::LDA_IMM);
+        self.emit_byte(25);
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::TAY); // Y = shift count
+
+        // Shift right loop
+        self.define_label("__f2w_shr_loop");
         self.emit_byte(opcodes::CPY_IMM);
         self.emit_byte(0);
-        self.emit_branch(opcodes::BEQ, &done);
+        self.emit_branch(opcodes::BEQ, "__f2w_done");
+        self.emit_byte(opcodes::LSR_ZP);
+        self.emit_byte(zeropage::TMP3_HI);
+        self.emit_byte(opcodes::ROR_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::DEY);
+        self.emit_jmp("__f2w_shr_loop");
 
-        let shift_loop = self.make_label("f2w_shift");
-        self.define_label(&shift_loop);
+        // exp >= 25: shift LEFT by (exp - 25)
+        self.define_label("__f2w_shift_left");
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_IMM);
+        self.emit_byte(25);
+        self.emit_byte(opcodes::TAY); // Y = shift count
+
+        // Check overflow (shift > 5 would overflow 16-bit result)
+        self.emit_byte(opcodes::CPY_IMM);
+        self.emit_byte(6);
+        self.emit_branch(opcodes::BCC, "__f2w_shl_loop");
+
+        // Overflow, return 65535
+        self.emit_imm(opcodes::LDA_IMM, 0xFF);
+        self.emit_imm(opcodes::LDX_IMM, 0xFF);
+        self.emit_byte(opcodes::RTS);
+
+        // Shift left loop
+        self.define_label("__f2w_shl_loop");
+        self.emit_byte(opcodes::CPY_IMM);
+        self.emit_byte(0);
+        self.emit_branch(opcodes::BEQ, "__f2w_done");
         self.emit_byte(opcodes::ASL_ZP);
         self.emit_byte(zeropage::TMP3);
         self.emit_byte(opcodes::ROL_ZP);
         self.emit_byte(zeropage::TMP3_HI);
         self.emit_byte(opcodes::DEY);
-        self.emit_branch(opcodes::BNE, &shift_loop);
+        self.emit_jmp("__f2w_shl_loop");
 
-        self.define_label(&done);
+        self.define_label("__f2w_done");
         self.emit_byte(opcodes::LDA_ZP);
         self.emit_byte(zeropage::TMP3);
         self.emit_byte(opcodes::LDX_ZP);

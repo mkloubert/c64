@@ -791,14 +791,14 @@ def main():
         println(k)
 ```
 
-#### `wait_for_key() -> byte`
+#### `read() -> byte`
 
 Waits for a key press and returns it.
 
 ```python
 def main():
     println("PRESS ANY KEY")
-    k: byte = wait_for_key()
+    k: byte = read()
     println(k)
 ```
 
@@ -859,6 +859,86 @@ def main():
     println(len(buffer))  # Prints: 100
 ```
 
+### Random Number Functions
+
+The random number generator uses a 16-bit Galois LFSR (Linear Feedback Shift Register) with polynomial $0039, seeded at program start from the SID noise register and VIC raster line for unpredictable results.
+
+#### `rand() -> fixed`
+
+Returns a random fixed-point number between 0.0 and 0.9375 (15/16).
+The resolution is 1/16 (0.0625), giving 16 possible values: 0.0, 0.0625, 0.125, ..., 0.9375.
+
+```python
+def main():
+    r: fixed = rand()
+    println(r)  # Prints something like 0.5000 or 0.8125
+```
+
+#### `rand_byte(from: byte, to: byte) -> byte`
+
+Returns a random byte in the range [from, to] (inclusive).
+
+```python
+def main():
+    # Simulate dice roll (1-6)
+    dice: byte = rand_byte(1, 6)
+    println(dice)
+```
+
+#### `rand_sbyte(from: sbyte, to: sbyte) -> sbyte`
+
+Returns a random signed byte in the range [from, to] (inclusive).
+
+```python
+def main():
+    # Random value from -10 to 10
+    offset: sbyte = rand_sbyte(-10, 10)
+    println(offset)
+```
+
+#### `rand_word(from: word, to: word) -> word`
+
+Returns a random 16-bit word in the range [from, to] (inclusive).
+
+```python
+def main():
+    # Random score between 100 and 1000
+    score: word = rand_word(100, 1000)
+    println(score)
+```
+
+#### `rand_sword(from: sword, to: sword) -> sword`
+
+Returns a random signed 16-bit word in the range [from, to] (inclusive).
+
+```python
+def main():
+    # Random value from -1000 to 1000
+    value: sword = rand_sword(-1000, 1000)
+    println(value)
+```
+
+#### `seed()`
+
+Reseeds the random number generator from hardware entropy sources (SID noise, CIA timers, raster line). This is useful when:
+
+- The emulator produces the same random sequence on each run
+- You want to refresh the random state during program execution
+
+```python
+def main():
+    # Generate some random numbers
+    println(rand_byte(1, 100))
+    println(rand_byte(1, 100))
+
+    # Reseed from hardware entropy
+    seed()
+
+    # Generate more random numbers with fresh entropy
+    println(rand_byte(1, 100))
+    println(rand_byte(1, 100))
+```
+
 ---
 
 ## Example Programs
@@ -913,7 +993,7 @@ def main():
 
     color: byte = 0
     while true:
-        k: byte = wait_for_key()
+        k: byte = read()
         color = color + 1
         if color > 15:
             color = 0
@@ -934,7 +1014,7 @@ def main():
 
     while true:
         print("YOUR GUESS: ")
-        k: byte = wait_for_key()
+        k: byte = read()
         guess: byte = k - 48  # Convert ASCII to number
         println(guess)
         guesses = guesses + 1
@@ -1271,7 +1351,14 @@ The generated PRG and D64 files should work with any C64 emulator that supports 
 
 ## Version History
 
-- **1.4.0** - Array support
+- **0.5.0** - Random number generation improvements
+  - Added `seed()` function to reseed PRNG from hardware entropy
+  - Changed `rand()` to return `fixed` type (was `float`)
+  - `rand()` now returns values 0.0 to 0.9375 with 1/16 resolution
+  - Fixed `__print_fixed` routine corruption bug
+  - Improved fixed-point multiplication for fractional display
+
+- **0.4.0** - Array support
   - Added `byte[]`, `word[]`, `bool[]` array types
   - Added `sbyte[]`, `sword[]` signed array types
   - Array literals with type inference: `[1, 2, 3]`, `[-10, 20, 30]`
@@ -1283,7 +1370,7 @@ The generated PRG and D64 files should work with any C64 emulator that supports 
   - Signed array type inference from negative values
   - Array-specific error messages
 
-- **1.3.0** - Naming convention for constants
+- **0.3.0** - Naming convention for constants
   - Removed `const` keyword
   - Constants are now identified by UPPERCASE naming convention
   - First letter uppercase + all letters uppercase = constant
@@ -1291,7 +1378,7 @@ The generated PRG and D64 files should work with any C64 emulator that supports 
   - Added compile-time validation for naming rules
   - New error codes: E026 (InvalidIdentifierNaming), E027 (IdentifierOnlyUnderscore)
 
-- **1.2.0** - Decimal number types
+- **0.2.0** - Decimal number types
   - Added `fixed` type (12.4 fixed-point, -2048.0 to +2047.9375)
   - Added `float` type (IEEE-754 binary16, ±65504)
   - Decimal literal support (3.14, 0.5, -2.25)
@@ -1301,7 +1388,7 @@ The generated PRG and D64 files should work with any C64 emulator that supports 
   - Automatic type promotion in mixed operations
   - Print support for fixed and float values
 
-- **1.1.0** - Signed integer types
+- **0.1.0** - Signed integer types
   - Added `sbyte` type (-128 to 127)
   - Added `sword` type (-32768 to 32767)
   - Full signed arithmetic (add, sub, mul, div)
@@ -1309,7 +1396,7 @@ The generated PRG and D64 files should work with any C64 emulator that supports 
   - Negative number literals (-128, -$7F, -%01111111)
   - Compile-time range validation
 
-- **1.0.0** - Initial release
+- **0.0.1** - Initial release
   - Complete language implementation
   - PRG and D64 output
   - All basic built-in functions

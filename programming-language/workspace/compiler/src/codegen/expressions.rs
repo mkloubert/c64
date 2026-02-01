@@ -32,7 +32,7 @@ use super::functions::FunctionCallEmitter;
 use super::mos6510::{opcodes, zeropage};
 use super::strings::StringManager;
 use super::type_inference::TypeInference;
-use super::types::decimal_string_to_binary16;
+use super::types::{decimal_string_to_binary16, decimal_string_to_fixed};
 use super::unary_ops::UnaryOpsEmitter;
 use super::variables::VariableManager;
 use super::CodeGenerator;
@@ -45,9 +45,39 @@ pub trait ExpressionEmitter {
     ///
     /// Result is left in A register (for byte) or A/X (for word, A=low, X=high).
     fn generate_expression(&mut self, expr: &Expr) -> Result<(), CompileError>;
+
+    /// Generate code for an expression with a known target type.
+    ///
+    /// This is used when assigning to variables where the target type affects
+    /// how literals (especially DecimalLiteral) should be interpreted.
+    fn generate_expression_for_type(
+        &mut self,
+        expr: &Expr,
+        target_type: &Type,
+    ) -> Result<(), CompileError>;
 }
 
 impl ExpressionEmitter for CodeGenerator {
+    fn generate_expression_for_type(
+        &mut self,
+        expr: &Expr,
+        target_type: &Type,
+    ) -> Result<(), CompileError> {
+        // Handle DecimalLiteral specially based on target type
+        if let ExprKind::DecimalLiteral(s) = &expr.kind {
+            if target_type.is_fixed() {
+                // Convert to fixed-point 12.4 format
+                let value = decimal_string_to_fixed(s);
+                self.emit_imm(opcodes::LDA_IMM, (value & 0xFF) as u8);
+                self.emit_imm(opcodes::LDX_IMM, ((value >> 8) & 0xFF) as u8);
+                return Ok(());
+            }
+            // For float or other types, fall through to default handling
+        }
+        // For all other cases, use standard expression generation
+        self.generate_expression(expr)
+    }
+
     fn generate_expression(&mut self, expr: &Expr) -> Result<(), CompileError> {
         match &expr.kind {
             ExprKind::IntegerLiteral(value) => {

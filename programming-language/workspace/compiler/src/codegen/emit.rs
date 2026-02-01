@@ -156,8 +156,8 @@ impl EmitHelpers for CodeGenerator {
             Type::Byte | Type::Sbyte | Type::Bool => {
                 self.emit_abs(opcodes::LDA_ABS, address);
             }
-            Type::Word | Type::Sword | Type::String => {
-                // String is a 16-bit pointer, same as Word
+            Type::Word | Type::Sword | Type::String | Type::Float | Type::Fixed => {
+                // All 16-bit types: load A (low byte) and X (high byte)
                 self.emit_abs(opcodes::LDA_ABS, address);
                 self.emit_abs(opcodes::LDX_ABS, address.wrapping_add(1));
             }
@@ -173,8 +173,8 @@ impl EmitHelpers for CodeGenerator {
             Type::Byte | Type::Sbyte | Type::Bool => {
                 self.emit_abs(opcodes::STA_ABS, address);
             }
-            Type::Word | Type::Sword | Type::String => {
-                // String is a 16-bit pointer, same as Word
+            Type::Word | Type::Sword | Type::String | Type::Float | Type::Fixed => {
+                // All 16-bit types: store A (low byte) and X (high byte)
                 self.emit_abs(opcodes::STA_ABS, address);
                 self.emit_byte(opcodes::STX_ABS);
                 self.emit_word(address.wrapping_add(1));

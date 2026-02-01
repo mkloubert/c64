@@ -327,6 +327,49 @@ pub mod zeropage {
     /// Pointer for string operations ($22-$23).
     pub const STR_PTR: u8 = 0x22;
     pub const STR_PTR_HI: u8 = 0x23;
+
+    /// PRNG state (16-bit seed) - using $06/$07 which are safe on C64.
+    pub const PRNG_LO: u8 = 0x06;
+    pub const PRNG_HI: u8 = 0x07;
+}
+
+/// SID (Sound Interface Device) registers.
+#[allow(dead_code)]
+pub mod sid {
+    /// SID base address.
+    pub const BASE: u16 = 0xD400;
+
+    /// Voice 3 frequency low byte.
+    pub const VOICE3_FREQ_LO: u16 = 0xD40E;
+    /// Voice 3 frequency high byte.
+    pub const VOICE3_FREQ_HI: u16 = 0xD40F;
+    /// Voice 3 control register.
+    pub const VOICE3_CTRL: u16 = 0xD412;
+    /// Voice 3 oscillator output (random when noise waveform).
+    pub const VOICE3_OSC: u16 = 0xD41B;
+
+    /// Waveform: Noise.
+    pub const WAVEFORM_NOISE: u8 = 0x80;
+}
+
+/// VIC-II registers.
+#[allow(dead_code)]
+pub mod vic {
+    /// Current raster line (bits 0-7).
+    pub const RASTER: u16 = 0xD012;
+}
+
+/// CIA (Complex Interface Adapter) registers.
+#[allow(dead_code)]
+pub mod cia {
+    /// CIA1 Timer A low byte (free-running counter).
+    pub const CIA1_TIMER_A_LO: u16 = 0xDC04;
+    /// CIA1 Timer A high byte.
+    pub const CIA1_TIMER_A_HI: u16 = 0xDC05;
+    /// CIA1 Timer B low byte.
+    pub const CIA1_TIMER_B_LO: u16 = 0xDC06;
+    /// CIA1 Timer B high byte.
+    pub const CIA1_TIMER_B_HI: u16 = 0xDC07;
 }
 
 /// PETSCII character codes.

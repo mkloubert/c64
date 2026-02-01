@@ -65,7 +65,7 @@ LIGHTGREEN=13  LIGHTBLUE=14  LIGHTGREY=15
 
 ```
 byte k = key()                  # Get key (0=none)
-byte k = wait_key()             # Wait for key
+byte k = read()             # Wait for key
 byte j = joystick(2)            # Read joy (1 or 2)
 
 JOY_UP=1  JOY_DOWN=2  JOY_LEFT=4  JOY_RIGHT=8  JOY_FIRE=16

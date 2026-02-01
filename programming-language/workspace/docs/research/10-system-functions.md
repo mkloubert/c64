@@ -69,7 +69,7 @@ const LIGHTGREY = 15
 | Function        | Description                 | KERNAL Equivalent |
 | --------------- | --------------------------- | ----------------- |
 | `key()`         | Get current key (0 if none) | GETIN ($FFE4)     |
-| `wait_key()`    | Wait for keypress           | Loop with GETIN   |
+| `read()`    | Wait for keypress           | Loop with GETIN   |
 | `key_pressed()` | Check if any key pressed    | SCNKEY ($FF9F)    |
 
 ### Joystick

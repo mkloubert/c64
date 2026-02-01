@@ -29,6 +29,26 @@ pub fn decimal_string_to_binary16(s: &str) -> u16 {
     f64_to_binary16(value)
 }
 
+/// Convert a decimal string to fixed-point 12.4 format.
+///
+/// Fixed 12.4 format: 12 bits integer, 4 bits fraction.
+/// Value range: -2048.0 to +2047.9375
+/// Resolution: 1/16 = 0.0625
+pub fn decimal_string_to_fixed(s: &str) -> i16 {
+    let value: f64 = s.parse().unwrap_or(0.0);
+    f64_to_fixed(value)
+}
+
+/// Convert an f64 value to fixed-point 12.4 format.
+///
+/// The internal representation is value * 16, stored as i16.
+pub fn f64_to_fixed(value: f64) -> i16 {
+    // Clamp to valid range
+    let clamped = value.clamp(-2048.0, 2047.9375);
+    // Multiply by 16 and round to nearest
+    (clamped * 16.0).round() as i16
+}
+
 /// Convert an f64 value to IEEE-754 binary16 bits.
 ///
 /// IEEE-754 binary16 format:
@@ -150,5 +170,64 @@ mod tests {
         // Test basic parsing
         let result = decimal_string_to_binary16("1.0");
         assert_eq!(result, f64_to_binary16(1.0));
+    }
+
+    #[test]
+    fn test_f64_to_binary16_half() {
+        // 0.5 should be 0x3800
+        let result = f64_to_binary16(0.5);
+        assert_eq!(result, 0x3800);
+    }
+
+    #[test]
+    fn test_f64_to_fixed_half() {
+        // 0.5 in fixed 12.4 = 0.5 * 16 = 8
+        let result = f64_to_fixed(0.5);
+        assert_eq!(result, 8);
+    }
+
+    #[test]
+    fn test_f64_to_fixed_one() {
+        // 1.0 in fixed 12.4 = 1.0 * 16 = 16
+        let result = f64_to_fixed(1.0);
+        assert_eq!(result, 16);
+    }
+
+    #[test]
+    fn test_f64_to_fixed_negative() {
+        // -1.5 in fixed 12.4 = -1.5 * 16 = -24
+        let result = f64_to_fixed(-1.5);
+        assert_eq!(result, -24);
+    }
+
+    #[test]
+    fn test_decimal_string_to_fixed() {
+        assert_eq!(decimal_string_to_fixed("0.5"), 8);
+        assert_eq!(decimal_string_to_fixed("1.0"), 16);
+        assert_eq!(decimal_string_to_fixed("-1.5"), -24);
+    }
+}
+
+#[cfg(test)]
+mod codegen_tests {
+    use crate::compile;
+
+    #[test]
+    fn test_fixed_literal_compilation() {
+        let source = r#"
+def main():
+    f: fixed = 0.5
+"#;
+        let result = compile(source);
+        assert!(result.is_ok(), "Compilation failed: {:?}", result.err());
+        let bytes = result.unwrap();
+        
+        // 0.5 in fixed 12.4 = 8
+        // LDA #$08 = A9 08
+        // LDX #$00 = A2 00
+        // Check if the pattern A9 08 A2 00 exists in the output
+        let pattern = [0xA9, 0x08, 0xA2, 0x00];
+        let found = bytes.windows(4).any(|w| w == pattern);
+        assert!(found, "Expected pattern A9 08 A2 00 (LDA #8, LDX #0) not found in output");
     }
 }

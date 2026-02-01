@@ -54,8 +54,8 @@ impl BuiltinRegistry for Analyzer {
         // get_key() -> byte - get key without waiting
         self.define_builtin("get_key", vec![], Some(Type::Byte));
 
-        // wait_for_key() -> byte - wait for key press
-        self.define_builtin("wait_for_key", vec![], Some(Type::Byte));
+        // read() -> byte - wait for key press
+        self.define_builtin("read", vec![], Some(Type::Byte));
 
         // readln() -> string - read a line of input
         self.define_builtin("readln", vec![], Some(Type::String));
@@ -66,6 +66,33 @@ impl BuiltinRegistry for Analyzer {
 
         // peek(addr) -> byte - read from memory
         self.define_builtin("peek", vec![Type::Word], Some(Type::Byte));
+
+        // Random number generation
+        // rand() -> fixed - random number between 0.0 and ~0.9375 (15/16)
+        self.define_builtin("rand", vec![], Some(Type::Fixed));
+
+        // rand_byte(from, to) -> byte - random integer in range [from, to]
+        self.define_builtin("rand_byte", vec![Type::Byte, Type::Byte], Some(Type::Byte));
+
+        // rand_sbyte(from, to) -> sbyte - random signed integer in range [from, to]
+        self.define_builtin(
+            "rand_sbyte",
+            vec![Type::Sbyte, Type::Sbyte],
+            Some(Type::Sbyte),
+        );
+
+        // rand_word(from, to) -> word - random 16-bit integer in range [from, to]
+        self.define_builtin("rand_word", vec![Type::Word, Type::Word], Some(Type::Word));
+
+        // rand_sword(from, to) -> sword - random signed 16-bit integer in range [from, to]
+        self.define_builtin(
+            "rand_sword",
+            vec![Type::Sword, Type::Sword],
+            Some(Type::Sword),
+        );
+
+        // seed() - reseed the random number generator from hardware entropy
+        self.define_builtin("seed", vec![], None);
     }
 
     fn define_builtin(&mut self, name: &str, params: Vec<Type>, return_type: Option<Type>) {

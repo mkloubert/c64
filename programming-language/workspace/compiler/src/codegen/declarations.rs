@@ -54,6 +54,11 @@ impl DeclarationEmitter for CodeGenerator {
             f.address = self.current_address;
         }
 
+        // For main function, call global initialization (PRNG init, global vars)
+        if func.name == "main" {
+            self.emit_jsr_label("__init_globals");
+        }
+
         // Note: Parameters are already allocated in the first pass.
         // The variables table already contains entries for parameter names.
 
@@ -99,7 +104,8 @@ impl DeclarationEmitter for CodeGenerator {
             if let ExprKind::ArrayLiteral { elements } = &init.kind {
                 generate_array_literal_init(self, address, &var_type, elements)?;
             } else {
-                self.generate_expression(init)?;
+                // Use type-aware expression generation for proper literal conversion
+                self.generate_expression_for_type(init, &var_type)?;
                 self.emit_store_to_address(address, &var_type);
             }
         }
@@ -117,7 +123,8 @@ impl DeclarationEmitter for CodeGenerator {
 
         let address = self.allocate_variable(&decl.name, &const_type, true);
 
-        self.generate_expression(&decl.value)?;
+        // Use type-aware expression generation for proper literal conversion
+        self.generate_expression_for_type(&decl.value, &const_type)?;
         self.emit_store_to_address(address, &const_type);
 
         Ok(())

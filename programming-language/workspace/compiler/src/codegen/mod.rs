@@ -71,7 +71,7 @@ pub mod variables;
 
 // Re-exports for public API
 pub use constants::{BASIC_STUB_SIZE, CODE_START, PROGRAM_START};
-pub use types::{decimal_string_to_binary16, f64_to_binary16};
+pub use types::{decimal_string_to_binary16, decimal_string_to_fixed, f64_to_binary16, f64_to_fixed};
 
 // Internal imports from submodules
 use assignments::AssignmentEmitter;
@@ -207,6 +207,10 @@ impl CodeGenerator {
 
         // Generate initialization for global variables
         self.define_label("__init_globals");
+
+        // Initialize PRNG with random seed
+        self.emit_jsr_label("__prng_init");
+
         for item in &program.items {
             match item {
                 TopLevelItem::Variable(decl) => {

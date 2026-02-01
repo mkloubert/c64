@@ -216,7 +216,7 @@ cls, print, println, cursor, char_at, color_at,
 screen_color, text_color
 
 # Input
-key, wait_key, joystick
+key, read, joystick
 
 # Sound
 sound_init, volume, sound_off, voice, voice_on, voice_off

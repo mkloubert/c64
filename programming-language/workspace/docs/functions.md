@@ -152,12 +152,12 @@ byte k = key()
 
 ---
 
-### wait_key
+### read
 
 Wait for a key press (blocking).
 
 ```
-byte k = wait_key()
+byte k = read()
 ```
 
 **Returns:** PETSCII code of pressed key.
