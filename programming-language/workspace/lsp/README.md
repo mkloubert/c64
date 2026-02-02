@@ -1,5 +1,9 @@
 # Cobra64 Language Support for VS Code
 
+<p align="center">
+  <img src="icons/cobra64.png" alt="Cobra64 Logo" width="256">
+</p>
+
 A full-featured VS Code extension providing language support for Cobra64 - a modern Python-like programming language that compiles to Commodore 64 binaries.
 
 ## Features
