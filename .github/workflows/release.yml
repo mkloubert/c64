@@ -1,0 +1,208 @@
+# Cobra64 - A concept for a modern Python-like compiler creating C64 binaries
+#
+# Copyright (C) 2026 Marcel Joachim Kloubert <marcel@kloubert.dev>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Extract version from tag and update Cargo.toml
+  prepare:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION"
+
+      - name: Update Cargo.toml version
+        working-directory: programming-language/workspace/compiler
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          sed -i "s/^version = \".*\"/version = \"$VERSION\"/" Cargo.toml
+          echo "Updated Cargo.toml to version $VERSION"
+          grep "^version" Cargo.toml
+
+      - name: Upload updated source
+        uses: actions/upload-artifact@v6
+        with:
+          name: source
+          path: programming-language/workspace/compiler
+          retention-days: 1
+
+  # Build for all target platforms
+  build:
+    name: Build ${{ matrix.target }}
+    needs: prepare
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux x86_64
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            archive: tar.gz
+
+          # Linux ARM64 (for Raspberry Pi and other ARM devices)
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            archive: tar.gz
+            cross: true
+
+          # macOS x86_64 (Intel)
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            archive: tar.gz
+
+          # macOS ARM64 (Apple Silicon)
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            archive: tar.gz
+
+          # Windows x86_64
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            archive: zip
+
+    steps:
+      - name: Download source
+        uses: actions/download-artifact@v5
+        with:
+          name: source
+          path: compiler
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross-compilation tools (Linux ARM64)
+        if: matrix.cross
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Configure cross-compilation (Linux ARM64)
+        if: matrix.cross
+        run: |
+          mkdir -p ~/.cargo
+          echo '[target.aarch64-unknown-linux-gnu]' >> ~/.cargo/config.toml
+          echo 'linker = "aarch64-linux-gnu-gcc"' >> ~/.cargo/config.toml
+
+      - name: Build release binary
+        working-directory: compiler
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Prepare archive (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          cd compiler/target/${{ matrix.target }}/release
+          tar -czvf ../../../../cobra64-${{ needs.prepare.outputs.version }}-${{ matrix.target }}.tar.gz cobra64
+          cd ../../../..
+
+      - name: Prepare archive (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          cd compiler/target/${{ matrix.target }}/release
+          Compress-Archive -Path cobra64.exe -DestinationPath ../../../../cobra64-${{ needs.prepare.outputs.version }}-${{ matrix.target }}.zip
+          cd ../../../..
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: cobra64-${{ matrix.target }}
+          path: cobra64-${{ needs.prepare.outputs.version }}-${{ matrix.target }}.${{ matrix.archive }}
+          retention-days: 1
+
+  # Create GitHub Release and upload all binaries
+  release:
+    name: Create Release
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v5
+        with:
+          path: artifacts
+          pattern: cobra64-*
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -la artifacts/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Cobra64 v${{ needs.prepare.outputs.version }}
+          tag_name: v${{ needs.prepare.outputs.version }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            artifacts/cobra64-*.tar.gz
+            artifacts/cobra64-*.zip
+          body: |
+            ## Cobra64 v${{ needs.prepare.outputs.version }}
+
+            A modern compiler for the Commodore 64 with Python-like syntax.
+
+            ### Downloads
+
+            | Platform | Architecture | Download |
+            |----------|--------------|----------|
+            | Linux | x86_64 | `cobra64-${{ needs.prepare.outputs.version }}-x86_64-unknown-linux-gnu.tar.gz` |
+            | Linux | ARM64 | `cobra64-${{ needs.prepare.outputs.version }}-aarch64-unknown-linux-gnu.tar.gz` |
+            | macOS | Intel (x86_64) | `cobra64-${{ needs.prepare.outputs.version }}-x86_64-apple-darwin.tar.gz` |
+            | macOS | Apple Silicon (ARM64) | `cobra64-${{ needs.prepare.outputs.version }}-aarch64-apple-darwin.tar.gz` |
+            | Windows | x86_64 | `cobra64-${{ needs.prepare.outputs.version }}-x86_64-pc-windows-msvc.zip` |
+
+            ### Installation
+
+            1. Download the archive for your platform
+            2. Extract the binary
+            3. Add it to your PATH or move it to a directory in your PATH
+
+            **Linux/macOS:**
+            ```bash
+            tar -xzf cobra64-${{ needs.prepare.outputs.version }}-<target>.tar.gz
+            chmod +x cobra64
+            sudo mv cobra64 /usr/local/bin/
+            ```
+
+            **Windows:**
+            Extract the ZIP file and add the directory to your PATH.
