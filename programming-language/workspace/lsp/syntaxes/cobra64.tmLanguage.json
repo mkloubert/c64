@@ -1,0 +1,260 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Cobra64",
+  "scopeName": "source.cobra64",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#characters" },
+    { "include": "#function-definition" },
+    { "include": "#numbers" },
+    { "include": "#keywords" },
+    { "include": "#type-annotations" },
+    { "include": "#types" },
+    { "include": "#constants" },
+    { "include": "#builtins" },
+    { "include": "#functions" },
+    { "include": "#operators" },
+    { "include": "#identifiers" }
+  ],
+  "repository": {
+    "comments": {
+      "name": "comment.line.number-sign.cobra64",
+      "match": "#.*$"
+    },
+    "strings": {
+      "name": "string.quoted.double.cobra64",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.cobra64",
+          "match": "\\\\[nrt\\\\\"'0]"
+        },
+        {
+          "name": "constant.character.escape.hex.cobra64",
+          "match": "\\\\x[0-9A-Fa-f]{2}"
+        },
+        {
+          "name": "invalid.illegal.escape.cobra64",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "characters": {
+      "name": "string.quoted.single.cobra64",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.cobra64",
+          "match": "\\\\[nrt\\\\\"'0]"
+        },
+        {
+          "name": "constant.character.escape.hex.cobra64",
+          "match": "\\\\x[0-9A-Fa-f]{2}"
+        },
+        {
+          "name": "invalid.illegal.escape.cobra64",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.hex.cobra64",
+          "match": "\\$[0-9A-Fa-f]+\\b"
+        },
+        {
+          "name": "constant.numeric.binary.cobra64",
+          "match": "%[01]+\\b"
+        },
+        {
+          "name": "constant.numeric.float.cobra64",
+          "match": "\\b\\d+\\.\\d+([eE][+-]?\\d+)?\\b"
+        },
+        {
+          "name": "constant.numeric.integer.decimal.cobra64",
+          "match": "\\b\\d+\\b"
+        }
+      ]
+    },
+    "function-definition": {
+      "patterns": [
+        {
+          "begin": "\\b(def)\\s+([a-z_][a-zA-Z0-9_]*)\\s*\\(",
+          "beginCaptures": {
+            "1": { "name": "keyword.other.def.cobra64" },
+            "2": { "name": "entity.name.function.definition.cobra64" }
+          },
+          "end": "\\)",
+          "patterns": [
+            { "include": "#function-parameters" }
+          ]
+        }
+      ]
+    },
+    "function-parameters": {
+      "patterns": [
+        {
+          "match": "([a-z_][a-zA-Z0-9_]*)\\s*:\\s*([a-z]+(?:\\[\\])?)",
+          "captures": {
+            "1": { "name": "variable.parameter.cobra64" },
+            "2": { "name": "storage.type.cobra64" }
+          }
+        },
+        {
+          "name": "punctuation.separator.comma.cobra64",
+          "match": ","
+        }
+      ]
+    },
+    "type-annotations": {
+      "patterns": [
+        {
+          "match": ":\\s*(byte|word|sbyte|sword|fixed|float|bool|string)(\\[\\])?",
+          "captures": {
+            "1": { "name": "storage.type.cobra64" },
+            "2": { "name": "storage.type.array.cobra64" }
+          }
+        },
+        {
+          "match": "->\\s*(byte|word|sbyte|sword|fixed|float|bool|string)(\\[\\])?",
+          "captures": {
+            "1": { "name": "storage.type.return.cobra64" },
+            "2": { "name": "storage.type.array.cobra64" }
+          }
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.conditional.cobra64",
+          "match": "\\b(if|elif|else)\\b"
+        },
+        {
+          "name": "keyword.control.loop.cobra64",
+          "match": "\\b(while|for)\\b"
+        },
+        {
+          "name": "keyword.control.flow.cobra64",
+          "match": "\\b(break|continue|return|pass)\\b"
+        },
+        {
+          "name": "keyword.other.range.cobra64",
+          "match": "\\b(in|to|downto)\\b"
+        },
+        {
+          "name": "keyword.other.def.cobra64",
+          "match": "\\b(def)\\b"
+        },
+        {
+          "name": "keyword.operator.logical.cobra64",
+          "match": "\\b(and|or|not)\\b"
+        },
+        {
+          "name": "constant.language.boolean.true.cobra64",
+          "match": "\\b(true)\\b"
+        },
+        {
+          "name": "constant.language.boolean.false.cobra64",
+          "match": "\\b(false)\\b"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "storage.type.primitive.cobra64",
+          "match": "\\b(byte|word|sbyte|sword|fixed|float|bool|string)\\b"
+        }
+      ]
+    },
+    "constants": {
+      "name": "constant.other.caps.cobra64",
+      "match": "\\b[A-Z][A-Z0-9_]*\\b"
+    },
+    "builtins": {
+      "patterns": [
+        {
+          "name": "support.function.builtin.screen.cobra64",
+          "match": "\\b(cls|cursor)\\b(?=\\s*\\()"
+        },
+        {
+          "name": "support.function.builtin.io.cobra64",
+          "match": "\\b(print|println|get_key|read|readln)\\b(?=\\s*\\()"
+        },
+        {
+          "name": "support.function.builtin.memory.cobra64",
+          "match": "\\b(poke|peek)\\b(?=\\s*\\()"
+        },
+        {
+          "name": "support.function.builtin.array.cobra64",
+          "match": "\\b(len)\\b(?=\\s*\\()"
+        },
+        {
+          "name": "support.function.builtin.random.cobra64",
+          "match": "\\b(rand|rand_byte|rand_sbyte|rand_word|rand_sword|seed)\\b(?=\\s*\\()"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "name": "entity.name.function.call.cobra64",
+          "match": "\\b[a-z_][a-zA-Z0-9_]*(?=\\s*\\()"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.comparison.cobra64",
+          "match": "(==|!=|<=|>=|<|>)"
+        },
+        {
+          "name": "keyword.operator.assignment.compound.cobra64",
+          "match": "(\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=|<<=|>>=)"
+        },
+        {
+          "name": "keyword.operator.assignment.cobra64",
+          "match": "="
+        },
+        {
+          "name": "keyword.operator.arithmetic.cobra64",
+          "match": "(\\+|-|\\*|/|%)"
+        },
+        {
+          "name": "keyword.operator.bitwise.cobra64",
+          "match": "(&|\\||\\^|~|<<|>>)"
+        },
+        {
+          "name": "keyword.operator.arrow.cobra64",
+          "match": "->"
+        },
+        {
+          "name": "punctuation.accessor.array.cobra64",
+          "match": "\\[|\\]"
+        },
+        {
+          "name": "punctuation.parenthesis.cobra64",
+          "match": "\\(|\\)"
+        },
+        {
+          "name": "punctuation.separator.colon.cobra64",
+          "match": ":"
+        },
+        {
+          "name": "punctuation.separator.comma.cobra64",
+          "match": ","
+        }
+      ]
+    },
+    "identifiers": {
+      "name": "variable.other.cobra64",
+      "match": "\\b[a-z_][a-zA-Z0-9_]*\\b"
+    }
+  }
+}

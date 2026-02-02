@@ -132,6 +132,34 @@ def main():
 
 ---
 
+## IDE Support
+
+### VS Code Extension
+
+A full-featured VS Code extension is available in the `/workspace/lsp` directory providing:
+
+- **Syntax Highlighting** - Full support for all Cobra64 constructs
+- **Real-time Diagnostics** - Error checking as you type
+- **IntelliSense** - Auto-completion for keywords, types, and functions
+- **Hover Information** - Type info and documentation
+- **Go to Definition** - Navigate to declarations
+- **Find All References** - Locate all symbol usages
+- **Rename Symbol** - Safely rename across files
+- **Signature Help** - Parameter hints for function calls
+
+To use the extension:
+
+```bash
+cd /workspace/lsp
+npm install
+npm run compile
+# Press F5 in VS Code to launch Extension Development Host
+```
+
+See `/workspace/lsp/README.md` for full documentation.
+
+---
+
 ## Language Reference
 
 ### Data Types

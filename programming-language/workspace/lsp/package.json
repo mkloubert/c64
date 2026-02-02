@@ -1,0 +1,110 @@
+{
+  "name": "cobra64-lsp",
+  "displayName": "Cobra64 Language Support",
+  "description": "Language support for Cobra64 - A modern programming language for the Commodore 64",
+  "version": "0.1.0",
+  "publisher": "cobra64",
+  "license": "AGPL-3.0-or-later",
+  "author": {
+    "name": "Marcel Joachim Kloubert",
+    "email": "marcel@kloubert.dev"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mkloubert/cobra64"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Snippets"
+  ],
+  "keywords": [
+    "cobra64",
+    "c64",
+    "commodore",
+    "6502",
+    "6510",
+    "retro"
+  ],
+  "main": "./out/client/src/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "cobra64",
+        "aliases": [
+          "Cobra64",
+          "cobra64"
+        ],
+        "extensions": [
+          ".cb64"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/cobra64-16.png",
+          "dark": "./icons/cobra64-16.png"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "cobra64",
+        "scopeName": "source.cobra64",
+        "path": "./syntaxes/cobra64.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Cobra64",
+      "properties": {
+        "cobra64.maxNumberOfProblems": {
+          "scope": "resource",
+          "type": "number",
+          "default": 100,
+          "description": "Maximum number of problems to report per file."
+        },
+        "cobra64.trace.server": {
+          "scope": "window",
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Traces the communication between VS Code and the language server."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -b",
+    "watch": "tsc -b -w",
+    "lint": "eslint ./client/src ./server/src --ext .ts",
+    "clean": "rimraf out",
+    "pretest": "npm run compile",
+    "test": "mocha --require ts-node/register 'server/src/test/**/*.test.ts'",
+    "test:unit": "mocha 'out/server/src/test/**/*.test.js'",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "eslint": "^8.56.0",
+    "mocha": "^10.2.0",
+    "rimraf": "^5.0.5",
+    "typescript": "^5.3.3",
+    "@vscode/vsce": "^2.22.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.11"
+  }
+}
