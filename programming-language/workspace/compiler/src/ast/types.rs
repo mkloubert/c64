@@ -95,6 +95,19 @@ impl Type {
         matches!(self, Type::Sbyte | Type::Sword | Type::Fixed | Type::Float)
     }
 
+    /// Check if this is an 8-bit type.
+    pub fn is_8bit(&self) -> bool {
+        matches!(self, Type::Byte | Type::Sbyte | Type::Bool)
+    }
+
+    /// Check if this is a 16-bit type.
+    pub fn is_16bit(&self) -> bool {
+        matches!(
+            self,
+            Type::Word | Type::Sword | Type::Fixed | Type::Float | Type::String
+        )
+    }
+
     /// Check if this is an array type.
     pub fn is_array(&self) -> bool {
         matches!(

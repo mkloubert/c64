@@ -1,0 +1,575 @@
+# ============================================================================
+# STAR CATCHER - A demo game for Cobra64
+# ============================================================================
+#
+# This is a simple "catch the falling object" game that demonstrates the
+# key features of the Cobra64 language and the C64 hardware:
+#
+#   - Hardware sprites (VIC-II chip)
+#   - Joystick input (CIA chip)
+#   - Sound effects (SID chip)
+#   - Sprite collision detection
+#   - Random number generation
+#
+# CONTROLS:
+#   - Joystick in Port 2: Move left/right
+#   - In VICE emulator: Enable "Joystick settings > Joystick in port 2"
+#     and use arrow keys or numpad
+#
+# GAMEPLAY:
+#   - Catch falling stars with your basket
+#   - Each star caught = +10 points
+#   - Miss a star = lose 1 life
+#   - Game ends when lives reach 0
+#
+# ============================================================================
+
+
+# ============================================================================
+# SECTION 1: CONSTANTS
+# ============================================================================
+#
+# Constants are variables that never change during the game.
+# Using named constants makes code more readable than "magic numbers".
+
+# ----------------------------------------------------------------------------
+# Color Constants
+# ----------------------------------------------------------------------------
+# The C64 has a fixed palette of 16 colors (0-15).
+# These are the VIC-II color codes used in this game:
+#
+#   0 = Black       4 = Purple      8 = Orange      12 = Gray (medium)
+#   1 = White       5 = Green       9 = Brown       13 = Light green
+#   2 = Red         6 = Blue       10 = Light red   14 = Light blue
+#   3 = Cyan        7 = Yellow     11 = Gray (dark) 15 = Gray (light)
+
+BLACK:       byte = 0
+BLUE:        byte = 6
+YELLOW:      byte = 7
+LIGHT_BLUE:  byte = 14
+
+
+# ----------------------------------------------------------------------------
+# Sprite Memory Constants
+# ----------------------------------------------------------------------------
+# C64 sprites are 24x21 pixels, stored as 63 bytes of bitmap data.
+# Sprite data must be aligned to 64-byte boundaries in memory.
+#
+# The VIC-II chip uses "sprite pointers" (0-255) to find sprite data.
+# The actual memory address is calculated as: pointer * 64
+#
+# In the default VIC bank (0), valid sprite memory is $0000-$3FFF.
+# We use addresses starting at $3000 (12288) which is safe to use.
+#
+# PLAYER_BLOCK = 192 means: 192 * 64 = 12288 = $3000
+# STAR_BLOCK   = 193 means: 193 * 64 = 12352 = $3040
+
+PLAYER_BLOCK: byte = 192
+STAR_BLOCK:   byte = 193
+
+
+# ----------------------------------------------------------------------------
+# Input Constants
+# ----------------------------------------------------------------------------
+# The C64 has two joystick ports. Port 2 is commonly used for single-player
+# games because Port 1 shares pins with the keyboard.
+
+JOY_PORT: byte = 2
+
+
+# ============================================================================
+# SECTION 2: GAME STATE VARIABLES
+# ============================================================================
+#
+# These variables track the current state of the game.
+# They change during gameplay.
+
+# ----------------------------------------------------------------------------
+# Position Variables
+# ----------------------------------------------------------------------------
+# Sprite X positions on C64 range from 0 to 343 (9-bit value).
+# Values 24-343 are visible on screen. We use 'word' (16-bit) for X
+# because it can exceed 255.
+#
+# Sprite Y positions range from 0 to 255 (8-bit value).
+# Values 50-249 are visible on screen. We use 'byte' (8-bit) for Y.
+#
+# Starting positions:
+#   - player_x = 172: horizontally centered (screen center is ~172)
+#   - star_y = 50: top of visible screen area
+
+player_x: word = 172    # Player basket horizontal position
+star_x: word = 172      # Falling star horizontal position
+star_y: byte = 50       # Falling star vertical position
+
+
+# ----------------------------------------------------------------------------
+# Score and Lives
+# ----------------------------------------------------------------------------
+# score uses 'word' because it can grow beyond 255.
+# lives uses 'byte' because 3 lives fits easily in 0-255.
+
+score: word = 0         # Player's current score
+lives: byte = 3         # Remaining lives (game over when 0)
+
+
+# ----------------------------------------------------------------------------
+# Sound Timer
+# ----------------------------------------------------------------------------
+# The SID chip plays sounds continuously until we stop them.
+# We use a timer to automatically stop sounds after a few frames.
+# Each frame is ~1/60 second (PAL) or ~1/50 second (NTSC).
+
+snd_tmr: byte = 0       # Frames remaining until sound stops
+
+
+# ============================================================================
+# SECTION 3: SPRITE DATA SETUP
+# ============================================================================
+#
+# C64 sprites are 24 pixels wide x 21 pixels tall.
+# Each row uses 3 bytes (24 bits = 24 pixels).
+# Total: 21 rows x 3 bytes = 63 bytes per sprite.
+#
+# The data is stored as a bitmap where 1 = pixel on, 0 = pixel off.
+# For example, the byte value 255 (binary 11111111) draws 8 pixels.
+
+
+# ----------------------------------------------------------------------------
+# setup_player() - Create the basket/catcher sprite
+# ----------------------------------------------------------------------------
+# This draws a basket shape that looks roughly like this:
+#
+#        _____
+#       /     \
+#      |       |
+#      |       |
+#       \_____/
+#
+# The sprite data is written directly to memory at address 12288 ($3000).
+# We first clear all 63 bytes to 0, then set specific bytes to draw
+# the basket outline.
+
+def setup_player():
+    # Base address for sprite data (192 * 64 = 12288)
+    b: word = 12288
+
+    # Clear all sprite bytes to 0 (transparent)
+    i: byte = 0
+    while i < 63:
+        poke(b + i, 0)
+        i = i + 1
+
+    # Draw the basket shape
+    # Each sprite row is 3 bytes. Row N starts at offset N*3.
+    # Bytes are written in pairs/triplets to form horizontal lines.
+    #
+    # The values below create curved edges using bit patterns:
+    #   31  = 00011111 (5 pixels on the right)
+    #   255 = 11111111 (8 pixels, full byte)
+    #   248 = 11111000 (5 pixels on the left)
+    #   63  = 00111111 (6 pixels)
+    #   252 = 11111100 (6 pixels)
+    #   127 = 01111111 (7 pixels)
+    #   254 = 11111110 (7 pixels)
+    #   15  = 00001111 (4 pixels)
+    #   240 = 11110000 (4 pixels)
+
+    # Row 11 - top of basket (narrow opening)
+    poke(b + 33, 31)
+    poke(b + 34, 255)
+    poke(b + 35, 248)
+
+    # Rows 12-15 - sides of basket (wider)
+    poke(b + 36, 63)
+    poke(b + 37, 255)
+    poke(b + 38, 252)
+
+    poke(b + 39, 63)
+    poke(b + 40, 255)
+    poke(b + 41, 252)
+
+    poke(b + 42, 63)
+    poke(b + 43, 255)
+    poke(b + 44, 252)
+
+    poke(b + 45, 63)
+    poke(b + 46, 255)
+    poke(b + 47, 252)
+
+    # Rows 16-17 - widest part
+    poke(b + 48, 127)
+    poke(b + 49, 255)
+    poke(b + 50, 254)
+
+    poke(b + 51, 127)
+    poke(b + 52, 255)
+    poke(b + 53, 254)
+
+    # Rows 18-20 - bottom of basket (tapering)
+    poke(b + 54, 63)
+    poke(b + 55, 255)
+    poke(b + 56, 252)
+
+    poke(b + 57, 31)
+    poke(b + 58, 255)
+    poke(b + 59, 248)
+
+    poke(b + 60, 15)
+    poke(b + 61, 255)
+    poke(b + 62, 240)
+
+
+# ----------------------------------------------------------------------------
+# setup_star() - Create the falling star/ball sprite
+# ----------------------------------------------------------------------------
+# This draws a simple diamond/ball shape:
+#
+#          *
+#         ***
+#        *****
+#       *******
+#        *****
+#         ***
+#          *
+#
+# The sprite data is written to memory at address 12352 ($3040).
+
+def setup_star():
+    # Base address for sprite data (193 * 64 = 12352)
+    b: word = 12352
+
+    # Clear all sprite bytes to 0 (transparent)
+    i: byte = 0
+    while i < 63:
+        poke(b + i, 0)
+        i = i + 1
+
+    # Draw the diamond shape
+    # The shape is centered horizontally in the sprite.
+    # We only set bytes 1 and 2 of each row (middle bytes).
+    #
+    # Values create a diamond expanding then contracting:
+    #   1/128   = 1 pixel  (smallest)
+    #   3/192   = 2 pixels
+    #   7/224   = 3 pixels
+    #   15/240  = 4 pixels
+    #   31/248  = 5 pixels (largest)
+
+    # Top of diamond (expanding)
+    poke(b + 18, 1)     # Row 6: tiny point
+    poke(b + 19, 128)
+
+    poke(b + 21, 3)     # Row 7: slightly wider
+    poke(b + 22, 192)
+
+    poke(b + 24, 7)     # Row 8
+    poke(b + 25, 224)
+
+    poke(b + 27, 15)    # Row 9
+    poke(b + 28, 240)
+
+    poke(b + 30, 31)    # Row 10: widest point
+    poke(b + 31, 248)
+
+    # Bottom of diamond (contracting)
+    poke(b + 33, 15)    # Row 11
+    poke(b + 34, 240)
+
+    poke(b + 36, 7)     # Row 12
+    poke(b + 37, 224)
+
+    poke(b + 39, 3)     # Row 13
+    poke(b + 40, 192)
+
+    poke(b + 42, 1)     # Row 14: tiny point
+    poke(b + 43, 128)
+
+
+# ============================================================================
+# SECTION 4: SOUND FUNCTIONS
+# ============================================================================
+#
+# The C64's SID (Sound Interface Device) chip has 3 voices.
+# Each voice can generate different waveforms (triangle, sawtooth,
+# pulse, noise) with configurable ADSR envelope.
+#
+# ADSR = Attack, Decay, Sustain, Release
+# These control how the sound volume changes over time:
+#   - Attack: Time to reach full volume (0-15, higher = slower)
+#   - Decay: Time to fall to sustain level (0-15)
+#   - Sustain: Volume level to hold (0-15)
+#   - Release: Time to fade out after key release (0-15)
+
+
+# ----------------------------------------------------------------------------
+# init_sound() - Initialize the SID chip for sound effects
+# ----------------------------------------------------------------------------
+def init_sound():
+    # Clear all SID registers (silence any previous sounds)
+    sid_clear()
+
+    # Set master volume to maximum (0-15)
+    sid_volume(15)
+
+    # Configure voice 0 for our sound effects:
+    # ADSR: Attack=0 (instant), Decay=4, Sustain=8, Release=4
+    # This creates a quick "blip" sound that fades smoothly
+    sid_voice_adsr(0, 0, 4, 8, 4)
+
+    # Set pulse width to 2048 (50% duty cycle for square wave)
+    # Range is 0-4095, 2048 = 50% = classic square wave
+    sid_voice_pulse(0, 2048)
+
+    # Set waveform to pulse/square wave (64 = pulse bit)
+    # Other options: 16=triangle, 32=sawtooth, 128=noise
+    sid_voice_wave(0, 64)
+
+
+# ----------------------------------------------------------------------------
+# beep_high() - Play a high-pitched "success" sound
+# ----------------------------------------------------------------------------
+# Used when catching a star. High frequency = happy sound.
+
+def beep_high():
+    # Set frequency to 16780 (approximately 2093 Hz, high C)
+    # Frequency formula: Hz = (freq_value * clock) / 16777216
+    # where clock = 1022727 Hz (NTSC) or 985248 Hz (PAL)
+    sid_voice_freq(0, 16780)
+
+    # Open the gate to start the sound (trigger attack phase)
+    sid_voice_gate(0, true)
+
+    # Sound will play for 5 frames (~1/12 second)
+    snd_tmr = 5
+
+
+# ----------------------------------------------------------------------------
+# beep_low() - Play a low-pitched "failure" sound
+# ----------------------------------------------------------------------------
+# Used when missing a star. Low frequency = sad sound.
+
+def beep_low():
+    # Set frequency to 3356 (approximately 419 Hz, low G#)
+    sid_voice_freq(0, 3356)
+
+    # Open the gate to start the sound
+    sid_voice_gate(0, true)
+
+    # Sound will play for 10 frames (~1/6 second)
+    # Longer than success sound for emphasis
+    snd_tmr = 10
+
+
+# ----------------------------------------------------------------------------
+# update_snd() - Update sound timer and stop sound when done
+# ----------------------------------------------------------------------------
+# Called every frame. Counts down the timer and closes the gate
+# when it reaches 0, triggering the release phase of the ADSR.
+
+def update_snd():
+    # Count down if timer is active
+    if snd_tmr > 0:
+        snd_tmr = snd_tmr - 1
+
+    # Close gate when timer expires (triggers release phase)
+    if snd_tmr == 0:
+        sid_voice_gate(0, false)
+
+
+# ============================================================================
+# SECTION 5: GAME LOGIC FUNCTIONS
+# ============================================================================
+
+
+# ----------------------------------------------------------------------------
+# spawn() - Spawn a new star at random position
+# ----------------------------------------------------------------------------
+# Resets the star to the top of the screen with a random X position.
+# Called at game start and whenever a star is caught or missed.
+
+def spawn():
+    # Random X position between 40 and 300
+    # This keeps the star within the visible play area
+    # (screen edges are roughly at X=24 and X=343)
+    star_x = rand_word(40, 300)
+
+    # Reset to top of visible screen
+    star_y = 50
+
+
+# ----------------------------------------------------------------------------
+# move_player() - Handle joystick input and move player
+# ----------------------------------------------------------------------------
+# Reads joystick and moves the basket left or right.
+# Movement is clamped to keep the sprite on screen.
+
+def move_player():
+    # Check if joystick is pushed left
+    if joy_left(JOY_PORT):
+        # Only move if not at left edge
+        # 28 = leftmost visible position for sprite
+        if player_x > 28:
+            player_x = player_x - 4  # Move 4 pixels left
+
+    # Check if joystick is pushed right
+    if joy_right(JOY_PORT):
+        # Only move if not at right edge
+        # 316 = rightmost position that keeps sprite fully visible
+        if player_x < 316:
+            player_x = player_x + 4  # Move 4 pixels right
+
+    # Update sprite position on screen
+    # Sprite 0 = player, Y is fixed at 220 (near bottom of screen)
+    sprite_pos(0, player_x, 220)
+
+
+# ----------------------------------------------------------------------------
+# move_star() - Move the falling star down
+# ----------------------------------------------------------------------------
+# Called every frame to make the star fall.
+# Speed is 2 pixels per frame = ~120 pixels/second.
+
+def move_star():
+    # Move down 2 pixels
+    star_y = star_y + 2
+
+    # Update sprite position on screen
+    # Sprite 1 = star
+    sprite_pos(1, star_x, star_y)
+
+
+# ----------------------------------------------------------------------------
+# check_bottom() - Check if star reached bottom without being caught
+# ----------------------------------------------------------------------------
+# If the star passes the basket's Y position, player loses a life.
+
+def check_bottom():
+    # 229 = just below the basket position (220)
+    # If star passes this point, it was missed
+    if star_y > 229:
+        lives = lives - 1   # Lose a life
+        beep_low()          # Play sad sound
+        spawn()             # Spawn new star at top
+
+
+# ----------------------------------------------------------------------------
+# check_coll() - Check for collision between player and star
+# ----------------------------------------------------------------------------
+# The VIC-II chip automatically detects when sprites overlap.
+# We read this collision register to detect catching the star.
+
+def check_coll():
+    # sprite_collision() returns a bitmask of colliding sprites
+    # Bit 0 = sprite 0 is colliding
+    # Bit 1 = sprite 1 is colliding
+    # Value 3 (binary 11) = both sprites 0 and 1 are colliding
+    c: byte = sprite_collision()
+
+    if c == 3:
+        # Star caught!
+        score = score + 10  # Award 10 points
+        beep_high()         # Play happy sound
+        spawn()             # Spawn new star at top
+
+
+# ----------------------------------------------------------------------------
+# draw_hud() - Draw the heads-up display (score and lives)
+# ----------------------------------------------------------------------------
+# Updates the text display showing current score and remaining lives.
+# Called every frame to keep display current.
+
+def draw_hud():
+    # Draw score in top-left corner
+    cursor(0, 0)        # Column 0, Row 0
+    print("SCORE:")
+    print(star_x)
+
+    # Draw lives in top-right area
+    cursor(30, 0)       # Column 30, Row 0
+    print("LIVES:")
+    print(lives)
+
+
+# ----------------------------------------------------------------------------
+# game_over() - Display game over message
+# ----------------------------------------------------------------------------
+# Called when lives reach 0. Shows final score.
+
+def game_over():
+    # Center "GAME OVER!" text (column 14, row 12)
+    # C64 screen is 40 columns x 25 rows
+    cursor(14, 12)
+    println("GAME OVER!")
+
+    # Show final score below
+    cursor(11, 14)
+    print("SCORE: ")
+    println(score)
+
+
+# ============================================================================
+# SECTION 6: MAIN PROGRAM
+# ============================================================================
+#
+# This is the entry point of the game. It runs when the program starts.
+# The structure follows a typical game pattern:
+#   1. Initialize (setup hardware, load data)
+#   2. Game loop (input -> update -> render -> repeat)
+#   3. Game over (show results)
+
+
+def main():
+    # ------------------------------------------
+    # INITIALIZATION
+    # ------------------------------------------
+
+    seed()
+
+    # Set screen colors
+    background(BLUE)    # Screen background color
+    border(BLACK)       # Border around screen
+    cls()               # Clear screen (fills with spaces)
+
+    # Initialize sound system
+    init_sound()
+
+    # Create sprite graphics in memory
+    setup_player()      # Basket sprite at $3000
+    setup_star()        # Star sprite at $3040
+
+    # Configure player sprite (sprite 0)
+    sprite_data(0, PLAYER_BLOCK)    # Point to sprite data
+    sprite_color(0, LIGHT_BLUE)     # Set sprite color
+    sprite_enable(0, true)          # Make sprite visible
+    sprite_pos(0, player_x, 220)    # Set initial position
+
+    # Configure star sprite (sprite 1)
+    sprite_data(1, STAR_BLOCK)      # Point to sprite data
+    sprite_color(1, YELLOW)         # Set sprite color
+    sprite_enable(1, true)          # Make sprite visible
+
+    # Spawn the first star at random position
+    # Note: PRNG is automatically seeded at program start
+    spawn()
+
+    # ------------------------------------------
+    # GAME LOOP
+    # ------------------------------------------
+    # This loop runs until the player loses all lives.
+    # Each iteration is one "frame" of the game.
+    # With vsync(), this runs at ~50 Hz (PAL) or ~60 Hz (NTSC).
+
+    while lives > 0:
+        move_player()   # Read input and move basket
+        move_star()     # Move star down
+        check_bottom()  # Check if star was missed
+        check_coll()    # Check if star was caught
+        draw_hud()      # Update score/lives display
+        update_snd()    # Update sound timer
+        vsync()         # Wait for vertical blank (smooth animation)
+
+    # ------------------------------------------
+    # GAME OVER
+    # ------------------------------------------
+    game_over()         # Show final message and score

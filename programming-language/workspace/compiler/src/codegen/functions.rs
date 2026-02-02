@@ -24,7 +24,7 @@
 use super::emit::EmitHelpers;
 use super::expressions::ExpressionEmitter;
 use super::labels::LabelManager;
-use super::mos6510::{kernal, opcodes, petscii, zeropage};
+use super::mos6510::{cia, kernal, opcodes, petscii, vic, zeropage};
 use super::type_inference::TypeInference;
 use super::CodeGenerator;
 use crate::ast::{Expr, Type};
@@ -214,6 +214,160 @@ impl FunctionCallEmitter for CodeGenerator {
                 // seed() - reseed the PRNG from hardware entropy
                 self.emit_jsr_label("__prng_init");
             }
+            "sprite_enable" => {
+                // sprite_enable(num, enabled) - enable or disable a sprite
+                if args.len() >= 2 {
+                    self.generate_sprite_enable(args)?;
+                }
+            }
+            "sprite_pos" => {
+                // sprite_pos(num, x, y) - set sprite position
+                if args.len() >= 3 {
+                    self.generate_sprite_pos(args)?;
+                }
+            }
+            "sprite_color" => {
+                // sprite_color(num, color) - set sprite color
+                if args.len() >= 2 {
+                    self.generate_sprite_color(args)?;
+                }
+            }
+            "sprite_data" => {
+                // sprite_data(num, pointer) - set sprite data pointer
+                if args.len() >= 2 {
+                    self.generate_sprite_data(args)?;
+                }
+            }
+            "sprite_expand_x" => {
+                // sprite_expand_x(num, enabled) - horizontal expansion
+                if args.len() >= 2 {
+                    self.generate_sprite_bit_register(args, vic::SPRITE_EXPAND_X)?;
+                }
+            }
+            "sprite_expand_y" => {
+                // sprite_expand_y(num, enabled) - vertical expansion
+                if args.len() >= 2 {
+                    self.generate_sprite_bit_register(args, vic::SPRITE_EXPAND_Y)?;
+                }
+            }
+            "sprite_multicolor" => {
+                // sprite_multicolor(num, enabled) - multicolor mode
+                if args.len() >= 2 {
+                    self.generate_sprite_bit_register(args, vic::SPRITE_MULTICOLOR)?;
+                }
+            }
+            "sprite_priority" => {
+                // sprite_priority(num, behind_bg) - priority (behind background)
+                if args.len() >= 2 {
+                    self.generate_sprite_bit_register(args, vic::SPRITE_PRIORITY)?;
+                }
+            }
+            "sprite_collision" => {
+                // sprite_collision() -> byte - read sprite-sprite collision
+                self.emit_abs(opcodes::LDA_ABS, vic::SPRITE_COLLISION);
+            }
+            "sprite_bg_collision" => {
+                // sprite_bg_collision() -> byte - read sprite-background collision
+                self.emit_abs(opcodes::LDA_ABS, vic::SPRITE_BG_COLLISION);
+            }
+            "joystick" => {
+                // joystick(port) -> byte - read raw joystick state
+                if !args.is_empty() {
+                    self.generate_joystick_read(args)?;
+                }
+            }
+            "joy_up" => {
+                // joy_up(port) -> bool - check if up is pressed
+                if !args.is_empty() {
+                    self.generate_joystick_direction(args, cia::JOY_UP_MASK)?;
+                }
+            }
+            "joy_down" => {
+                // joy_down(port) -> bool - check if down is pressed
+                if !args.is_empty() {
+                    self.generate_joystick_direction(args, cia::JOY_DOWN_MASK)?;
+                }
+            }
+            "joy_left" => {
+                // joy_left(port) -> bool - check if left is pressed
+                if !args.is_empty() {
+                    self.generate_joystick_direction(args, cia::JOY_LEFT_MASK)?;
+                }
+            }
+            "joy_right" => {
+                // joy_right(port) -> bool - check if right is pressed
+                if !args.is_empty() {
+                    self.generate_joystick_direction(args, cia::JOY_RIGHT_MASK)?;
+                }
+            }
+            "joy_fire" => {
+                // joy_fire(port) -> bool - check if fire is pressed
+                if !args.is_empty() {
+                    self.generate_joystick_direction(args, cia::JOY_FIRE_MASK)?;
+                }
+            }
+            "sid_volume" => {
+                // sid_volume(vol) - set master volume (0-15)
+                if !args.is_empty() {
+                    self.generate_sid_volume(args)?;
+                }
+            }
+            "sid_voice_freq" => {
+                // sid_voice_freq(voice, freq) - set voice frequency
+                if args.len() >= 2 {
+                    self.generate_sid_voice_freq(args)?;
+                }
+            }
+            "sid_voice_pulse" => {
+                // sid_voice_pulse(voice, width) - set pulse width
+                if args.len() >= 2 {
+                    self.generate_sid_voice_pulse(args)?;
+                }
+            }
+            "sid_voice_wave" => {
+                // sid_voice_wave(voice, waveform) - set waveform
+                if args.len() >= 2 {
+                    self.generate_sid_voice_wave(args)?;
+                }
+            }
+            "sid_voice_adsr" => {
+                // sid_voice_adsr(voice, attack, decay, sustain, release)
+                if args.len() >= 5 {
+                    self.generate_sid_voice_adsr(args)?;
+                }
+            }
+            "sid_voice_gate" => {
+                // sid_voice_gate(voice, on) - set gate
+                if args.len() >= 2 {
+                    self.generate_sid_voice_gate(args)?;
+                }
+            }
+            "sid_clear" => {
+                // sid_clear() - clear all SID registers
+                self.generate_sid_clear()?;
+            }
+            "border" => {
+                // border(color) - set border color
+                if !args.is_empty() {
+                    self.generate_expression(&args[0])?;
+                    self.emit_abs(opcodes::STA_ABS, vic::BORDER_COLOR);
+                }
+            }
+            "background" => {
+                // background(color) - set background color
+                if !args.is_empty() {
+                    self.generate_expression(&args[0])?;
+                    self.emit_abs(opcodes::STA_ABS, vic::BACKGROUND_COLOR);
+                }
+            }
+            "vsync" => {
+                // vsync() - wait for vertical blank
+                self.generate_vsync()?;
+            }
+            "raster" => {
+                // raster() -> byte - get current raster line
+                self.emit_abs(opcodes::LDA_ABS, vic::RASTER);
+            }
             _ => {
                 // User-defined function
                 if let Some(func_info) = self.functions.get(name).cloned() {
@@ -377,6 +531,11 @@ impl CodeGenerator {
     fn generate_rand_word(&mut self, args: &[Expr], _span: &Span) -> Result<(), CompileError> {
         // Evaluate 'to' (16-bit) and save it
         self.generate_expression(&args[1])?;
+        // Ensure X is 0 for byte-sized arguments (they don't set X)
+        let to_type = self.infer_type_from_expr(&args[1]);
+        if to_type.is_8bit() {
+            self.emit_imm(opcodes::LDX_IMM, 0);
+        }
         self.emit_byte(opcodes::STA_ZP);
         self.emit_byte(zeropage::TMP2);
         self.emit_byte(opcodes::STX_ZP);
@@ -384,6 +543,11 @@ impl CodeGenerator {
 
         // Evaluate 'from' (16-bit) and save it
         self.generate_expression(&args[0])?;
+        // Ensure X is 0 for byte-sized arguments (they don't set X)
+        let from_type = self.infer_type_from_expr(&args[0]);
+        if from_type.is_8bit() {
+            self.emit_imm(opcodes::LDX_IMM, 0);
+        }
         self.emit_byte(opcodes::STA_ZP);
         self.emit_byte(zeropage::TMP1);
         self.emit_byte(opcodes::STX_ZP);
@@ -494,6 +658,23 @@ impl CodeGenerator {
 
         // Evaluate 'to' (16-bit) and save it
         self.generate_expression(&args[1])?;
+        // Ensure X is set correctly for byte-sized arguments
+        let to_type = self.infer_type_from_expr(&args[1]);
+        if to_type.is_8bit() {
+            // For signed bytes, sign-extend to 16-bit
+            if to_type.is_signed() {
+                // Sign extend: if bit 7 is set, X = $FF, else X = $00
+                self.emit_imm(opcodes::LDX_IMM, 0);
+                self.emit_byte(opcodes::CMP_IMM);
+                self.emit_byte(0x80);
+                let skip_label = self.make_label("rsw_skip1");
+                self.emit_branch(opcodes::BCC, &skip_label);
+                self.emit_byte(opcodes::DEX); // X = $FF
+                self.define_label(&skip_label);
+            } else {
+                self.emit_imm(opcodes::LDX_IMM, 0);
+            }
+        }
         self.emit_byte(opcodes::STA_ZP);
         self.emit_byte(zeropage::TMP2);
         self.emit_byte(opcodes::STX_ZP);
@@ -501,6 +682,23 @@ impl CodeGenerator {
 
         // Evaluate 'from' (16-bit) and save it
         self.generate_expression(&args[0])?;
+        // Ensure X is set correctly for byte-sized arguments
+        let from_type = self.infer_type_from_expr(&args[0]);
+        if from_type.is_8bit() {
+            // For signed bytes, sign-extend to 16-bit
+            if from_type.is_signed() {
+                // Sign extend: if bit 7 is set, X = $FF, else X = $00
+                self.emit_imm(opcodes::LDX_IMM, 0);
+                self.emit_byte(opcodes::CMP_IMM);
+                self.emit_byte(0x80);
+                let skip_label = self.make_label("rsw_skip2");
+                self.emit_branch(opcodes::BCC, &skip_label);
+                self.emit_byte(opcodes::DEX); // X = $FF
+                self.define_label(&skip_label);
+            } else {
+                self.emit_imm(opcodes::LDX_IMM, 0);
+            }
+        }
         self.emit_byte(opcodes::STA_ZP);
         self.emit_byte(zeropage::TMP1);
         self.emit_byte(opcodes::STX_ZP);
@@ -595,6 +793,666 @@ impl CodeGenerator {
         self.emit_byte(zeropage::TMP4);
 
         self.define_label(&done_label);
+
+        Ok(())
+    }
+
+    /// Generate code for sprite_enable(num, enabled).
+    ///
+    /// Sets or clears the bit for sprite `num` in the SPRITE_ENABLE register ($D015).
+    fn generate_sprite_enable(&mut self, args: &[Expr]) -> Result<(), CompileError> {
+        // Evaluate enabled flag and save it
+        self.generate_expression(&args[1])?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2); // TMP2 = enabled flag
+
+        // Evaluate sprite number and create bit mask
+        self.generate_expression(&args[0])?;
+        // A = sprite number (0-7)
+        self.emit_byte(opcodes::TAX); // X = sprite number
+
+        // Create bit mask: 1 << sprite_num
+        self.emit_imm(opcodes::LDA_IMM, 1);
+        let shift_label = self.make_label("se_shift");
+        let shift_done = self.make_label("se_done");
+        self.emit_byte(opcodes::CPX_IMM);
+        self.emit_byte(0);
+        self.emit_branch(opcodes::BEQ, &shift_done);
+        self.define_label(&shift_label);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::DEX);
+        self.emit_branch(opcodes::BNE, &shift_label);
+        self.define_label(&shift_done);
+        // A = bit mask (1 << num)
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1); // TMP1 = bit mask
+
+        // Check if enabling or disabling
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        let disable_label = self.make_label("se_disable");
+        let done_label = self.make_label("se_end");
+        self.emit_branch(opcodes::BEQ, &disable_label);
+
+        // Enable: OR the bit into the register
+        self.emit_abs(opcodes::LDA_ABS, vic::SPRITE_ENABLE);
+        self.emit_byte(opcodes::ORA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_abs(opcodes::STA_ABS, vic::SPRITE_ENABLE);
+        self.emit_jmp(&done_label);
+
+        // Disable: AND with inverted mask
+        self.define_label(&disable_label);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_imm(opcodes::EOR_IMM, 0xFF); // Invert mask
+        self.emit_abs(opcodes::AND_ABS, vic::SPRITE_ENABLE);
+        self.emit_abs(opcodes::STA_ABS, vic::SPRITE_ENABLE);
+
+        self.define_label(&done_label);
+        Ok(())
+    }
+
+    /// Generate code for sprite_pos(num, x, y).
+    ///
+    /// Sets sprite position. X is 9-bit (0-320), Y is 8-bit (0-255).
+    /// X low 8 bits go to $D000+num*2, X bit 8 goes to $D010 bit num.
+    /// Y goes to $D001+num*2.
+    fn generate_sprite_pos(&mut self, args: &[Expr]) -> Result<(), CompileError> {
+        // Evaluate Y position and save
+        self.generate_expression(&args[2])?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP3); // TMP3 = Y
+
+        // Evaluate X position (16-bit) and save
+        self.generate_expression(&args[1])?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1); // TMP1 = X low byte
+        self.emit_byte(opcodes::STX_ZP);
+        self.emit_byte(zeropage::TMP2); // TMP2 = X high byte (bit 8)
+
+        // Evaluate sprite number
+        self.generate_expression(&args[0])?;
+        // A = sprite number (0-7)
+        self.emit_byte(opcodes::ASL_ACC); // A = num * 2 (offset for X/Y pair)
+        self.emit_byte(opcodes::TAX); // X = offset
+
+        // Store X low byte at $D000 + offset
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_abs(opcodes::STA_ABX, vic::SPRITE0_X);
+
+        // Store Y at $D001 + offset
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_abs(opcodes::STA_ABX, vic::SPRITE0_Y);
+
+        // Now handle X MSB (bit 8) in $D010
+        // First, get sprite number back (X/2)
+        self.emit_byte(opcodes::TXA);
+        self.emit_byte(opcodes::LSR_ACC); // A = sprite number
+        self.emit_byte(opcodes::TAX); // X = sprite number
+
+        // Create bit mask for this sprite
+        self.emit_imm(opcodes::LDA_IMM, 1);
+        let shift_label = self.make_label("sp_shift");
+        let shift_done = self.make_label("sp_sdone");
+        self.emit_byte(opcodes::CPX_IMM);
+        self.emit_byte(0);
+        self.emit_branch(opcodes::BEQ, &shift_done);
+        self.define_label(&shift_label);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::DEX);
+        self.emit_branch(opcodes::BNE, &shift_label);
+        self.define_label(&shift_done);
+        // A = bit mask
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP4); // TMP4 = bit mask
+
+        // Check if X MSB (bit 8) is set
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2); // X high byte
+        let msb_clear = self.make_label("sp_mclr");
+        let msb_done = self.make_label("sp_mdone");
+        self.emit_branch(opcodes::BEQ, &msb_clear);
+
+        // MSB set: OR bit into $D010
+        self.emit_abs(opcodes::LDA_ABS, vic::SPRITE_X_MSB);
+        self.emit_byte(opcodes::ORA_ZP);
+        self.emit_byte(zeropage::TMP4);
+        self.emit_abs(opcodes::STA_ABS, vic::SPRITE_X_MSB);
+        self.emit_jmp(&msb_done);
+
+        // MSB clear: AND inverted mask into $D010
+        self.define_label(&msb_clear);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP4);
+        self.emit_imm(opcodes::EOR_IMM, 0xFF); // Invert mask
+        self.emit_abs(opcodes::AND_ABS, vic::SPRITE_X_MSB);
+        self.emit_abs(opcodes::STA_ABS, vic::SPRITE_X_MSB);
+
+        self.define_label(&msb_done);
+        Ok(())
+    }
+
+    /// Generate code for sprite_color(num, color).
+    ///
+    /// Sets sprite color at $D027 + num.
+    fn generate_sprite_color(&mut self, args: &[Expr]) -> Result<(), CompileError> {
+        // Evaluate color and save
+        self.generate_expression(&args[1])?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1); // TMP1 = color
+
+        // Evaluate sprite number
+        self.generate_expression(&args[0])?;
+        self.emit_byte(opcodes::TAX); // X = sprite number
+
+        // Store color at $D027 + X
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_abs(opcodes::STA_ABX, vic::SPRITE0_COLOR);
+
+        Ok(())
+    }
+
+    /// Generate code for sprite_data(num, pointer).
+    ///
+    /// Sets sprite data pointer at $07F8 + num.
+    /// Pointer is a block number (0-255), actual address = pointer * 64.
+    fn generate_sprite_data(&mut self, args: &[Expr]) -> Result<(), CompileError> {
+        // Evaluate pointer and save
+        self.generate_expression(&args[1])?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1); // TMP1 = pointer
+
+        // Evaluate sprite number
+        self.generate_expression(&args[0])?;
+        self.emit_byte(opcodes::TAX); // X = sprite number
+
+        // Store pointer at $07F8 + X
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_abs(opcodes::STA_ABX, vic::SPRITE_POINTERS);
+
+        Ok(())
+    }
+
+    /// Generate code for sprite bit-register functions.
+    ///
+    /// Used for sprite_expand_x, sprite_expand_y, sprite_multicolor, sprite_priority.
+    /// Sets or clears a bit in the given register based on sprite number and enabled flag.
+    fn generate_sprite_bit_register(
+        &mut self,
+        args: &[Expr],
+        register: u16,
+    ) -> Result<(), CompileError> {
+        // Evaluate enabled flag and save
+        self.generate_expression(&args[1])?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2); // TMP2 = enabled flag
+
+        // Evaluate sprite number and create bit mask
+        self.generate_expression(&args[0])?;
+        self.emit_byte(opcodes::TAX); // X = sprite number
+
+        // Create bit mask: 1 << sprite_num
+        self.emit_imm(opcodes::LDA_IMM, 1);
+        let shift_label = self.make_label("sbr_shift");
+        let shift_done = self.make_label("sbr_sdone");
+        self.emit_byte(opcodes::CPX_IMM);
+        self.emit_byte(0);
+        self.emit_branch(opcodes::BEQ, &shift_done);
+        self.define_label(&shift_label);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::DEX);
+        self.emit_branch(opcodes::BNE, &shift_label);
+        self.define_label(&shift_done);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1); // TMP1 = bit mask
+
+        // Check if enabling or disabling
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        let disable_label = self.make_label("sbr_dis");
+        let done_label = self.make_label("sbr_done");
+        self.emit_branch(opcodes::BEQ, &disable_label);
+
+        // Enable: OR the bit into the register
+        self.emit_abs(opcodes::LDA_ABS, register);
+        self.emit_byte(opcodes::ORA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_abs(opcodes::STA_ABS, register);
+        self.emit_jmp(&done_label);
+
+        // Disable: AND with inverted mask
+        self.define_label(&disable_label);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_imm(opcodes::EOR_IMM, 0xFF);
+        self.emit_abs(opcodes::AND_ABS, register);
+        self.emit_abs(opcodes::STA_ABS, register);
+
+        self.define_label(&done_label);
+        Ok(())
+    }
+
+    /// Generate code for joystick(port) -> byte.
+    ///
+    /// Reads raw joystick state from CIA1.
+    /// Port 1 = $DC01 (CIA1_PORT_B), Port 2 = $DC00 (CIA1_PORT_A).
+    /// Returns active-low bitmask (0 = pressed).
+    ///
+    /// Note: We configure the DDR to set joystick bits as inputs,
+    /// and disable keyboard interference by writing $FF to port A.
+    fn generate_joystick_read(&mut self, args: &[Expr]) -> Result<(), CompileError> {
+        // Evaluate port number
+        self.generate_expression(&args[0])?;
+        // A = port number (1 or 2)
+
+        let port1_label = self.make_label("joy_p1");
+        let done_label = self.make_label("joy_done");
+
+        // Check if port 1 or 2
+        self.emit_byte(opcodes::CMP_IMM);
+        self.emit_byte(1);
+        self.emit_branch(opcodes::BEQ, &port1_label);
+
+        // Port 2: read from $DC00
+        // Set DDR A ($DC02) to $E0 - bits 7-5 output, bits 4-0 input for joystick
+        self.emit_imm(opcodes::LDA_IMM, 0xE0);
+        self.emit_abs(opcodes::STA_ABS, cia::CIA1_DDR_A);
+        // Read joystick from port A
+        self.emit_abs(opcodes::LDA_ABS, cia::CIA1_PORT_A);
+        self.emit_jmp(&done_label);
+
+        // Port 1: read from $DC01
+        self.define_label(&port1_label);
+        // Set port A to $FF to disable keyboard column selection
+        self.emit_imm(opcodes::LDA_IMM, 0xFF);
+        self.emit_abs(opcodes::STA_ABS, cia::CIA1_PORT_A);
+        // Set DDR B ($DC03) to $00 - all inputs for joystick
+        self.emit_imm(opcodes::LDA_IMM, 0x00);
+        self.emit_abs(opcodes::STA_ABS, cia::CIA1_DDR_B);
+        // Read joystick from port B
+        self.emit_abs(opcodes::LDA_ABS, cia::CIA1_PORT_B);
+
+        self.define_label(&done_label);
+        Ok(())
+    }
+
+    /// Generate code for joy_up/down/left/right/fire(port) -> bool.
+    ///
+    /// Reads joystick and tests specific direction bit.
+    /// Returns true if direction is pressed (bit is 0, active-low).
+    fn generate_joystick_direction(&mut self, args: &[Expr], mask: u8) -> Result<(), CompileError> {
+        // First read the joystick port
+        self.generate_joystick_read(args)?;
+        // A = raw joystick state (active-low)
+
+        // Test the specific bit
+        // If bit is 0, direction is pressed (return true = 1)
+        // If bit is 1, direction is not pressed (return false = 0)
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(mask);
+
+        // If result is 0, bit was 0 (pressed), return 1
+        // If result is non-zero, bit was 1 (not pressed), return 0
+        let pressed_label = self.make_label("jd_pressed");
+        let done_label = self.make_label("jd_done");
+
+        self.emit_branch(opcodes::BEQ, &pressed_label);
+
+        // Not pressed: return 0
+        self.emit_imm(opcodes::LDA_IMM, 0);
+        self.emit_jmp(&done_label);
+
+        // Pressed: return 1
+        self.define_label(&pressed_label);
+        self.emit_imm(opcodes::LDA_IMM, 1);
+
+        self.define_label(&done_label);
+        Ok(())
+    }
+
+    /// Generate code for sid_volume(vol).
+    ///
+    /// Sets the SID master volume (0-15) in bits 0-3 of $D418.
+    fn generate_sid_volume(&mut self, args: &[Expr]) -> Result<(), CompileError> {
+        use super::mos6510::sid;
+
+        // Evaluate volume (0-15)
+        self.generate_expression(&args[0])?;
+        // Mask to 4 bits
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x0F);
+        // Store to volume register (preserving filter bits would require read-modify-write,
+        // but for simplicity we just set volume and clear filter mode)
+        self.emit_abs(opcodes::STA_ABS, sid::VOLUME_FILTER);
+        Ok(())
+    }
+
+    /// Generate code for sid_voice_freq(voice, freq).
+    ///
+    /// Sets the frequency for a voice (0-2).
+    fn generate_sid_voice_freq(&mut self, args: &[Expr]) -> Result<(), CompileError> {
+        use super::mos6510::sid;
+
+        // Evaluate frequency (16-bit) and save
+        self.generate_expression(&args[1])?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1); // freq low
+        self.emit_byte(opcodes::STX_ZP);
+        self.emit_byte(zeropage::TMP2); // freq high
+
+        // Evaluate voice number
+        self.generate_expression(&args[0])?;
+        // A = voice (0, 1, or 2)
+
+        // Calculate register offset: voice * 7
+        // Voice 0: $D400, Voice 1: $D407, Voice 2: $D40E
+        self.emit_byte(opcodes::TAX);
+        self.emit_byte(opcodes::ASL_ACC); // * 2
+        self.emit_byte(opcodes::ASL_ACC); // * 4
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::TXA);
+        self.emit_byte(opcodes::ASL_ACC); // * 2
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::ADC_IMM);
+        self.emit_byte(0x01); // +1 to skip the multiply issue, actually voice*7
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_IMM);
+        self.emit_byte(0x01);
+        self.emit_byte(opcodes::TAX); // X = offset (0, 7, or 14)
+
+        // Store frequency low byte at $D400 + offset
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_abs(opcodes::STA_ABX, sid::VOICE1_FREQ_LO);
+
+        // Store frequency high byte at $D401 + offset
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::INX);
+        self.emit_abs(opcodes::STA_ABX, sid::VOICE1_FREQ_LO);
+
+        Ok(())
+    }
+
+    /// Generate code for sid_voice_pulse(voice, width).
+    ///
+    /// Sets the pulse width for a voice (0-4095, 12-bit).
+    fn generate_sid_voice_pulse(&mut self, args: &[Expr]) -> Result<(), CompileError> {
+        use super::mos6510::sid;
+
+        // Evaluate pulse width (16-bit, only lower 12 bits used) and save
+        self.generate_expression(&args[1])?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1); // width low
+        self.emit_byte(opcodes::STX_ZP);
+        self.emit_byte(zeropage::TMP2); // width high (bits 0-3 only)
+
+        // Mask high byte to 4 bits
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x0F);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+
+        // Evaluate voice number and calculate offset
+        self.generate_expression(&args[0])?;
+        self.emit_byte(opcodes::TAX);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::TXA);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::ADC_IMM);
+        self.emit_byte(0x01);
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_IMM);
+        self.emit_byte(0x01);
+        self.emit_byte(opcodes::TAX); // X = offset
+
+        // Store pulse width low at $D402 + offset
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_abs(opcodes::STA_ABX, sid::VOICE1_PW_LO);
+
+        // Store pulse width high at $D403 + offset
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::INX);
+        self.emit_abs(opcodes::STA_ABX, sid::VOICE1_PW_LO);
+
+        Ok(())
+    }
+
+    /// Generate code for sid_voice_wave(voice, waveform).
+    ///
+    /// Sets the waveform for a voice. Preserves gate bit.
+    /// Waveform values: 16=triangle, 32=sawtooth, 64=pulse, 128=noise
+    fn generate_sid_voice_wave(&mut self, args: &[Expr]) -> Result<(), CompileError> {
+        use super::mos6510::sid;
+
+        // Evaluate waveform and save
+        self.generate_expression(&args[1])?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1); // waveform
+
+        // Evaluate voice number and calculate control register offset
+        self.generate_expression(&args[0])?;
+        self.emit_byte(opcodes::TAX);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::TXA);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::ADC_IMM);
+        self.emit_byte(0x01);
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_IMM);
+        self.emit_byte(0x01);
+        self.emit_byte(opcodes::TAX); // X = offset
+
+        // Read current control register to preserve gate bit
+        self.emit_abs(opcodes::LDA_ABX, sid::VOICE1_CTRL);
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x01); // Keep only gate bit
+        self.emit_byte(opcodes::ORA_ZP);
+        self.emit_byte(zeropage::TMP1); // OR with new waveform
+        self.emit_abs(opcodes::STA_ABX, sid::VOICE1_CTRL);
+
+        Ok(())
+    }
+
+    /// Generate code for sid_voice_adsr(voice, attack, decay, sustain, release).
+    ///
+    /// Sets the ADSR envelope for a voice. Each parameter is 0-15.
+    fn generate_sid_voice_adsr(&mut self, args: &[Expr]) -> Result<(), CompileError> {
+        use super::mos6510::sid;
+
+        // Evaluate release and save
+        self.generate_expression(&args[4])?;
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x0F);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP4); // release
+
+        // Evaluate sustain and combine with release
+        self.generate_expression(&args[3])?;
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x0F);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC); // << 4
+        self.emit_byte(opcodes::ORA_ZP);
+        self.emit_byte(zeropage::TMP4);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2); // SR byte
+
+        // Evaluate decay and save
+        self.generate_expression(&args[2])?;
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x0F);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP4); // decay
+
+        // Evaluate attack and combine with decay
+        self.generate_expression(&args[1])?;
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x0F);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC); // << 4
+        self.emit_byte(opcodes::ORA_ZP);
+        self.emit_byte(zeropage::TMP4);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1); // AD byte
+
+        // Evaluate voice number and calculate register offset
+        self.generate_expression(&args[0])?;
+        self.emit_byte(opcodes::TAX);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::TXA);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::ADC_IMM);
+        self.emit_byte(0x01);
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_IMM);
+        self.emit_byte(0x01);
+        self.emit_byte(opcodes::TAX); // X = offset
+
+        // Store AD at $D405 + offset
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_abs(opcodes::STA_ABX, sid::VOICE1_AD);
+
+        // Store SR at $D406 + offset
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::INX);
+        self.emit_abs(opcodes::STA_ABX, sid::VOICE1_AD);
+
+        Ok(())
+    }
+
+    /// Generate code for sid_voice_gate(voice, on).
+    ///
+    /// Sets or clears the gate bit to start/stop a sound.
+    fn generate_sid_voice_gate(&mut self, args: &[Expr]) -> Result<(), CompileError> {
+        use super::mos6510::sid;
+
+        // Evaluate gate flag and save
+        self.generate_expression(&args[1])?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1); // gate flag
+
+        // Evaluate voice number and calculate control register offset
+        self.generate_expression(&args[0])?;
+        self.emit_byte(opcodes::TAX);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::TXA);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::ADC_IMM);
+        self.emit_byte(0x01);
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_IMM);
+        self.emit_byte(0x01);
+        self.emit_byte(opcodes::TAX); // X = offset
+
+        // Check if gate on or off
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        let gate_off = self.make_label("sg_off");
+        let done_label = self.make_label("sg_done");
+        self.emit_branch(opcodes::BEQ, &gate_off);
+
+        // Gate on: set bit 0
+        self.emit_abs(opcodes::LDA_ABX, sid::VOICE1_CTRL);
+        self.emit_byte(opcodes::ORA_IMM);
+        self.emit_byte(sid::GATE);
+        self.emit_abs(opcodes::STA_ABX, sid::VOICE1_CTRL);
+        self.emit_jmp(&done_label);
+
+        // Gate off: clear bit 0
+        self.define_label(&gate_off);
+        self.emit_abs(opcodes::LDA_ABX, sid::VOICE1_CTRL);
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(!sid::GATE);
+        self.emit_abs(opcodes::STA_ABX, sid::VOICE1_CTRL);
+
+        self.define_label(&done_label);
+        Ok(())
+    }
+
+    /// Generate code for sid_clear().
+    ///
+    /// Clears all SID registers to silence the chip.
+    fn generate_sid_clear(&mut self) -> Result<(), CompileError> {
+        use super::mos6510::sid;
+
+        // Clear all 25 SID registers ($D400-$D418)
+        self.emit_imm(opcodes::LDA_IMM, 0);
+        self.emit_imm(opcodes::LDX_IMM, 24);
+
+        let loop_label = self.make_label("sc_loop");
+        self.define_label(&loop_label);
+        self.emit_abs(opcodes::STA_ABX, sid::BASE);
+        self.emit_byte(opcodes::DEX);
+        self.emit_branch(opcodes::BPL, &loop_label);
+
+        Ok(())
+    }
+
+    /// Generate code for vsync().
+    ///
+    /// Waits for vertical blank by monitoring the raster register.
+    /// First waits for raster to reach line 250, then waits for it to go back to top.
+    /// This ensures we're synchronized with the screen refresh.
+    fn generate_vsync(&mut self) -> Result<(), CompileError> {
+        // Wait for raster line >= 250 (bottom of visible screen)
+        let wait_bottom = self.make_label("vs_bot");
+        self.define_label(&wait_bottom);
+        self.emit_abs(opcodes::LDA_ABS, vic::RASTER);
+        self.emit_byte(opcodes::CMP_IMM);
+        self.emit_byte(250);
+        self.emit_branch(opcodes::BCC, &wait_bottom);
+
+        // Wait for raster line < 250 (top of screen, new frame)
+        let wait_top = self.make_label("vs_top");
+        self.define_label(&wait_top);
+        self.emit_abs(opcodes::LDA_ABS, vic::RASTER);
+        self.emit_byte(opcodes::CMP_IMM);
+        self.emit_byte(250);
+        self.emit_branch(opcodes::BCS, &wait_top);
 
         Ok(())
     }

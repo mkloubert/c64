@@ -93,6 +93,95 @@ impl BuiltinRegistry for Analyzer {
 
         // seed() - reseed the random number generator from hardware entropy
         self.define_builtin("seed", vec![], None);
+
+        // Sprite functions
+        // sprite_enable(num, enabled) - enable or disable a sprite
+        self.define_builtin("sprite_enable", vec![Type::Byte, Type::Bool], None);
+
+        // sprite_pos(num, x, y) - set sprite position (x is 9-bit, 0-320)
+        self.define_builtin("sprite_pos", vec![Type::Byte, Type::Word, Type::Byte], None);
+
+        // sprite_color(num, color) - set sprite color (0-15)
+        self.define_builtin("sprite_color", vec![Type::Byte, Type::Byte], None);
+
+        // sprite_data(num, pointer) - set sprite data pointer (block number 0-255)
+        self.define_builtin("sprite_data", vec![Type::Byte, Type::Byte], None);
+
+        // sprite_expand_x(num, enabled) - enable/disable horizontal expansion
+        self.define_builtin("sprite_expand_x", vec![Type::Byte, Type::Bool], None);
+
+        // sprite_expand_y(num, enabled) - enable/disable vertical expansion
+        self.define_builtin("sprite_expand_y", vec![Type::Byte, Type::Bool], None);
+
+        // sprite_multicolor(num, enabled) - enable/disable multicolor mode
+        self.define_builtin("sprite_multicolor", vec![Type::Byte, Type::Bool], None);
+
+        // sprite_priority(num, behind_bg) - set sprite priority (true = behind background)
+        self.define_builtin("sprite_priority", vec![Type::Byte, Type::Bool], None);
+
+        // sprite_collision() -> byte - get sprite-sprite collision flags (clears on read)
+        self.define_builtin("sprite_collision", vec![], Some(Type::Byte));
+
+        // sprite_bg_collision() -> byte - get sprite-background collision flags (clears on read)
+        self.define_builtin("sprite_bg_collision", vec![], Some(Type::Byte));
+
+        // Joystick functions
+        // joystick(port) -> byte - read raw joystick state (active-low bitmask)
+        self.define_builtin("joystick", vec![Type::Byte], Some(Type::Byte));
+
+        // joy_up(port) -> bool - check if joystick is pushed up
+        self.define_builtin("joy_up", vec![Type::Byte], Some(Type::Bool));
+
+        // joy_down(port) -> bool - check if joystick is pushed down
+        self.define_builtin("joy_down", vec![Type::Byte], Some(Type::Bool));
+
+        // joy_left(port) -> bool - check if joystick is pushed left
+        self.define_builtin("joy_left", vec![Type::Byte], Some(Type::Bool));
+
+        // joy_right(port) -> bool - check if joystick is pushed right
+        self.define_builtin("joy_right", vec![Type::Byte], Some(Type::Bool));
+
+        // joy_fire(port) -> bool - check if fire button is pressed
+        self.define_builtin("joy_fire", vec![Type::Byte], Some(Type::Bool));
+
+        // SID Sound functions
+        // sid_volume(vol) - set master volume (0-15)
+        self.define_builtin("sid_volume", vec![Type::Byte], None);
+
+        // sid_voice_freq(voice, freq) - set voice frequency (0-65535)
+        self.define_builtin("sid_voice_freq", vec![Type::Byte, Type::Word], None);
+
+        // sid_voice_pulse(voice, width) - set pulse width (0-4095)
+        self.define_builtin("sid_voice_pulse", vec![Type::Byte, Type::Word], None);
+
+        // sid_voice_wave(voice, waveform) - set waveform (16=tri, 32=saw, 64=pulse, 128=noise)
+        self.define_builtin("sid_voice_wave", vec![Type::Byte, Type::Byte], None);
+
+        // sid_voice_adsr(voice, attack, decay, sustain, release) - set envelope (0-15 each)
+        self.define_builtin(
+            "sid_voice_adsr",
+            vec![Type::Byte, Type::Byte, Type::Byte, Type::Byte, Type::Byte],
+            None,
+        );
+
+        // sid_voice_gate(voice, on) - set gate (start/stop sound)
+        self.define_builtin("sid_voice_gate", vec![Type::Byte, Type::Bool], None);
+
+        // sid_clear() - clear all SID registers (silence)
+        self.define_builtin("sid_clear", vec![], None);
+
+        // Screen helper functions
+        // border(color) - set border color (0-15)
+        self.define_builtin("border", vec![Type::Byte], None);
+
+        // background(color) - set background color (0-15)
+        self.define_builtin("background", vec![Type::Byte], None);
+
+        // vsync() - wait for vertical blank (raster line 255)
+        self.define_builtin("vsync", vec![], None);
+
+        // raster() -> byte - get current raster line
+        self.define_builtin("raster", vec![], Some(Type::Byte));
     }
 
     fn define_builtin(&mut self, name: &str, params: Vec<Type>, return_type: Option<Type>) {

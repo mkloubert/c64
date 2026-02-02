@@ -339,29 +339,228 @@ pub mod sid {
     /// SID base address.
     pub const BASE: u16 = 0xD400;
 
+    // Voice 1 registers
+    /// Voice 1 frequency low byte.
+    pub const VOICE1_FREQ_LO: u16 = 0xD400;
+    /// Voice 1 frequency high byte.
+    pub const VOICE1_FREQ_HI: u16 = 0xD401;
+    /// Voice 1 pulse width low byte.
+    pub const VOICE1_PW_LO: u16 = 0xD402;
+    /// Voice 1 pulse width high byte (bits 0-3 only).
+    pub const VOICE1_PW_HI: u16 = 0xD403;
+    /// Voice 1 control register (waveform, gate, sync, ring, test).
+    pub const VOICE1_CTRL: u16 = 0xD404;
+    /// Voice 1 attack/decay (high nibble = attack, low nibble = decay).
+    pub const VOICE1_AD: u16 = 0xD405;
+    /// Voice 1 sustain/release (high nibble = sustain, low nibble = release).
+    pub const VOICE1_SR: u16 = 0xD406;
+
+    // Voice 2 registers
+    /// Voice 2 frequency low byte.
+    pub const VOICE2_FREQ_LO: u16 = 0xD407;
+    /// Voice 2 frequency high byte.
+    pub const VOICE2_FREQ_HI: u16 = 0xD408;
+    /// Voice 2 pulse width low byte.
+    pub const VOICE2_PW_LO: u16 = 0xD409;
+    /// Voice 2 pulse width high byte (bits 0-3 only).
+    pub const VOICE2_PW_HI: u16 = 0xD40A;
+    /// Voice 2 control register.
+    pub const VOICE2_CTRL: u16 = 0xD40B;
+    /// Voice 2 attack/decay.
+    pub const VOICE2_AD: u16 = 0xD40C;
+    /// Voice 2 sustain/release.
+    pub const VOICE2_SR: u16 = 0xD40D;
+
+    // Voice 3 registers
     /// Voice 3 frequency low byte.
     pub const VOICE3_FREQ_LO: u16 = 0xD40E;
     /// Voice 3 frequency high byte.
     pub const VOICE3_FREQ_HI: u16 = 0xD40F;
+    /// Voice 3 pulse width low byte.
+    pub const VOICE3_PW_LO: u16 = 0xD410;
+    /// Voice 3 pulse width high byte (bits 0-3 only).
+    pub const VOICE3_PW_HI: u16 = 0xD411;
     /// Voice 3 control register.
     pub const VOICE3_CTRL: u16 = 0xD412;
+    /// Voice 3 attack/decay.
+    pub const VOICE3_AD: u16 = 0xD413;
+    /// Voice 3 sustain/release.
+    pub const VOICE3_SR: u16 = 0xD414;
+
+    // Filter and volume registers
+    /// Filter cutoff frequency low byte (bits 0-2 only).
+    pub const FILTER_CUTOFF_LO: u16 = 0xD415;
+    /// Filter cutoff frequency high byte.
+    pub const FILTER_CUTOFF_HI: u16 = 0xD416;
+    /// Filter resonance and routing.
+    pub const FILTER_CTRL: u16 = 0xD417;
+    /// Volume and filter mode (bits 0-3 = volume, bits 4-7 = filter mode).
+    pub const VOLUME_FILTER: u16 = 0xD418;
+
+    // Read-only registers
     /// Voice 3 oscillator output (random when noise waveform).
     pub const VOICE3_OSC: u16 = 0xD41B;
+    /// Voice 3 envelope output.
+    pub const VOICE3_ENV: u16 = 0xD41C;
 
+    // Waveform bits for control register
+    /// Waveform: Triangle.
+    pub const WAVEFORM_TRIANGLE: u8 = 0x10;
+    /// Waveform: Sawtooth.
+    pub const WAVEFORM_SAWTOOTH: u8 = 0x20;
+    /// Waveform: Pulse/Square.
+    pub const WAVEFORM_PULSE: u8 = 0x40;
     /// Waveform: Noise.
     pub const WAVEFORM_NOISE: u8 = 0x80;
+
+    // Control register bits
+    /// Gate bit (start/stop envelope).
+    pub const GATE: u8 = 0x01;
+    /// Sync bit (synchronize with voice 3/1/2).
+    pub const SYNC: u8 = 0x02;
+    /// Ring modulation bit.
+    pub const RING_MOD: u8 = 0x04;
+    /// Test bit (resets oscillator).
+    pub const TEST: u8 = 0x08;
 }
 
 /// VIC-II registers.
 #[allow(dead_code)]
 pub mod vic {
+    /// VIC-II base address.
+    pub const BASE: u16 = 0xD000;
+
+    // Sprite position registers
+    /// Sprite 0 X position (bits 0-7).
+    pub const SPRITE0_X: u16 = 0xD000;
+    /// Sprite 0 Y position.
+    pub const SPRITE0_Y: u16 = 0xD001;
+    /// Sprite 1 X position (bits 0-7).
+    pub const SPRITE1_X: u16 = 0xD002;
+    /// Sprite 1 Y position.
+    pub const SPRITE1_Y: u16 = 0xD003;
+    /// Sprite 2 X position (bits 0-7).
+    pub const SPRITE2_X: u16 = 0xD004;
+    /// Sprite 2 Y position.
+    pub const SPRITE2_Y: u16 = 0xD005;
+    /// Sprite 3 X position (bits 0-7).
+    pub const SPRITE3_X: u16 = 0xD006;
+    /// Sprite 3 Y position.
+    pub const SPRITE3_Y: u16 = 0xD007;
+    /// Sprite 4 X position (bits 0-7).
+    pub const SPRITE4_X: u16 = 0xD008;
+    /// Sprite 4 Y position.
+    pub const SPRITE4_Y: u16 = 0xD009;
+    /// Sprite 5 X position (bits 0-7).
+    pub const SPRITE5_X: u16 = 0xD00A;
+    /// Sprite 5 Y position.
+    pub const SPRITE5_Y: u16 = 0xD00B;
+    /// Sprite 6 X position (bits 0-7).
+    pub const SPRITE6_X: u16 = 0xD00C;
+    /// Sprite 6 Y position.
+    pub const SPRITE6_Y: u16 = 0xD00D;
+    /// Sprite 7 X position (bits 0-7).
+    pub const SPRITE7_X: u16 = 0xD00E;
+    /// Sprite 7 Y position.
+    pub const SPRITE7_Y: u16 = 0xD00F;
+
+    /// Sprite X position MSB (bit 8 for all sprites).
+    /// Bit 0 = Sprite 0, Bit 7 = Sprite 7.
+    pub const SPRITE_X_MSB: u16 = 0xD010;
+
+    // Control registers
+    /// Control register 1 (screen height, bitmap mode, etc.).
+    pub const CONTROL1: u16 = 0xD011;
     /// Current raster line (bits 0-7).
     pub const RASTER: u16 = 0xD012;
+    /// Light pen X position.
+    pub const LIGHTPEN_X: u16 = 0xD013;
+    /// Light pen Y position.
+    pub const LIGHTPEN_Y: u16 = 0xD014;
+    /// Sprite enable register. Bit 0 = Sprite 0, etc.
+    pub const SPRITE_ENABLE: u16 = 0xD015;
+    /// Control register 2 (screen width, multicolor mode).
+    pub const CONTROL2: u16 = 0xD016;
+    /// Sprite Y expansion (double height). Bit 0 = Sprite 0, etc.
+    pub const SPRITE_EXPAND_Y: u16 = 0xD017;
+    /// Memory pointers (screen and character memory).
+    pub const MEMORY_POINTERS: u16 = 0xD018;
+    /// Interrupt register.
+    pub const INTERRUPT: u16 = 0xD019;
+    /// Interrupt enable register.
+    pub const INTERRUPT_ENABLE: u16 = 0xD01A;
+    /// Sprite to background priority. Bit=1: background in front.
+    pub const SPRITE_PRIORITY: u16 = 0xD01B;
+    /// Sprite multicolor mode. Bit 0 = Sprite 0, etc.
+    pub const SPRITE_MULTICOLOR: u16 = 0xD01C;
+    /// Sprite X expansion (double width). Bit 0 = Sprite 0, etc.
+    pub const SPRITE_EXPAND_X: u16 = 0xD01D;
+    /// Sprite-sprite collision register (read clears).
+    pub const SPRITE_COLLISION: u16 = 0xD01E;
+    /// Sprite-background collision register (read clears).
+    pub const SPRITE_BG_COLLISION: u16 = 0xD01F;
+
+    // Color registers
+    /// Border color.
+    pub const BORDER_COLOR: u16 = 0xD020;
+    /// Background color 0.
+    pub const BACKGROUND_COLOR: u16 = 0xD021;
+    /// Background color 1 (multicolor mode).
+    pub const BACKGROUND_COLOR1: u16 = 0xD022;
+    /// Background color 2 (multicolor mode).
+    pub const BACKGROUND_COLOR2: u16 = 0xD023;
+    /// Background color 3 (multicolor mode).
+    pub const BACKGROUND_COLOR3: u16 = 0xD024;
+    /// Sprite multicolor 0 (shared color for bit pattern "01").
+    pub const SPRITE_MULTICOLOR0: u16 = 0xD025;
+    /// Sprite multicolor 1 (shared color for bit pattern "11").
+    pub const SPRITE_MULTICOLOR1: u16 = 0xD026;
+
+    // Individual sprite colors
+    /// Sprite 0 color.
+    pub const SPRITE0_COLOR: u16 = 0xD027;
+    /// Sprite 1 color.
+    pub const SPRITE1_COLOR: u16 = 0xD028;
+    /// Sprite 2 color.
+    pub const SPRITE2_COLOR: u16 = 0xD029;
+    /// Sprite 3 color.
+    pub const SPRITE3_COLOR: u16 = 0xD02A;
+    /// Sprite 4 color.
+    pub const SPRITE4_COLOR: u16 = 0xD02B;
+    /// Sprite 5 color.
+    pub const SPRITE5_COLOR: u16 = 0xD02C;
+    /// Sprite 6 color.
+    pub const SPRITE6_COLOR: u16 = 0xD02D;
+    /// Sprite 7 color.
+    pub const SPRITE7_COLOR: u16 = 0xD02E;
+
+    // Sprite data pointers (in default screen memory at $0400)
+    /// Sprite pointer base address (screen RAM + $03F8).
+    pub const SPRITE_POINTERS: u16 = 0x07F8;
 }
 
 /// CIA (Complex Interface Adapter) registers.
 #[allow(dead_code)]
 pub mod cia {
+    /// CIA1 base address.
+    pub const CIA1_BASE: u16 = 0xDC00;
+
+    /// CIA1 Port A - Joystick Port 2 and keyboard columns.
+    /// Read: Bit 0-3 = Joystick directions, Bit 4 = Fire button (active low)
+    /// Joystick bits: 0=Up, 1=Down, 2=Left, 3=Right, 4=Fire (0 = pressed)
+    pub const CIA1_PORT_A: u16 = 0xDC00;
+
+    /// CIA1 Port B - Joystick Port 1 and keyboard rows.
+    /// Read: Bit 0-3 = Joystick directions, Bit 4 = Fire button (active low)
+    /// Joystick bits: 0=Up, 1=Down, 2=Left, 3=Right, 4=Fire (0 = pressed)
+    pub const CIA1_PORT_B: u16 = 0xDC01;
+
+    /// CIA1 Data Direction Register A.
+    pub const CIA1_DDR_A: u16 = 0xDC02;
+
+    /// CIA1 Data Direction Register B.
+    pub const CIA1_DDR_B: u16 = 0xDC03;
+
     /// CIA1 Timer A low byte (free-running counter).
     pub const CIA1_TIMER_A_LO: u16 = 0xDC04;
     /// CIA1 Timer A high byte.
@@ -370,6 +569,14 @@ pub mod cia {
     pub const CIA1_TIMER_B_LO: u16 = 0xDC06;
     /// CIA1 Timer B high byte.
     pub const CIA1_TIMER_B_HI: u16 = 0xDC07;
+
+    /// Joystick bit masks (directly from CIA port, active-low).
+    /// Note: 0 = pressed, 1 = not pressed
+    pub const JOY_UP_MASK: u8 = 0x01;
+    pub const JOY_DOWN_MASK: u8 = 0x02;
+    pub const JOY_LEFT_MASK: u8 = 0x04;
+    pub const JOY_RIGHT_MASK: u8 = 0x08;
+    pub const JOY_FIRE_MASK: u8 = 0x10;
 }
 
 /// PETSCII character codes.

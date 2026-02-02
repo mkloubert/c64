@@ -36,7 +36,7 @@ use super::labels::LabelManager;
 use super::mos6510::{opcodes, zeropage};
 use super::type_inference::TypeInference;
 use super::CodeGenerator;
-use crate::ast::{BinaryOp, Expr};
+use crate::ast::{BinaryOp, Expr, Type};
 use crate::error::{CompileError, ErrorCode};
 
 /// Extension trait for binary operation code generation.
@@ -72,6 +72,17 @@ pub trait BinaryOpsEmitter {
         op: BinaryOp,
         right: &Expr,
     ) -> Result<(), CompileError>;
+
+    /// Generate code for a word/sword binary operation (16-bit integer).
+    ///
+    /// Handles 16-bit arithmetic and comparisons for word and sword types.
+    fn generate_word_binary_op(
+        &mut self,
+        left: &Expr,
+        op: BinaryOp,
+        right: &Expr,
+        use_signed: bool,
+    ) -> Result<(), CompileError>;
 }
 
 impl BinaryOpsEmitter for CodeGenerator {
@@ -87,6 +98,8 @@ impl BinaryOpsEmitter for CodeGenerator {
         let use_signed = self.is_signed_type(&left_type) || self.is_signed_type(&right_type);
         let use_fixed = self.is_fixed_type(&left_type) || self.is_fixed_type(&right_type);
         let use_float = self.is_float_type(&left_type) || self.is_float_type(&right_type);
+        let use_word = matches!(left_type, Type::Word | Type::Sword)
+            || matches!(right_type, Type::Word | Type::Sword);
 
         // Use 16-bit float operations if either operand is float
         if use_float {
@@ -96,6 +109,11 @@ impl BinaryOpsEmitter for CodeGenerator {
         // Use 16-bit fixed-point operations if either operand is fixed
         if use_fixed {
             return self.generate_fixed_binary_op(left, op, right);
+        }
+
+        // Use 16-bit operations if either operand is word/sword
+        if use_word {
+            return self.generate_word_binary_op(left, op, right, use_signed);
         }
 
         // Generate left operand
@@ -551,6 +569,393 @@ impl BinaryOpsEmitter for CodeGenerator {
                 return Err(CompileError::new(
                     ErrorCode::InvalidOperatorForType,
                     format!("Operator {:?} is not supported for float types", op),
+                    left.span.clone(),
+                ));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn generate_word_binary_op(
+        &mut self,
+        left: &Expr,
+        op: BinaryOp,
+        right: &Expr,
+        use_signed: bool,
+    ) -> Result<(), CompileError> {
+        let left_type = self.infer_type_from_expr(left);
+        let right_type = self.infer_type_from_expr(right);
+        let left_is_byte = matches!(left_type, Type::Byte | Type::Sbyte | Type::Bool);
+        let right_is_byte = matches!(right_type, Type::Byte | Type::Sbyte | Type::Bool);
+
+        // Generate left operand
+        self.generate_expression(left)?;
+
+        // Save left in TMP3/TMP3_HI (zero-extend if byte)
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        if left_is_byte {
+            // Zero-extend byte to word
+            self.emit_imm(opcodes::LDA_IMM, 0);
+            self.emit_byte(opcodes::STA_ZP);
+            self.emit_byte(zeropage::TMP3_HI);
+        } else {
+            self.emit_byte(opcodes::STX_ZP);
+            self.emit_byte(zeropage::TMP3_HI);
+        }
+
+        // Generate right operand
+        self.generate_expression(right)?;
+
+        // Save right in TMP1/TMP1_HI (zero-extend if byte)
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        if right_is_byte {
+            // Zero-extend byte to word
+            self.emit_imm(opcodes::LDA_IMM, 0);
+            self.emit_byte(opcodes::STA_ZP);
+            self.emit_byte(zeropage::TMP1_HI);
+        } else {
+            self.emit_byte(opcodes::STX_ZP);
+            self.emit_byte(zeropage::TMP1_HI);
+        }
+
+        match op {
+            BinaryOp::Add => {
+                // 16-bit addition: TMP3 + TMP1 -> A/X
+                self.emit_byte(opcodes::CLC);
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::ADC_ZP);
+                self.emit_byte(zeropage::TMP1);
+                self.emit_byte(opcodes::STA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3_HI);
+                self.emit_byte(opcodes::ADC_ZP);
+                self.emit_byte(zeropage::TMP1_HI);
+                self.emit_byte(opcodes::TAX);
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+            }
+            BinaryOp::Sub => {
+                // 16-bit subtraction: TMP3 - TMP1 -> A/X
+                self.emit_byte(opcodes::SEC);
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::SBC_ZP);
+                self.emit_byte(zeropage::TMP1);
+                self.emit_byte(opcodes::STA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3_HI);
+                self.emit_byte(opcodes::SBC_ZP);
+                self.emit_byte(zeropage::TMP1_HI);
+                self.emit_byte(opcodes::TAX);
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+            }
+            BinaryOp::Mul => {
+                // 16-bit multiplication
+                if use_signed {
+                    self.emit_jsr_label("__mul_sword");
+                } else {
+                    self.emit_jsr_label("__mul_word");
+                }
+            }
+            BinaryOp::Div => {
+                // 16-bit division
+                if use_signed {
+                    self.emit_jsr_label("__div_sword");
+                } else {
+                    self.emit_jsr_label("__div_word");
+                }
+            }
+            BinaryOp::Mod => {
+                // 16-bit modulo
+                if use_signed {
+                    self.emit_jsr_label("__mod_sword");
+                } else {
+                    self.emit_jsr_label("__mod_word");
+                }
+            }
+            BinaryOp::BitAnd => {
+                // 16-bit AND
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::AND_ZP);
+                self.emit_byte(zeropage::TMP1);
+                self.emit_byte(opcodes::STA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3_HI);
+                self.emit_byte(opcodes::AND_ZP);
+                self.emit_byte(zeropage::TMP1_HI);
+                self.emit_byte(opcodes::TAX);
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+            }
+            BinaryOp::BitOr => {
+                // 16-bit OR
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::ORA_ZP);
+                self.emit_byte(zeropage::TMP1);
+                self.emit_byte(opcodes::STA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3_HI);
+                self.emit_byte(opcodes::ORA_ZP);
+                self.emit_byte(zeropage::TMP1_HI);
+                self.emit_byte(opcodes::TAX);
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+            }
+            BinaryOp::BitXor => {
+                // 16-bit XOR
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::EOR_ZP);
+                self.emit_byte(zeropage::TMP1);
+                self.emit_byte(opcodes::STA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3_HI);
+                self.emit_byte(opcodes::EOR_ZP);
+                self.emit_byte(zeropage::TMP1_HI);
+                self.emit_byte(opcodes::TAX);
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+            }
+            BinaryOp::Equal => {
+                // 16-bit equality
+                self.emit_fixed_comparison(|s| {
+                    let eq_label = s.make_label("weq");
+                    let done_label = s.make_label("weq_done");
+
+                    // Compare low bytes
+                    s.emit_byte(opcodes::LDA_ZP);
+                    s.emit_byte(zeropage::TMP3);
+                    s.emit_byte(opcodes::CMP_ZP);
+                    s.emit_byte(zeropage::TMP1);
+                    s.emit_branch(opcodes::BNE, &eq_label);
+
+                    // Compare high bytes
+                    s.emit_byte(opcodes::LDA_ZP);
+                    s.emit_byte(zeropage::TMP3_HI);
+                    s.emit_byte(opcodes::CMP_ZP);
+                    s.emit_byte(zeropage::TMP1_HI);
+                    s.emit_branch(opcodes::BNE, &eq_label);
+
+                    s.emit_imm(opcodes::LDA_IMM, 1); // Equal
+                    s.emit_jmp(&done_label);
+                    s.define_label(&eq_label);
+                    s.emit_imm(opcodes::LDA_IMM, 0); // Not equal
+                    s.define_label(&done_label);
+                });
+            }
+            BinaryOp::NotEqual => {
+                // 16-bit inequality
+                self.emit_fixed_comparison(|s| {
+                    let ne_label = s.make_label("wne");
+                    let done_label = s.make_label("wne_done");
+
+                    // Compare low bytes
+                    s.emit_byte(opcodes::LDA_ZP);
+                    s.emit_byte(zeropage::TMP3);
+                    s.emit_byte(opcodes::CMP_ZP);
+                    s.emit_byte(zeropage::TMP1);
+                    s.emit_branch(opcodes::BNE, &ne_label);
+
+                    // Compare high bytes
+                    s.emit_byte(opcodes::LDA_ZP);
+                    s.emit_byte(zeropage::TMP3_HI);
+                    s.emit_byte(opcodes::CMP_ZP);
+                    s.emit_byte(zeropage::TMP1_HI);
+                    s.emit_branch(opcodes::BNE, &ne_label);
+
+                    s.emit_imm(opcodes::LDA_IMM, 0); // Equal (return false)
+                    s.emit_jmp(&done_label);
+                    s.define_label(&ne_label);
+                    s.emit_imm(opcodes::LDA_IMM, 1); // Not equal (return true)
+                    s.define_label(&done_label);
+                });
+            }
+            BinaryOp::Less => {
+                // 16-bit less than
+                if use_signed {
+                    self.emit_jsr_label("__cmp_fixed_lt"); // Reuse fixed compare
+                } else {
+                    // Unsigned: TMP3 < TMP1
+                    self.emit_fixed_comparison(|s| {
+                        let lt_label = s.make_label("wlt");
+                        let done_label = s.make_label("wlt_done");
+
+                        // Compare high bytes first
+                        s.emit_byte(opcodes::LDA_ZP);
+                        s.emit_byte(zeropage::TMP3_HI);
+                        s.emit_byte(opcodes::CMP_ZP);
+                        s.emit_byte(zeropage::TMP1_HI);
+                        s.emit_branch(opcodes::BCC, &lt_label); // TMP3_HI < TMP1_HI
+                        s.emit_branch(opcodes::BNE, &done_label); // TMP3_HI > TMP1_HI
+
+                        // High bytes equal, compare low bytes
+                        s.emit_byte(opcodes::LDA_ZP);
+                        s.emit_byte(zeropage::TMP3);
+                        s.emit_byte(opcodes::CMP_ZP);
+                        s.emit_byte(zeropage::TMP1);
+                        s.emit_branch(opcodes::BCC, &lt_label);
+
+                        s.emit_imm(opcodes::LDA_IMM, 0); // Not less
+                        s.emit_jmp(&done_label);
+                        s.define_label(&lt_label);
+                        s.emit_imm(opcodes::LDA_IMM, 1); // Less
+                        s.define_label(&done_label);
+                    });
+                }
+            }
+            BinaryOp::LessEqual => {
+                if use_signed {
+                    self.emit_jsr_label("__cmp_fixed_le");
+                } else {
+                    // Unsigned: TMP3 <= TMP1
+                    self.emit_fixed_comparison(|s| {
+                        let le_label = s.make_label("wle");
+                        let done_label = s.make_label("wle_done");
+
+                        // Compare high bytes first
+                        s.emit_byte(opcodes::LDA_ZP);
+                        s.emit_byte(zeropage::TMP3_HI);
+                        s.emit_byte(opcodes::CMP_ZP);
+                        s.emit_byte(zeropage::TMP1_HI);
+                        s.emit_branch(opcodes::BCC, &le_label); // TMP3_HI < TMP1_HI
+                        s.emit_branch(opcodes::BNE, &done_label); // TMP3_HI > TMP1_HI
+
+                        // High bytes equal, compare low bytes
+                        s.emit_byte(opcodes::LDA_ZP);
+                        s.emit_byte(zeropage::TMP3);
+                        s.emit_byte(opcodes::CMP_ZP);
+                        s.emit_byte(zeropage::TMP1);
+                        s.emit_branch(opcodes::BCC, &le_label);
+                        s.emit_branch(opcodes::BEQ, &le_label);
+
+                        s.emit_imm(opcodes::LDA_IMM, 0); // Not less or equal
+                        s.emit_jmp(&done_label);
+                        s.define_label(&le_label);
+                        s.emit_imm(opcodes::LDA_IMM, 1); // Less or equal
+                        s.define_label(&done_label);
+                    });
+                }
+            }
+            BinaryOp::Greater => {
+                if use_signed {
+                    self.emit_jsr_label("__cmp_fixed_gt");
+                } else {
+                    // Unsigned: TMP3 > TMP1
+                    self.emit_fixed_comparison(|s| {
+                        let gt_label = s.make_label("wgt");
+                        let done_label = s.make_label("wgt_done");
+
+                        // Compare high bytes first
+                        s.emit_byte(opcodes::LDA_ZP);
+                        s.emit_byte(zeropage::TMP3_HI);
+                        s.emit_byte(opcodes::CMP_ZP);
+                        s.emit_byte(zeropage::TMP1_HI);
+                        s.emit_branch(opcodes::BCC, &done_label); // TMP3_HI < TMP1_HI
+                        s.emit_branch(opcodes::BNE, &gt_label); // TMP3_HI > TMP1_HI
+
+                        // High bytes equal, compare low bytes
+                        s.emit_byte(opcodes::LDA_ZP);
+                        s.emit_byte(zeropage::TMP3);
+                        s.emit_byte(opcodes::CMP_ZP);
+                        s.emit_byte(zeropage::TMP1);
+                        s.emit_branch(opcodes::BEQ, &done_label);
+                        s.emit_branch(opcodes::BCS, &gt_label);
+
+                        s.emit_imm(opcodes::LDA_IMM, 0); // Not greater
+                        s.emit_jmp(&done_label);
+                        s.define_label(&gt_label);
+                        s.emit_imm(opcodes::LDA_IMM, 1); // Greater
+                        s.define_label(&done_label);
+                    });
+                }
+            }
+            BinaryOp::GreaterEqual => {
+                if use_signed {
+                    self.emit_jsr_label("__cmp_fixed_ge");
+                } else {
+                    // Unsigned: TMP3 >= TMP1
+                    self.emit_fixed_comparison(|s| {
+                        let ge_label = s.make_label("wge");
+                        let done_label = s.make_label("wge_done");
+
+                        // Compare high bytes first
+                        s.emit_byte(opcodes::LDA_ZP);
+                        s.emit_byte(zeropage::TMP3_HI);
+                        s.emit_byte(opcodes::CMP_ZP);
+                        s.emit_byte(zeropage::TMP1_HI);
+                        s.emit_branch(opcodes::BCC, &done_label); // TMP3_HI < TMP1_HI
+                        s.emit_branch(opcodes::BNE, &ge_label); // TMP3_HI > TMP1_HI
+
+                        // High bytes equal, compare low bytes
+                        s.emit_byte(opcodes::LDA_ZP);
+                        s.emit_byte(zeropage::TMP3);
+                        s.emit_byte(opcodes::CMP_ZP);
+                        s.emit_byte(zeropage::TMP1);
+                        s.emit_branch(opcodes::BCS, &ge_label);
+
+                        s.emit_imm(opcodes::LDA_IMM, 0); // Not greater or equal
+                        s.emit_jmp(&done_label);
+                        s.define_label(&ge_label);
+                        s.emit_imm(opcodes::LDA_IMM, 1); // Greater or equal
+                        s.define_label(&done_label);
+                    });
+                }
+            }
+            BinaryOp::And | BinaryOp::Or => {
+                // Logical operations - evaluate both as boolean (non-zero = true)
+                let result_label = self.make_label("wlog");
+                let done_label = self.make_label("wlog_done");
+
+                // Check if TMP3 (left) is non-zero
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::ORA_ZP);
+                self.emit_byte(zeropage::TMP3_HI);
+
+                if op == BinaryOp::And {
+                    self.emit_branch(opcodes::BEQ, &result_label); // Left is zero -> false
+                    // Check right
+                    self.emit_byte(opcodes::LDA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_byte(opcodes::ORA_ZP);
+                    self.emit_byte(zeropage::TMP1_HI);
+                    self.emit_branch(opcodes::BEQ, &result_label); // Right is zero -> false
+                    self.emit_imm(opcodes::LDA_IMM, 1); // Both true
+                    self.emit_jmp(&done_label);
+                    self.define_label(&result_label);
+                    self.emit_imm(opcodes::LDA_IMM, 0);
+                } else {
+                    // Or
+                    self.emit_branch(opcodes::BNE, &result_label); // Left is non-zero -> true
+                    // Check right
+                    self.emit_byte(opcodes::LDA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_byte(opcodes::ORA_ZP);
+                    self.emit_byte(zeropage::TMP1_HI);
+                    self.emit_branch(opcodes::BNE, &result_label); // Right is non-zero -> true
+                    self.emit_imm(opcodes::LDA_IMM, 0); // Both false
+                    self.emit_jmp(&done_label);
+                    self.define_label(&result_label);
+                    self.emit_imm(opcodes::LDA_IMM, 1);
+                }
+                self.define_label(&done_label);
+            }
+            _ => {
+                return Err(CompileError::new(
+                    ErrorCode::InvalidOperatorForType,
+                    format!("Operator {:?} is not supported for word types", op),
                     left.span.clone(),
                 ));
             }

@@ -939,6 +939,483 @@ def main():
     println(rand_byte(1, 100))
 ```
 
+### Sprite Functions
+
+The C64 VIC-II chip supports 8 hardware sprites. Each sprite is 24x21 pixels and can be positioned anywhere on the screen.
+
+#### `sprite_enable(num: byte, enabled: bool)`
+
+Enables or disables a sprite.
+
+- num: Sprite number (0-7)
+- enabled: `true` to show sprite, `false` to hide
+
+```python
+def main():
+    sprite_enable(0, true)   # Enable sprite 0
+    sprite_enable(1, false)  # Disable sprite 1
+```
+
+#### `sprite_pos(num: byte, x: word, y: byte)`
+
+Sets the position of a sprite.
+
+- num: Sprite number (0-7)
+- x: X position (0-320, 9-bit value)
+- y: Y position (0-255)
+
+Note: Visible screen area is approximately X: 24-343, Y: 50-249.
+
+```python
+def main():
+    sprite_enable(0, true)
+    sprite_pos(0, 160, 100)  # Center of screen
+```
+
+#### `sprite_color(num: byte, color: byte)`
+
+Sets the color of a sprite.
+
+- num: Sprite number (0-7)
+- color: Color value (0-15)
+
+```python
+def main():
+    sprite_color(0, 1)   # White
+    sprite_color(1, 7)   # Yellow
+```
+
+#### `sprite_data(num: byte, pointer: byte)`
+
+Sets the sprite data pointer. The pointer is a block number (0-255). The actual memory address is `pointer * 64`.
+
+- num: Sprite number (0-7)
+- pointer: Block number (e.g., 13 = address $0340)
+
+```python
+def main():
+    # Point sprite 0 to data at $0340 (block 13)
+    sprite_data(0, 13)
+```
+
+#### `sprite_expand_x(num: byte, enabled: bool)`
+
+Enables or disables horizontal expansion (double width).
+
+```python
+def main():
+    sprite_expand_x(0, true)  # Double width
+```
+
+#### `sprite_expand_y(num: byte, enabled: bool)`
+
+Enables or disables vertical expansion (double height).
+
+```python
+def main():
+    sprite_expand_y(0, true)  # Double height
+```
+
+#### `sprite_multicolor(num: byte, enabled: bool)`
+
+Enables or disables multicolor mode for a sprite. In multicolor mode, sprites use 4 colors but have half the horizontal resolution.
+
+```python
+def main():
+    sprite_multicolor(0, true)
+```
+
+#### `sprite_priority(num: byte, behind_bg: bool)`
+
+Sets sprite priority relative to background.
+
+- behind_bg: `true` = sprite appears behind background, `false` = sprite in front
+
+```python
+def main():
+    sprite_priority(0, true)  # Sprite behind background
+```
+
+#### `sprite_collision() -> byte`
+
+Returns sprite-sprite collision flags. Each bit represents a sprite that has collided with another sprite. Reading this register clears it.
+
+```python
+def main():
+    coll: byte = sprite_collision()
+    if coll & 1:
+        println("SPRITE 0 HIT")
+    if coll & 2:
+        println("SPRITE 1 HIT")
+```
+
+#### `sprite_bg_collision() -> byte`
+
+Returns sprite-background collision flags. Each bit represents a sprite that has collided with non-background pixels. Reading this register clears it.
+
+```python
+def main():
+    coll: byte = sprite_bg_collision()
+    if coll & 1:
+        println("SPRITE 0 HIT BG")
+```
+
+#### Sprite Data Format
+
+Each sprite is 24 pixels wide and 21 pixels tall, requiring 63 bytes of data (24/8 \* 21 = 63). Sprite data must be aligned to 64-byte boundaries.
+
+Example: Writing a simple sprite shape using `poke()`:
+
+```python
+def main():
+    # Write sprite data at $0340 (block 13 = 13*64 = 832)
+    # Simple ball shape (3 bytes per row, 21 rows)
+    poke(832, %00000000)
+    poke(833, %00111100)
+    poke(834, %00000000)
+    # ... continue for all 63 bytes
+
+    sprite_data(0, 13)
+    sprite_enable(0, true)
+    sprite_pos(0, 160, 100)
+    sprite_color(0, 1)
+```
+
+### Joystick Functions
+
+The C64 has two joystick ports. Port 2 is preferred for games because Port 1 shares lines with the keyboard.
+
+#### `joystick(port: byte) -> byte`
+
+Reads the raw joystick state as a bitmask (active-low: 0 = pressed).
+
+- port: 1 for Port 1, 2 for Port 2
+- Returns: Bitmask with bits 0-4 (Up, Down, Left, Right, Fire)
+
+```python
+def main():
+    state: byte = joystick(2)
+    # Bit 0 = Up, Bit 1 = Down, Bit 2 = Left, Bit 3 = Right, Bit 4 = Fire
+    # Value is 0 when pressed (active-low)
+```
+
+#### `joy_up(port: byte) -> bool`
+
+Returns `true` if joystick is pushed up.
+
+```python
+def main():
+    if joy_up(2):
+        println("UP PRESSED")
+```
+
+#### `joy_down(port: byte) -> bool`
+
+Returns `true` if joystick is pushed down.
+
+```python
+def main():
+    if joy_down(2):
+        println("DOWN PRESSED")
+```
+
+#### `joy_left(port: byte) -> bool`
+
+Returns `true` if joystick is pushed left.
+
+```python
+def main():
+    if joy_left(2):
+        println("LEFT PRESSED")
+```
+
+#### `joy_right(port: byte) -> bool`
+
+Returns `true` if joystick is pushed right.
+
+```python
+def main():
+    if joy_right(2):
+        println("RIGHT PRESSED")
+```
+
+#### `joy_fire(port: byte) -> bool`
+
+Returns `true` if fire button is pressed.
+
+```python
+def main():
+    if joy_fire(2):
+        println("FIRE!")
+```
+
+#### Joystick Example: Simple Movement
+
+```python
+def main():
+    cls()
+    x: word = 160
+    y: byte = 100
+
+    sprite_enable(0, true)
+    sprite_color(0, 1)
+    sprite_data(0, 13)
+
+    while true:
+        # Read joystick port 2
+        if joy_left(2):
+            if x > 24:
+                x = x - 2
+        if joy_right(2):
+            if x < 320:
+                x = x + 2
+        if joy_up(2):
+            if y > 50:
+                y = y - 2
+        if joy_down(2):
+            if y < 229:
+                y = y + 2
+
+        sprite_pos(0, x, y)
+```
+
+### Sound Functions
+
+The C64 SID chip has 3 voices, each with independent frequency, waveform, and envelope settings.
+
+#### `sid_volume(vol: byte)`
+
+Sets the master volume (0-15).
+
+```python
+def main():
+    sid_volume(15)  # Maximum volume
+```
+
+#### `sid_voice_freq(voice: byte, freq: word)`
+
+Sets the frequency for a voice (0-2). The frequency value is a 16-bit number where higher values produce higher pitches.
+
+Common frequency values:
+
+- Middle C (C4): 4291
+- A4 (440 Hz): 7217
+- C5: 8583
+
+```python
+def main():
+    sid_volume(15)
+    sid_voice_freq(0, 7217)  # A4 = 440 Hz
+```
+
+#### `sid_voice_pulse(voice: byte, width: word)`
+
+Sets the pulse width for pulse waveform (0-4095). 2048 = 50% duty cycle (square wave).
+
+```python
+def main():
+    sid_voice_pulse(0, 2048)  # Square wave
+```
+
+#### `sid_voice_wave(voice: byte, waveform: byte)`
+
+Sets the waveform for a voice. Can be combined with OR for special effects.
+
+| Value | Waveform |
+| ----- | -------- |
+| 16    | Triangle |
+| 32    | Sawtooth |
+| 64    | Pulse    |
+| 128   | Noise    |
+
+```python
+def main():
+    sid_voice_wave(0, 32)   # Sawtooth
+    sid_voice_wave(1, 64)   # Pulse
+    sid_voice_wave(2, 128)  # Noise
+```
+
+#### `sid_voice_adsr(voice: byte, attack: byte, decay: byte, sustain: byte, release: byte)`
+
+Sets the ADSR envelope for a voice. Each parameter is 0-15.
+
+- **Attack**: Time to reach maximum volume (0=2ms, 15=8s)
+- **Decay**: Time to fall to sustain level (0=6ms, 15=24s)
+- **Sustain**: Volume level to hold (0-15, where 15=max)
+- **Release**: Time to fade out after gate off (0=6ms, 15=24s)
+
+```python
+def main():
+    # Short beep: fast attack, medium decay, no sustain, fast release
+    sid_voice_adsr(0, 0, 4, 0, 2)
+
+    # Smooth pad: slow attack, slow decay, high sustain, slow release
+    sid_voice_adsr(1, 8, 8, 12, 8)
+```
+
+#### `sid_voice_gate(voice: byte, on: bool)`
+
+Starts or stops a sound. Setting gate to `true` starts the attack phase. Setting to `false` starts the release phase.
+
+```python
+def main():
+    sid_voice_gate(0, true)   # Start sound
+    # ... wait ...
+    sid_voice_gate(0, false)  # Release sound
+```
+
+#### `sid_clear()`
+
+Clears all SID registers, silencing the chip.
+
+```python
+def main():
+    sid_clear()  # Silence everything
+```
+
+#### Sound Example: Simple Beep
+
+```python
+def main():
+    # Setup SID
+    sid_volume(15)
+
+    # Configure voice 0
+    sid_voice_freq(0, 7217)      # A4 = 440 Hz
+    sid_voice_adsr(0, 0, 8, 0, 4)  # Fast attack, medium decay
+    sid_voice_wave(0, 32)        # Sawtooth wave
+
+    # Play beep
+    sid_voice_gate(0, true)
+
+    # Wait (simple delay loop)
+    i: word = 0
+    while i < 10000:
+        i = i + 1
+
+    # Stop
+    sid_voice_gate(0, false)
+```
+
+#### Sound Example: Two-Tone Effect
+
+```python
+def main():
+    sid_volume(15)
+
+    # Voice 0: Low tone
+    sid_voice_freq(0, 2000)
+    sid_voice_adsr(0, 0, 4, 8, 4)
+    sid_voice_wave(0, 64)
+    sid_voice_pulse(0, 2048)
+
+    # Voice 1: High tone
+    sid_voice_freq(1, 6000)
+    sid_voice_adsr(1, 0, 4, 8, 4)
+    sid_voice_wave(1, 16)
+
+    # Play both
+    sid_voice_gate(0, true)
+    sid_voice_gate(1, true)
+```
+
+### Screen Helper Functions
+
+Convenient functions for common screen operations.
+
+#### `border(color: byte)`
+
+Sets the border color (0-15).
+
+```python
+def main():
+    border(0)   # Black border
+    border(6)   # Blue border
+```
+
+#### `background(color: byte)`
+
+Sets the background color (0-15).
+
+```python
+def main():
+    background(0)   # Black background
+    background(1)   # White background
+```
+
+#### `vsync()`
+
+Waits for vertical blank (screen refresh). Use this in game loops for smooth animation at ~50/60 FPS.
+
+```python
+def main():
+    while true:
+        # Update game logic
+        # ...
+
+        # Wait for next frame
+        vsync()
+```
+
+#### `raster() -> byte`
+
+Returns the current raster line (0-255). Useful for timing and effects.
+
+```python
+def main():
+    line: byte = raster()
+    println(line)
+```
+
+### C64 Color Values
+
+The C64 has 16 colors. Define them as constants in your program:
+
+```python
+# C64 Color Constants
+BLACK = 0
+WHITE = 1
+RED = 2
+CYAN = 3
+PURPLE = 4
+GREEN = 5
+BLUE = 6
+YELLOW = 7
+ORANGE = 8
+BROWN = 9
+LIGHT_RED = 10
+DARK_GRAY = 11
+GRAY = 12
+LIGHT_GREEN = 13
+LIGHT_BLUE = 14
+LIGHT_GRAY = 15
+
+def main():
+    border(BLACK)
+    background(BLUE)
+    sprite_color(0, YELLOW)
+```
+
+### Screen Example: Color Cycle
+
+```python
+def main():
+    cls()
+    println("PRESS ANY KEY")
+
+    color: byte = 0
+    while true:
+        vsync()
+
+        k: byte = get_key()
+        if k != 0:
+            color = color + 1
+            if color > 15:
+                color = 0
+            border(color)
+            background(color)
+```
+
 ---
 
 ## Example Programs
