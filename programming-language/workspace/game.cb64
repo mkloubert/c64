@@ -483,7 +483,7 @@ def draw_hud():
     # Draw score in top-left corner
     cursor(0, 0)        # Column 0, Row 0
     print("SCORE:")
-    print(star_x)
+    print(score)
 
     # Draw lives in top-right area
     cursor(30, 0)       # Column 30, Row 0
