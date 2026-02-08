@@ -46,6 +46,8 @@ pub enum Token {
     Bool,
     /// `string` - string type.
     StringType,
+    /// `str` - string conversion function.
+    Str,
     /// `fixed` - 12.4 fixed-point type.
     Fixed,
     /// `float` - IEEE-754 binary16 floating-point type.
@@ -212,6 +214,7 @@ impl Token {
                 | Token::Sword
                 | Token::Bool
                 | Token::StringType
+                | Token::Str
                 | Token::Fixed
                 | Token::Float
                 | Token::Def
@@ -277,6 +280,7 @@ impl Token {
             "sword" => Token::Sword,
             "bool" => Token::Bool,
             "string" => Token::StringType,
+            "str" => Token::Str,
             "fixed" => Token::Fixed,
             "float" => Token::Float,
 
@@ -326,6 +330,7 @@ impl Token {
             Token::Sword => "'sword'",
             Token::Bool => "'bool'",
             Token::StringType => "'string'",
+            Token::Str => "'str'",
             Token::Fixed => "'fixed'",
             Token::Float => "'float'",
             Token::Def => "'def'",

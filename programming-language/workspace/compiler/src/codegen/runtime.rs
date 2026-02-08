@@ -28,6 +28,7 @@
 use super::emit::EmitHelpers;
 use super::labels::LabelManager;
 use super::mos6510::{kernal, opcodes, zeropage};
+use super::string_runtime::StringRuntime;
 use super::CodeGenerator;
 
 /// Extension trait for runtime library emission.
@@ -120,6 +121,9 @@ impl RuntimeEmitter for CodeGenerator {
 
         // Float runtime routines
         self.emit_float_runtime();
+
+        // String conversion routines
+        self.emit_string_runtime();
 
         // Input routine
         self.emit_readln_routine();

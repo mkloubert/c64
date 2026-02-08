@@ -88,20 +88,46 @@ impl TypeConversions for CodeGenerator {
             }
 
             // Integer to Fixed conversions
-            (Type::Byte, Type::Fixed) | (Type::Sbyte, Type::Fixed) => {
-                // 8-bit value in A -> 12.4 fixed in A/X
+            (Type::Byte, Type::Fixed) => {
+                // 8-bit unsigned value in A -> 12.4 fixed in A/X
                 // fixed = value << 4 (value * 16)
+                // For byte, we can shift directly since value is 0-255
+                // After 4 left shifts, max value is 255*16 = 4080 (0x0FF0)
                 self.emit_byte(opcodes::ASL_ACC); // *2
                 self.emit_byte(opcodes::ASL_ACC); // *4
                 self.emit_byte(opcodes::ASL_ACC); // *8
                 self.emit_byte(opcodes::ASL_ACC); // *16
-                self.emit_imm(opcodes::LDX_IMM, 0); // High byte = 0 for positive
-                                                    // Handle sign extension for signed bytes
-                if *source_type == Type::Sbyte {
-                    // If original was negative, we need to handle differently
-                    // This simple version works for non-negative values
-                    // For negative, we'd need to sign-extend before shifting
+                self.emit_imm(opcodes::LDX_IMM, 0); // High byte = 0 (always positive)
+            }
+            (Type::Sbyte, Type::Fixed) => {
+                // 8-bit signed value in A -> 12.4 fixed in A/X
+                // Must sign-extend to 16-bit first, then shift left 4 times
+                // Example: -10 (0xF6) -> sign-extend to 0xFFF6 -> shift to 0xFF60 = -10.0
+
+                // Step 1: Sign-extend A to A/X (same logic as Sbyte->Sword)
+                self.emit_imm(opcodes::LDX_IMM, 0);
+                self.emit_byte(opcodes::CMP_IMM);
+                self.emit_byte(0x80);
+                let positive = self.make_label("sbyte_fixed_pos");
+                self.emit_branch(opcodes::BCC, &positive);
+                self.emit_imm(opcodes::LDX_IMM, 0xFF); // Sign extend with $FF for negative
+                self.define_label(&positive);
+
+                // Step 2: Store 16-bit value to temp and shift left 4 times
+                self.emit_byte(opcodes::STA_ZP);
+                self.emit_byte(zeropage::TMP1);
+                self.emit_byte(opcodes::STX_ZP);
+                self.emit_byte(zeropage::TMP1_HI);
+                for _ in 0..4 {
+                    self.emit_byte(opcodes::ASL_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_byte(opcodes::ROL_ZP);
+                    self.emit_byte(zeropage::TMP1_HI);
                 }
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP1);
+                self.emit_byte(opcodes::LDX_ZP);
+                self.emit_byte(zeropage::TMP1_HI);
             }
             (Type::Word, Type::Fixed) | (Type::Sword, Type::Fixed) => {
                 // 16-bit value in A/X -> 12.4 fixed in A/X
@@ -124,15 +150,15 @@ impl TypeConversions for CodeGenerator {
                 self.emit_byte(zeropage::TMP1_HI);
             }
 
-            // Fixed to Integer conversions
-            (Type::Fixed, Type::Byte) | (Type::Fixed, Type::Sbyte) => {
-                // 12.4 fixed in A/X -> 8-bit in A
-                // Truncate: value >> 4
+            // Fixed to Integer conversions (unsigned)
+            (Type::Fixed, Type::Byte) => {
+                // 12.4 fixed in A/X -> 8-bit unsigned in A
+                // Truncate: value >> 4 (logical shift)
                 self.emit_byte(opcodes::STA_ZP);
                 self.emit_byte(zeropage::TMP1);
                 self.emit_byte(opcodes::STX_ZP);
                 self.emit_byte(zeropage::TMP1_HI);
-                // Shift right 4 times (arithmetic for signed)
+                // Logical shift right 4 times
                 for _ in 0..4 {
                     self.emit_byte(opcodes::LSR_ZP);
                     self.emit_byte(zeropage::TMP1_HI);
@@ -142,16 +168,64 @@ impl TypeConversions for CodeGenerator {
                 self.emit_byte(opcodes::LDA_ZP);
                 self.emit_byte(zeropage::TMP1);
             }
-            (Type::Fixed, Type::Word) | (Type::Fixed, Type::Sword) => {
-                // 12.4 fixed in A/X -> 16-bit in A/X
-                // Truncate: value >> 4
+            (Type::Fixed, Type::Sbyte) => {
+                // 12.4 fixed in A/X -> 8-bit signed in A
+                // Truncate: value >> 4 (arithmetic shift to preserve sign)
                 self.emit_byte(opcodes::STA_ZP);
                 self.emit_byte(zeropage::TMP1);
                 self.emit_byte(opcodes::STX_ZP);
                 self.emit_byte(zeropage::TMP1_HI);
-                // Shift right 4 times
+                // Arithmetic shift right 4 times
+                // CMP #$80 sets carry if bit 7 is set (negative)
+                // ROR then rotates that carry into bit 7, preserving sign
+                for _ in 0..4 {
+                    self.emit_byte(opcodes::LDA_ZP);
+                    self.emit_byte(zeropage::TMP1_HI);
+                    self.emit_byte(opcodes::CMP_IMM);
+                    self.emit_byte(0x80);
+                    self.emit_byte(opcodes::ROR_ZP);
+                    self.emit_byte(zeropage::TMP1_HI);
+                    self.emit_byte(opcodes::ROR_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                }
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP1);
+            }
+            (Type::Fixed, Type::Word) => {
+                // 12.4 fixed in A/X -> 16-bit unsigned in A/X
+                // Truncate: value >> 4 (logical shift)
+                self.emit_byte(opcodes::STA_ZP);
+                self.emit_byte(zeropage::TMP1);
+                self.emit_byte(opcodes::STX_ZP);
+                self.emit_byte(zeropage::TMP1_HI);
+                // Logical shift right 4 times
                 for _ in 0..4 {
                     self.emit_byte(opcodes::LSR_ZP);
+                    self.emit_byte(zeropage::TMP1_HI);
+                    self.emit_byte(opcodes::ROR_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                }
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP1);
+                self.emit_byte(opcodes::LDX_ZP);
+                self.emit_byte(zeropage::TMP1_HI);
+            }
+            (Type::Fixed, Type::Sword) => {
+                // 12.4 fixed in A/X -> 16-bit signed in A/X
+                // Truncate: value >> 4 (arithmetic shift to preserve sign)
+                self.emit_byte(opcodes::STA_ZP);
+                self.emit_byte(zeropage::TMP1);
+                self.emit_byte(opcodes::STX_ZP);
+                self.emit_byte(zeropage::TMP1_HI);
+                // Arithmetic shift right 4 times
+                // CMP #$80 sets carry if bit 7 is set (negative)
+                // ROR then rotates that carry into bit 7, preserving sign
+                for _ in 0..4 {
+                    self.emit_byte(opcodes::LDA_ZP);
+                    self.emit_byte(zeropage::TMP1_HI);
+                    self.emit_byte(opcodes::CMP_IMM);
+                    self.emit_byte(0x80);
+                    self.emit_byte(opcodes::ROR_ZP);
                     self.emit_byte(zeropage::TMP1_HI);
                     self.emit_byte(opcodes::ROR_ZP);
                     self.emit_byte(zeropage::TMP1);
@@ -198,7 +272,89 @@ impl TypeConversions for CodeGenerator {
                 // No-op, just reinterpret
             }
 
-            // Other conversions (bool, string, etc.) - no runtime conversion
+            // Bool to integer conversions
+            // Bool is already 0 or 1 in A register, no conversion needed for byte
+            (Type::Bool, Type::Byte) | (Type::Bool, Type::Sbyte) => {
+                // No-op: bool is already 0 or 1 in A
+            }
+            (Type::Bool, Type::Word) | (Type::Bool, Type::Sword) => {
+                // Zero-extend: bool (0 or 1) in A, X = 0
+                self.emit_imm(opcodes::LDX_IMM, 0);
+            }
+
+            // Integer to bool conversions (explicit cast only)
+            // Any non-zero value becomes 1 (true), zero stays 0 (false)
+            (Type::Byte, Type::Bool) | (Type::Sbyte, Type::Bool) => {
+                // If A != 0, set A = 1; else A = 0
+                let done = self.make_label("to_bool_done");
+                let set_true = self.make_label("to_bool_true");
+                self.emit_byte(opcodes::CMP_IMM);
+                self.emit_byte(0x00);
+                self.emit_branch(opcodes::BNE, &set_true);
+                // A is already 0, we're done
+                self.emit_branch(opcodes::BEQ, &done); // JMP equivalent using BEQ (always taken when Z=1)
+                self.define_label(&set_true);
+                self.emit_imm(opcodes::LDA_IMM, 1);
+                self.define_label(&done);
+            }
+            (Type::Word, Type::Bool) | (Type::Sword, Type::Bool) => {
+                // If A|X != 0, set A = 1; else A = 0
+                // Check if either byte is non-zero
+                let set_true = self.make_label("w_bool_true");
+                let done = self.make_label("w_bool_done");
+                self.emit_byte(opcodes::STX_ZP);
+                self.emit_byte(zeropage::TMP1);
+                self.emit_byte(opcodes::ORA_ZP);
+                self.emit_byte(zeropage::TMP1); // A = A | X
+                self.emit_branch(opcodes::BNE, &set_true);
+                self.emit_imm(opcodes::LDA_IMM, 0);
+                self.emit_branch(opcodes::BEQ, &done);
+                self.define_label(&set_true);
+                self.emit_imm(opcodes::LDA_IMM, 1);
+                self.define_label(&done);
+            }
+
+            // String conversions (numeric -> string)
+            (Type::Byte, Type::String) | (Type::Sbyte, Type::String) => {
+                // 8-bit value in A -> string pointer in A/X
+                self.emit_jsr_label("__byte_to_string");
+            }
+            (Type::Word, Type::String) | (Type::Sword, Type::String) => {
+                // 16-bit value in A/X -> string pointer in A/X
+                self.emit_jsr_label("__word_to_string");
+            }
+            (Type::Fixed, Type::String) => {
+                // 12.4 fixed in A/X -> string pointer in A/X
+                self.emit_jsr_label("__fixed_to_string");
+            }
+            (Type::Float, Type::String) => {
+                // IEEE-754 binary16 in A/X -> string pointer in A/X
+                self.emit_jsr_label("__float_to_string");
+            }
+            (Type::Bool, Type::String) => {
+                // Bool in A -> string pointer in A/X ("TRUE" or "FALSE")
+                self.emit_jsr_label("__bool_to_string");
+            }
+
+            // String conversions (string -> numeric)
+            (Type::String, Type::Byte) => {
+                // String pointer in A/X -> 8-bit unsigned in A
+                self.emit_jsr_label("__string_to_byte");
+            }
+            (Type::String, Type::Sbyte) => {
+                // String pointer in A/X -> 8-bit signed in A
+                self.emit_jsr_label("__string_to_sbyte");
+            }
+            (Type::String, Type::Word) => {
+                // String pointer in A/X -> 16-bit unsigned in A/X
+                self.emit_jsr_label("__string_to_word");
+            }
+            (Type::String, Type::Sword) => {
+                // String pointer in A/X -> 16-bit signed in A/X
+                self.emit_jsr_label("__string_to_sword");
+            }
+
+            // Other conversions - no runtime conversion needed
             _ => {}
         }
 

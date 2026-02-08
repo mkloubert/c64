@@ -209,7 +209,7 @@ fn test_semantic_undefined_function(source: &str, expected_code: ErrorCode) {
 /// Test type mismatch errors.
 #[test_case("def main():\n    x: byte = \"hello\"\n", ErrorCode::TypeMismatch; "string_to_byte")]
 #[test_case("def main():\n    x: bool = 42\n", ErrorCode::TypeMismatch; "int_to_bool")]
-#[test_case("def main():\n    x: byte = true\n", ErrorCode::TypeMismatch; "bool_to_byte")]
+// Note: bool_to_byte is now allowed (bool -> byte is implicit)
 fn test_semantic_type_mismatch_assignment(source: &str, expected_code: ErrorCode) {
     let err = compile_and_get_error(source);
     assert!(err.is_some(), "Expected error for type mismatch");
@@ -287,7 +287,7 @@ fn test_semantic_continue_outside_loop() {
 
 /// Test return type mismatch.
 #[test_case("def foo() -> byte:\n    return \"hello\"\n\ndef main():\n    pass\n", ErrorCode::TypeMismatch; "string_for_byte")]
-#[test_case("def foo() -> byte:\n    return true\n\ndef main():\n    pass\n", ErrorCode::TypeMismatch; "bool_for_byte")]
+// Note: bool_for_byte is now allowed (bool -> byte is implicit)
 fn test_semantic_return_type_mismatch(source: &str, expected_code: ErrorCode) {
     let err = compile_and_get_error(source);
     assert!(err.is_some(), "Expected error for return type mismatch");

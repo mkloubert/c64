@@ -63,6 +63,7 @@ pub mod functions;
 pub mod labels;
 pub mod mos6510;
 pub mod runtime;
+pub mod string_runtime;
 pub mod strings;
 pub mod type_inference;
 pub mod types;
@@ -146,6 +147,12 @@ impl CodeGenerator {
     pub fn generate(&mut self, program: &Program) -> Result<Vec<u8>, CompileError> {
         // Emit BASIC stub
         self.emit_basic_stub();
+
+        // Clear decimal mode flag for safety.
+        // On NMOS 6502/6510, the D flag is not automatically cleared after
+        // reset or when entering an interrupt. While BASIC clears it, we do
+        // this explicitly for robustness if the program is started directly.
+        self.emit_byte(opcodes::CLD);
 
         // First pass: collect function and variable info
         for item in &program.items {

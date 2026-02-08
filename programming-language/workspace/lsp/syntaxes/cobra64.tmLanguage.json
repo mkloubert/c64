@@ -201,6 +201,14 @@
         {
           "name": "support.function.builtin.random.cobra64",
           "match": "\\b(rand|rand_byte|rand_sbyte|rand_word|rand_sword|seed)\\b(?=\\s*\\()"
+        },
+        {
+          "name": "support.function.builtin.conversion.cobra64",
+          "match": "\\b(str|byte|word|sbyte|sword|fixed|float|bool)\\b(?=\\s*\\()"
+        },
+        {
+          "name": "support.function.builtin.string.cobra64",
+          "match": "\\b(str_at)\\b(?=\\s*\\()"
         }
       ]
     },

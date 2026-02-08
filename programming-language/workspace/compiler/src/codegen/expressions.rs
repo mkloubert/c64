@@ -135,8 +135,13 @@ impl ExpressionEmitter for CodeGenerator {
                         )
                     })?;
 
-                    let is_word_array =
-                        matches!(var.var_type, Type::WordArray(_) | Type::SwordArray(_));
+                    let is_word_array = matches!(
+                        var.var_type,
+                        Type::WordArray(_)
+                            | Type::SwordArray(_)
+                            | Type::FixedArray(_)
+                            | Type::FloatArray(_)
+                    );
 
                     // Generate index expression
                     self.generate_expression(index)?;

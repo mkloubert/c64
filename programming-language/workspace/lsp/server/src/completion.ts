@@ -221,6 +221,8 @@ function getTypeCompletions(): CompletionItem[] {
         { label: 'sbyte[]', doc: 'Signed byte array' },
         { label: 'sword[]', doc: 'Signed word array' },
         { label: 'bool[]', doc: 'Boolean array' },
+        { label: 'fixed[]', doc: 'Fixed-point array (12.4 format)' },
+        { label: 'float[]', doc: 'IEEE-754 float array' },
     ];
 
     return types.map((t, index) => ({

@@ -61,7 +61,7 @@ use functions::FunctionAnalyzer;
 use statements::StatementAnalyzer;
 
 use crate::ast::{Block, Program, TopLevelItem, Type};
-use crate::error::{CompileError, ErrorCode, Span};
+use crate::error::{CompileError, CompileWarning, ErrorCode, Span};
 
 /// The semantic analyzer.
 pub struct Analyzer {
@@ -69,6 +69,8 @@ pub struct Analyzer {
     pub symbols: SymbolTable,
     /// Collected errors.
     errors: Vec<CompileError>,
+    /// Collected warnings.
+    warnings: Vec<CompileWarning>,
     /// Analysis context.
     context: AnalysisContext,
 }
@@ -79,10 +81,26 @@ impl Analyzer {
         let mut analyzer = Self {
             symbols: SymbolTable::new(),
             errors: Vec::new(),
+            warnings: Vec::new(),
             context: AnalysisContext::default(),
         };
         analyzer.register_builtins();
         analyzer
+    }
+
+    /// Add a warning.
+    pub fn warning(&mut self, warning: CompileWarning) {
+        self.warnings.push(warning);
+    }
+
+    /// Get the collected warnings.
+    pub fn get_warnings(&self) -> &[CompileWarning] {
+        &self.warnings
+    }
+
+    /// Take the collected warnings.
+    pub fn take_warnings(&mut self) -> Vec<CompileWarning> {
+        std::mem::take(&mut self.warnings)
     }
 
     /// Analyze a program.
@@ -192,6 +210,16 @@ impl Default for Analyzer {
 pub fn analyze(program: &Program) -> Result<(), Vec<CompileError>> {
     let mut analyzer = Analyzer::new();
     analyzer.analyze(program)
+}
+
+/// Analyze a program and return both errors and warnings.
+pub fn analyze_with_warnings(
+    program: &Program,
+) -> (Result<(), Vec<CompileError>>, Vec<CompileWarning>) {
+    let mut analyzer = Analyzer::new();
+    let result = analyzer.analyze(program);
+    let warnings = analyzer.take_warnings();
+    (result, warnings)
 }
 
 #[cfg(test)]
@@ -595,10 +623,24 @@ mod tests {
     }
 
     #[test]
-    fn test_error_array_literal_float_element() {
-        // Float elements should fail
+    fn test_error_float_array_assigned_to_byte_array() {
+        // Float array cannot be assigned to byte array
         let result = analyze_source("def main():\n    arr: byte[] = [1.5, 2.0]");
-        assert!(has_error_code(&result, ErrorCode::ArrayElementTypeMismatch));
+        assert!(has_error_code(&result, ErrorCode::TypeMismatch));
+    }
+
+    #[test]
+    fn test_float_array_literal() {
+        // Float array literals are now supported
+        let result = analyze_source("def main():\n    arr: float[3] = [1.5, 2.0, 3.5]");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_fixed_array_literal() {
+        // Fixed array literals are now supported
+        let result = analyze_source("def main():\n    arr: fixed[2] = [fixed(1.5), fixed(2.0)]");
+        assert!(result.is_ok());
     }
 
     #[test]

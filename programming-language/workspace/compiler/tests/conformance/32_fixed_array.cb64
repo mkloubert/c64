@@ -1,0 +1,28 @@
+# Test Fixed Array Types
+# Tests declaration, initialization, indexing, and assignment
+
+def main():
+    # Test 1: Fixed array declaration with size
+    arr1: fixed[3]
+    arr1[0] = fixed(1.5)
+    arr1[1] = fixed(2.25)
+    arr1[2] = fixed(-0.5)
+    println(arr1[0])  # Expected: 1.5
+    println(arr1[1])  # Expected: 2.25
+    println(arr1[2])  # Expected: -0.5
+
+    # Test 2: Fixed array with literal initialization
+    arr2: fixed[3] = [fixed(10.0), fixed(20.5), fixed(30.25)]
+    println(arr2[0])  # Expected: 10.0
+    println(arr2[1])  # Expected: 20.5
+    println(arr2[2])  # Expected: 30.25
+
+    # Test 3: Fixed array indexing with variable
+    i: byte = 1
+    println(arr2[i])  # Expected: 20.5
+
+    # Test 4: Fixed array arithmetic
+    arr2[0] = arr2[0] + fixed(1.0)
+    println(arr2[0])  # Expected: 11.0
+
+    println("DONE")

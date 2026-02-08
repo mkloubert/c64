@@ -568,3 +568,184 @@ def main():
         "Generated code should be at least 100 bytes"
     );
 }
+
+// ============================================================================
+// Signed Shift Right Tests
+// ============================================================================
+
+#[test]
+fn test_sbyte_shift_right() {
+    // Tests arithmetic shift right for signed bytes
+    // -4 >> 1 should be -2 (arithmetic shift preserves sign)
+    let source = r#"
+def main():
+    x: sbyte = -4
+    y: sbyte = x >> 1
+    println(y)
+"#;
+    let result = cobra64::compile(source);
+    assert!(
+        result.is_ok(),
+        "sbyte shift right should compile: {:?}",
+        result.err()
+    );
+}
+
+#[test]
+fn test_sbyte_shift_right_multiple() {
+    // Tests multiple arithmetic shifts
+    // -8 >> 2 should be -2 (arithmetic shift)
+    let source = r#"
+def main():
+    x: sbyte = -8
+    y: sbyte = x >> 2
+    println(y)
+"#;
+    let result = cobra64::compile(source);
+    assert!(
+        result.is_ok(),
+        "sbyte multiple shift right should compile"
+    );
+}
+
+#[test]
+fn test_byte_shift_right_unsigned() {
+    // Tests logical shift right for unsigned bytes
+    // 128 >> 1 should be 64 (logical shift)
+    let source = r#"
+def main():
+    x: byte = 128
+    y: byte = x >> 1
+    println(y)
+"#;
+    let result = cobra64::compile(source);
+    assert!(
+        result.is_ok(),
+        "byte shift right should compile"
+    );
+}
+
+#[test]
+fn test_sbyte_shift_right_positive() {
+    // Positive signed values should shift like unsigned
+    // 8 >> 1 should be 4
+    let source = r#"
+def main():
+    x: sbyte = 8
+    y: sbyte = x >> 1
+    println(y)
+"#;
+    let result = cobra64::compile(source);
+    assert!(
+        result.is_ok(),
+        "positive sbyte shift right should compile"
+    );
+}
+
+// ============================================================================
+// Fixed to Signed Conversion Tests
+// ============================================================================
+
+#[test]
+fn test_fixed_to_sbyte_positive() {
+    // Tests fixed-point to signed byte conversion for positive values
+    let source = r#"
+def main():
+    f: fixed = 5.5
+    x: sbyte = sbyte(f)
+    println(x)
+"#;
+    let result = cobra64::compile(source);
+    assert!(
+        result.is_ok(),
+        "fixed to sbyte (positive) should compile: {:?}",
+        result.err()
+    );
+}
+
+#[test]
+fn test_fixed_to_sbyte_negative() {
+    // Tests fixed-point to signed byte conversion for negative values
+    // This requires arithmetic shift to preserve the sign
+    let source = r#"
+def main():
+    f: fixed = -5.5
+    x: sbyte = sbyte(f)
+    println(x)
+"#;
+    let result = cobra64::compile(source);
+    assert!(
+        result.is_ok(),
+        "fixed to sbyte (negative) should compile: {:?}",
+        result.err()
+    );
+}
+
+#[test]
+fn test_fixed_to_sword_positive() {
+    // Tests fixed-point to signed word conversion for positive values
+    let source = r#"
+def main():
+    f: fixed = 100.25
+    x: sword = sword(f)
+    println(x)
+"#;
+    let result = cobra64::compile(source);
+    assert!(
+        result.is_ok(),
+        "fixed to sword (positive) should compile: {:?}",
+        result.err()
+    );
+}
+
+#[test]
+fn test_fixed_to_sword_negative() {
+    // Tests fixed-point to signed word conversion for negative values
+    // This requires arithmetic shift to preserve the sign
+    let source = r#"
+def main():
+    f: fixed = -100.25
+    x: sword = sword(f)
+    println(x)
+"#;
+    let result = cobra64::compile(source);
+    assert!(
+        result.is_ok(),
+        "fixed to sword (negative) should compile: {:?}",
+        result.err()
+    );
+}
+
+#[test]
+fn test_fixed_to_byte_unsigned() {
+    // Tests fixed-point to unsigned byte conversion (logical shift)
+    let source = r#"
+def main():
+    f: fixed = 100.75
+    x: byte = byte(f)
+    println(x)
+"#;
+    let result = cobra64::compile(source);
+    assert!(
+        result.is_ok(),
+        "fixed to byte (unsigned) should compile: {:?}",
+        result.err()
+    );
+}
+
+#[test]
+fn test_fixed_to_word_unsigned() {
+    // Tests fixed-point to unsigned word conversion (logical shift)
+    let source = r#"
+def main():
+    f: fixed = 100.5
+    x: word = word(f)
+    println(x)
+"#;
+    let result = cobra64::compile(source);
+    assert!(
+        result.is_ok(),
+        "fixed to word (unsigned) should compile: {:?}",
+        result.err()
+    );
+}

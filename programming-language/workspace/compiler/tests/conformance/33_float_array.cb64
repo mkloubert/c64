@@ -1,0 +1,28 @@
+# Test Float Array Types
+# Tests declaration, initialization, indexing, and assignment
+
+def main():
+    # Test 1: Float array declaration with size
+    arr1: float[3]
+    arr1[0] = 1.5
+    arr1[1] = 2.25
+    arr1[2] = -0.5
+    println(arr1[0])  # Expected: 1.5
+    println(arr1[1])  # Expected: 2.25
+    println(arr1[2])  # Expected: -0.5
+
+    # Test 2: Float array with literal initialization
+    arr2: float[3] = [10.0, 20.5, 30.25]
+    println(arr2[0])  # Expected: 10.0
+    println(arr2[1])  # Expected: 20.5
+    println(arr2[2])  # Expected: 30.25
+
+    # Test 3: Float array indexing with variable
+    i: byte = 1
+    println(arr2[i])  # Expected: 20.5
+
+    # Test 4: Float array arithmetic
+    arr2[0] = arr2[0] + 1.0
+    println(arr2[0])  # Expected: 11.0
+
+    println("DONE")

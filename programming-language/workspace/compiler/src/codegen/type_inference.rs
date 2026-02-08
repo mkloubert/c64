@@ -120,6 +120,8 @@ impl TypeInference for CodeGenerator {
                         Type::Word => Type::WordArray(Some(len)),
                         Type::Sbyte => Type::SbyteArray(Some(len)),
                         Type::Sword => Type::SwordArray(Some(len)),
+                        Type::Fixed => Type::FixedArray(Some(len)),
+                        Type::Float => Type::FloatArray(Some(len)),
                         _ => Type::ByteArray(Some(len)),
                     }
                 }
@@ -174,12 +176,16 @@ impl TypeInference for CodeGenerator {
                     | Type::WordArray(Some(size))
                     | Type::BoolArray(Some(size))
                     | Type::SbyteArray(Some(size))
-                    | Type::SwordArray(Some(size)) => Ok(*size),
+                    | Type::SwordArray(Some(size))
+                    | Type::FixedArray(Some(size))
+                    | Type::FloatArray(Some(size)) => Ok(*size),
                     Type::ByteArray(None)
                     | Type::WordArray(None)
                     | Type::BoolArray(None)
                     | Type::SbyteArray(None)
-                    | Type::SwordArray(None) => {
+                    | Type::SwordArray(None)
+                    | Type::FixedArray(None)
+                    | Type::FloatArray(None) => {
                         // Array without known size - should not happen after analysis
                         Err(CompileError::new(
                             ErrorCode::TypeMismatch,

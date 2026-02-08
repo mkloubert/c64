@@ -1,0 +1,40 @@
+# Test String Conversions
+# Tests str() for numeric-to-string and byte()/word() for string-to-numeric
+
+def main():
+    # Test 1: str() for byte value
+    b: byte = 42
+    s1: string = str(b)
+    println(s1)  # Expected: 42
+
+    # Test 2: str() for word value
+    w: word = 12345
+    s2: string = str(w)
+    println(s2)  # Expected: 12345
+
+    # Test 3: str() for zero
+    z: byte = 0
+    s3: string = str(z)
+    println(s3)  # Expected: 0
+
+    # Test 4: str() for max byte
+    m: byte = 255
+    s4: string = str(m)
+    println(s4)  # Expected: 255
+
+    # Test 5: byte() parsing a string
+    s5: string = "123"
+    b2: byte = byte(s5)
+    println(b2)  # Expected: 123
+
+    # Test 6: word() parsing a string
+    s6: string = "54321"
+    w2: word = word(s6)
+    println(w2)  # Expected: 54321
+
+    # Test 7: String with leading spaces
+    s7: string = "  99"
+    b3: byte = byte(s7)
+    println(b3)  # Expected: 99
+
+    println("DONE")

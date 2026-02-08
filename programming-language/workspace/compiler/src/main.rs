@@ -22,7 +22,7 @@ use clap::Parser;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use cobra64::error::format_error;
+use cobra64::error::{format_error, format_warning};
 use cobra64::output::{format_from_extension, write_output};
 
 /// Cobra64 - A modern compiler for the Commodore 64
@@ -108,13 +108,18 @@ fn main() -> ExitCode {
         .and_then(|s| s.to_str())
         .unwrap_or("<input>");
 
-    let code = match cobra64::compile(&source) {
-        Ok(code) => code,
+    let (code, warnings) = match cobra64::compile_with_warnings(&source) {
+        Ok((code, warnings)) => (code, warnings),
         Err(e) => {
             eprint!("{}", format_error(&e, &source, Some(primary_filename)));
             return ExitCode::from(1);
         }
     };
+
+    // Print warnings (they don't prevent compilation)
+    for warning in &warnings {
+        eprint!("{}", format_warning(warning, &source, Some(primary_filename)));
+    }
 
     if cli.verbose {
         println!("Generated {} bytes of code", code.len());

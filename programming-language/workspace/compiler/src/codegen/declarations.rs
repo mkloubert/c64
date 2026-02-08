@@ -89,6 +89,8 @@ impl DeclarationEmitter for CodeGenerator {
                     Type::BoolArray(None) => Type::BoolArray(Some(len)),
                     Type::SbyteArray(None) => Type::SbyteArray(Some(len)),
                     Type::SwordArray(None) => Type::SwordArray(Some(len)),
+                    Type::FixedArray(None) => Type::FixedArray(Some(len)),
+                    Type::FloatArray(None) => Type::FloatArray(Some(len)),
                     _ => var_type,
                 };
             }
@@ -142,7 +144,7 @@ fn generate_array_literal_init(
 ) -> Result<(), CompileError> {
     let element_type = array_type.element_type().unwrap_or(Type::Byte);
     let element_size = match element_type {
-        Type::Word | Type::Sword => 2,
+        Type::Word | Type::Sword | Type::Fixed | Type::Float => 2,
         _ => 1, // Byte, Sbyte, Bool
     };
 
@@ -161,7 +163,7 @@ fn generate_array_literal_init(
 
         // Store the value at the element address
         match element_type {
-            Type::Word | Type::Sword => {
+            Type::Word | Type::Sword | Type::Fixed | Type::Float => {
                 // Store 16-bit value (A=low, X=high)
                 gen.emit_abs(opcodes::STA_ABS, elem_address);
                 gen.emit_byte(opcodes::STX_ABS);

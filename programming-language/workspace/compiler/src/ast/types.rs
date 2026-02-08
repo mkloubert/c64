@@ -45,6 +45,10 @@ pub enum Type {
     SbyteArray(Option<u16>),
     /// Sword array (signed 16-bit elements).
     SwordArray(Option<u16>),
+    /// Fixed array (16-bit fixed-point elements, 12.4 format).
+    FixedArray(Option<u16>),
+    /// Float array (16-bit IEEE-754 binary16 elements).
+    FloatArray(Option<u16>),
     /// Void (no value, for functions).
     Void,
 }
@@ -66,6 +70,10 @@ impl Type {
             Type::SbyteArray(None) => 0,              // Unknown size
             Type::SwordArray(Some(n)) => (*n as usize) * 2, // 2 bytes per sword
             Type::SwordArray(None) => 0,              // Unknown size
+            Type::FixedArray(Some(n)) => (*n as usize) * 2, // 2 bytes per fixed
+            Type::FixedArray(None) => 0,              // Unknown size
+            Type::FloatArray(Some(n)) => (*n as usize) * 2, // 2 bytes per float
+            Type::FloatArray(None) => 0,              // Unknown size
             Type::Void => 0,
         }
     }
@@ -104,6 +112,8 @@ impl Type {
                 | Type::BoolArray(_)
                 | Type::SbyteArray(_)
                 | Type::SwordArray(_)
+                | Type::FixedArray(_)
+                | Type::FloatArray(_)
         )
     }
 
@@ -115,6 +125,8 @@ impl Type {
             Type::BoolArray(_) => Some(Type::Bool),
             Type::SbyteArray(_) => Some(Type::Sbyte),
             Type::SwordArray(_) => Some(Type::Sword),
+            Type::FixedArray(_) => Some(Type::Fixed),
+            Type::FloatArray(_) => Some(Type::Float),
             _ => None,
         }
     }
@@ -126,26 +138,23 @@ impl Type {
         }
 
         // Integer type promotion rules
+        // SAFETY: Only allow implicit conversions that are always safe (no data loss)
         match (self, target) {
-            // Unsigned to larger unsigned
+            // Unsigned to larger unsigned (safe: widening)
             (Type::Byte, Type::Word) => true,
             // Unsigned to larger signed (safe: byte 0-255 fits in sword -32768..32767)
             (Type::Byte, Type::Sword) => true,
-            // Signed to larger signed
+            // Signed to larger signed (safe: widening with sign extension)
             (Type::Sbyte, Type::Sword) => true,
-            // Byte to sbyte: allowed for literals, range checked at compile time
-            // This allows `x: sbyte = 127` to work (127 is a valid sbyte value)
-            (Type::Byte, Type::Sbyte) => true,
-            // Word to sword: allowed for literals, range checked at compile time
-            // This allows `x: sword = 32767` to work (32767 is a valid sword value)
-            (Type::Word, Type::Sword) => true,
 
-            // Integer to fixed: allowed (value becomes N.0)
-            // Range is checked at compile time (-2048 to 2047 for integer part)
+            // REMOVED: Byte to sbyte - values 128-255 become negative, require explicit cast
+            // REMOVED: Word to sword - values > 32767 become negative, require explicit cast
+
+            // Small integers to fixed: allowed (byte/sbyte always fit in fixed range)
             (Type::Byte, Type::Fixed) => true,
             (Type::Sbyte, Type::Fixed) => true,
-            (Type::Word, Type::Fixed) => true, // Range checked at compile time
-            (Type::Sword, Type::Fixed) => true, // Range checked at compile time
+            // REMOVED: Word to fixed - values > 2047 overflow, require explicit cast
+            // REMOVED: Sword to fixed - values outside -2048..2047 overflow, require explicit cast
 
             // Integer to float: allowed (may lose precision for large values)
             (Type::Byte, Type::Float) => true,
@@ -156,6 +165,15 @@ impl Type {
             // Fixed to float: allowed (fixed range fits in float range)
             (Type::Fixed, Type::Float) => true,
 
+            // Bool to integer: allowed (true=1, false=0, always safe)
+            (Type::Bool, Type::Byte) => true,
+            (Type::Bool, Type::Word) => true,
+            (Type::Bool, Type::Sbyte) => true,
+            (Type::Bool, Type::Sword) => true,
+
+            // Integer to bool: requires explicit cast (non-zero becomes true)
+            // This is NOT implicit - use bool(x) syntax
+
             // Array type compatibility:
             // - byte[n] can be assigned to byte[] (unsized accepts any size)
             // - byte[n] can be assigned to byte[n] (same size) - handled by == check above
@@ -165,6 +183,8 @@ impl Type {
             (Type::BoolArray(Some(_)), Type::BoolArray(None)) => true,
             (Type::SbyteArray(Some(_)), Type::SbyteArray(None)) => true,
             (Type::SwordArray(Some(_)), Type::SwordArray(None)) => true,
+            (Type::FixedArray(Some(_)), Type::FixedArray(None)) => true,
+            (Type::FloatArray(Some(_)), Type::FloatArray(None)) => true,
 
             // Float to fixed: requires explicit cast (potential precision/range loss)
             // Fixed to integer: requires explicit cast (truncation)
@@ -247,6 +267,8 @@ impl Type {
             Type::BoolArray(_) => "bool[]",
             Type::SbyteArray(_) => "sbyte[]",
             Type::SwordArray(_) => "sword[]",
+            Type::FixedArray(_) => "fixed[]",
+            Type::FloatArray(_) => "float[]",
             Type::Void => "void",
         }
     }
@@ -265,6 +287,10 @@ impl std::fmt::Display for Type {
             Type::SbyteArray(None) => write!(f, "sbyte[]"),
             Type::SwordArray(Some(n)) => write!(f, "sword[{}]", n),
             Type::SwordArray(None) => write!(f, "sword[]"),
+            Type::FixedArray(Some(n)) => write!(f, "fixed[{}]", n),
+            Type::FixedArray(None) => write!(f, "fixed[]"),
+            Type::FloatArray(Some(n)) => write!(f, "float[{}]", n),
+            Type::FloatArray(None) => write!(f, "float[]"),
             _ => write!(f, "{}", self.name()),
         }
     }
@@ -299,6 +325,10 @@ mod tests {
         assert_eq!(Type::SbyteArray(None).size(), 0);
         assert_eq!(Type::SwordArray(Some(10)).size(), 20);
         assert_eq!(Type::SwordArray(None).size(), 0);
+        assert_eq!(Type::FixedArray(Some(10)).size(), 20);
+        assert_eq!(Type::FixedArray(None).size(), 0);
+        assert_eq!(Type::FloatArray(Some(10)).size(), 20);
+        assert_eq!(Type::FloatArray(None).size(), 0);
     }
 
     #[test]
@@ -364,6 +394,8 @@ mod tests {
         assert!(!Type::Bool.is_array());
         assert!(!Type::Sbyte.is_array());
         assert!(!Type::Sword.is_array());
+        assert!(!Type::Fixed.is_array());
+        assert!(!Type::Float.is_array());
         assert!(Type::ByteArray(Some(10)).is_array());
         assert!(Type::ByteArray(None).is_array());
         assert!(Type::WordArray(Some(10)).is_array());
@@ -374,6 +406,10 @@ mod tests {
         assert!(Type::SbyteArray(None).is_array());
         assert!(Type::SwordArray(Some(10)).is_array());
         assert!(Type::SwordArray(None).is_array());
+        assert!(Type::FixedArray(Some(10)).is_array());
+        assert!(Type::FixedArray(None).is_array());
+        assert!(Type::FloatArray(Some(10)).is_array());
+        assert!(Type::FloatArray(None).is_array());
     }
 
     #[test]
@@ -383,6 +419,8 @@ mod tests {
         assert_eq!(Type::BoolArray(Some(10)).element_type(), Some(Type::Bool));
         assert_eq!(Type::SbyteArray(Some(10)).element_type(), Some(Type::Sbyte));
         assert_eq!(Type::SwordArray(Some(10)).element_type(), Some(Type::Sword));
+        assert_eq!(Type::FixedArray(Some(10)).element_type(), Some(Type::Fixed));
+        assert_eq!(Type::FloatArray(Some(10)).element_type(), Some(Type::Float));
         assert_eq!(Type::Byte.element_type(), None);
         assert_eq!(Type::String.element_type(), None);
     }
@@ -399,11 +437,12 @@ mod tests {
 
     #[test]
     fn test_assignable_to_fixed() {
-        // All integers can be assigned to fixed
+        // Small integers (byte/sbyte) can be implicitly assigned to fixed
         assert!(Type::Byte.is_assignable_to(&Type::Fixed));
         assert!(Type::Sbyte.is_assignable_to(&Type::Fixed));
-        assert!(Type::Word.is_assignable_to(&Type::Fixed));
-        assert!(Type::Sword.is_assignable_to(&Type::Fixed));
+        // Large integers (word/sword) require explicit cast (overflow risk)
+        assert!(!Type::Word.is_assignable_to(&Type::Fixed));
+        assert!(!Type::Sword.is_assignable_to(&Type::Fixed));
         // Fixed to itself
         assert!(Type::Fixed.is_assignable_to(&Type::Fixed));
         // Fixed to float is allowed
@@ -544,6 +583,8 @@ mod tests {
         assert_eq!(Type::BoolArray(None).name(), "bool[]");
         assert_eq!(Type::SbyteArray(None).name(), "sbyte[]");
         assert_eq!(Type::SwordArray(None).name(), "sword[]");
+        assert_eq!(Type::FixedArray(None).name(), "fixed[]");
+        assert_eq!(Type::FloatArray(None).name(), "float[]");
     }
 
     #[test]
@@ -567,6 +608,10 @@ mod tests {
         assert_eq!(format!("{}", Type::SbyteArray(None)), "sbyte[]");
         assert_eq!(format!("{}", Type::SwordArray(Some(5))), "sword[5]");
         assert_eq!(format!("{}", Type::SwordArray(None)), "sword[]");
+        assert_eq!(format!("{}", Type::FixedArray(Some(10))), "fixed[10]");
+        assert_eq!(format!("{}", Type::FixedArray(None)), "fixed[]");
+        assert_eq!(format!("{}", Type::FloatArray(Some(5))), "float[5]");
+        assert_eq!(format!("{}", Type::FloatArray(None)), "float[]");
     }
 
     #[test]
@@ -602,5 +647,20 @@ mod tests {
         // Different array types are not compatible
         assert!(!Type::SbyteArray(Some(10)).is_assignable_to(&Type::ByteArray(None)));
         assert!(!Type::ByteArray(Some(10)).is_assignable_to(&Type::SbyteArray(None)));
+    }
+
+    #[test]
+    fn test_fixed_float_array_assignable() {
+        // Sized to unsized is allowed
+        assert!(Type::FixedArray(Some(10)).is_assignable_to(&Type::FixedArray(None)));
+        assert!(Type::FloatArray(Some(10)).is_assignable_to(&Type::FloatArray(None)));
+        // Unsized to sized is not allowed
+        assert!(!Type::FixedArray(None).is_assignable_to(&Type::FixedArray(Some(10))));
+        assert!(!Type::FloatArray(None).is_assignable_to(&Type::FloatArray(Some(10))));
+        // Different array types are not compatible
+        assert!(!Type::FixedArray(Some(10)).is_assignable_to(&Type::FloatArray(None)));
+        assert!(!Type::FloatArray(Some(10)).is_assignable_to(&Type::FixedArray(None)));
+        assert!(!Type::FixedArray(Some(10)).is_assignable_to(&Type::WordArray(None)));
+        assert!(!Type::FloatArray(Some(10)).is_assignable_to(&Type::WordArray(None)));
     }
 }

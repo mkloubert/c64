@@ -197,7 +197,10 @@ impl CodeGenerator {
             )
         })?;
 
-        let is_word_array = matches!(var.var_type, Type::WordArray(_) | Type::SwordArray(_));
+        let is_word_array = matches!(
+            var.var_type,
+            Type::WordArray(_) | Type::SwordArray(_) | Type::FixedArray(_) | Type::FloatArray(_)
+        );
         let var_address = var.address;
 
         match assign.op {

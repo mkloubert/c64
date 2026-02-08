@@ -196,7 +196,17 @@ impl BinaryOpsEmitter for CodeGenerator {
                 self.emit_byte(opcodes::CPX_IMM);
                 self.emit_byte(0);
                 self.emit_branch(opcodes::BEQ, &done_label);
-                self.emit_byte(opcodes::LSR_ACC);
+                if use_signed {
+                    // Arithmetic shift right for signed types:
+                    // CMP #$80 sets carry if bit 7 is set (negative)
+                    // ROR rotates carry into bit 7, preserving the sign
+                    self.emit_byte(opcodes::CMP_IMM);
+                    self.emit_byte(0x80);
+                    self.emit_byte(opcodes::ROR_ACC);
+                } else {
+                    // Logical shift right for unsigned types
+                    self.emit_byte(opcodes::LSR_ACC);
+                }
                 self.emit_byte(opcodes::DEX);
                 self.emit_jmp(&loop_label);
                 self.define_label(&done_label);

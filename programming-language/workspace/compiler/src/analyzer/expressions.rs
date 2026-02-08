@@ -27,7 +27,7 @@ use super::operators::OperatorChecker;
 use super::type_check::TypeChecker;
 use super::Analyzer;
 use crate::ast::{Expr, ExprKind, Type};
-use crate::error::{CompileError, ErrorCode, Span};
+use crate::error::{CompileError, CompileWarning, ErrorCode, Span, WarningCode};
 
 /// Extension trait for expression analysis.
 pub trait ExpressionAnalyzer {
@@ -42,6 +42,24 @@ pub trait ExpressionAnalyzer {
 
     /// Check that array literal elements are compatible with declared element type.
     fn check_array_literal_elements(&mut self, array_type: &Type, elements: &[Expr]);
+
+    /// Check for potentially dangerous type casts and emit warnings.
+    fn check_type_cast_warnings(
+        &mut self,
+        source_type: &Type,
+        target_type: &Type,
+        inner_expr: &Expr,
+        span: &Span,
+    );
+}
+
+/// Check if an expression is a DecimalLiteral (including through groupings).
+fn is_decimal_literal(expr: &Expr) -> bool {
+    match &expr.kind {
+        ExprKind::DecimalLiteral(_) => true,
+        ExprKind::Grouped(inner) => is_decimal_literal(inner),
+        _ => false,
+    }
 }
 
 impl ExpressionAnalyzer for Analyzer {
@@ -70,9 +88,29 @@ impl ExpressionAnalyzer for Analyzer {
                 }
             }
             ExprKind::BinaryOp { left, op, right } => {
+                // Handle DecimalLiteral type adaptation:
+                // If one operand is a DecimalLiteral and the other is Fixed,
+                // treat the DecimalLiteral as Fixed to preserve type consistency.
+                let left_is_decimal = is_decimal_literal(left);
+                let right_is_decimal = is_decimal_literal(right);
+
                 let left_type = self.analyze_expression(left);
                 let right_type = self.analyze_expression(right);
-                self.check_binary_op(&left_type, op, &right_type, &expr.span)
+
+                // Adapt DecimalLiteral type based on the other operand
+                let (adapted_left, adapted_right) = match (&left_type, &right_type) {
+                    (Some(Type::Float), Some(Type::Fixed)) if left_is_decimal => {
+                        // Left is DecimalLiteral, right is Fixed -> treat left as Fixed
+                        (Some(Type::Fixed), right_type)
+                    }
+                    (Some(Type::Fixed), Some(Type::Float)) if right_is_decimal => {
+                        // Left is Fixed, right is DecimalLiteral -> treat right as Fixed
+                        (left_type, Some(Type::Fixed))
+                    }
+                    _ => (left_type, right_type),
+                };
+
+                self.check_binary_op(&adapted_left, op, &adapted_right, &expr.span)
             }
             ExprKind::UnaryOp { op, operand } => {
                 let operand_type = self.analyze_expression(operand);
@@ -103,7 +141,13 @@ impl ExpressionAnalyzer for Analyzer {
                 target_type,
                 expr: inner,
             } => {
-                self.analyze_expression(inner);
+                let source_type = self.analyze_expression(inner);
+
+                // Check for potentially dangerous casts and emit warnings
+                if let Some(ref src_type) = source_type {
+                    self.check_type_cast_warnings(src_type, target_type, inner, &expr.span);
+                }
+
                 Some(target_type.clone())
             }
             ExprKind::FixedLiteral(_) => Some(Type::Fixed),
@@ -133,6 +177,8 @@ impl ExpressionAnalyzer for Analyzer {
         let mut has_bool = false;
         let mut has_integer = false;
         let mut has_negative = false;
+        let mut has_fixed = false;
+        let mut has_float = false;
         let mut max_value: i64 = 0;
         let mut min_value: i64 = 0;
         let mut has_error = false;
@@ -182,13 +228,11 @@ impl ExpressionAnalyzer for Analyzer {
                             has_negative = true; // Assume might be negative
                         }
                     }
-                    Type::Fixed | Type::Float => {
-                        self.error(CompileError::new(
-                            ErrorCode::ArrayElementTypeMismatch,
-                            format!("Array literals do not support {} elements", elem_type),
-                            elem.span.clone(),
-                        ));
-                        has_error = true;
+                    Type::Fixed => {
+                        has_fixed = true;
+                    }
+                    Type::Float => {
+                        has_float = true;
                     }
                     Type::String => {
                         self.error(CompileError::new(
@@ -216,11 +260,33 @@ impl ExpressionAnalyzer for Analyzer {
             return None;
         }
 
-        // Check for mixed types (bools and integers)
-        if has_bool && has_integer {
+        // Check for mixed types
+        let type_count = [has_bool, has_integer, has_fixed, has_float]
+            .iter()
+            .filter(|&&x| x)
+            .count();
+
+        if type_count > 1 {
+            // Determine what types are mixed
+            let mut types_present = Vec::new();
+            if has_bool {
+                types_present.push("bool");
+            }
+            if has_integer {
+                types_present.push("integer");
+            }
+            if has_fixed {
+                types_present.push("fixed");
+            }
+            if has_float {
+                types_present.push("float");
+            }
             self.error(CompileError::new(
                 ErrorCode::ArrayElementTypeMismatch,
-                "Cannot mix boolean and integer elements in array literal",
+                format!(
+                    "Cannot mix {} elements in array literal",
+                    types_present.join(" and ")
+                ),
                 span.clone(),
             ));
             return None;
@@ -228,9 +294,13 @@ impl ExpressionAnalyzer for Analyzer {
 
         let array_len = elements.len() as u16;
 
-        // Determine array type based on value ranges
+        // Determine array type based on element types
         if has_bool {
             Some(Type::BoolArray(Some(array_len)))
+        } else if has_fixed {
+            Some(Type::FixedArray(Some(array_len)))
+        } else if has_float {
+            Some(Type::FloatArray(Some(array_len)))
         } else if has_negative {
             // Signed array type inference:
             // - All values fit in sbyte (-128 to 127) → sbyte[]
@@ -273,7 +343,9 @@ impl ExpressionAnalyzer for Analyzer {
             | Type::WordArray(Some(n))
             | Type::BoolArray(Some(n))
             | Type::SbyteArray(Some(n))
-            | Type::SwordArray(Some(n)) => Some(*n as usize),
+            | Type::SwordArray(Some(n))
+            | Type::FixedArray(Some(n))
+            | Type::FloatArray(Some(n)) => Some(*n as usize),
             _ => None,
         };
 
@@ -355,6 +427,119 @@ impl ExpressionAnalyzer for Analyzer {
                     _ => {}
                 }
             }
+        }
+    }
+
+    fn check_type_cast_warnings(
+        &mut self,
+        source_type: &Type,
+        target_type: &Type,
+        inner_expr: &Expr,
+        span: &Span,
+    ) {
+        // Try to get constant value for literal checks
+        let const_value = self.try_eval_constant(inner_expr);
+
+        match (source_type, target_type) {
+            // Warning: Truncation when casting to smaller type
+            (Type::Word, Type::Byte) | (Type::Sword, Type::Sbyte) => {
+                if let Some(val) = const_value {
+                    let truncated = (val & 0xFF) as i8 as i64;
+                    if val != truncated && val > 255 {
+                        self.warning(CompileWarning::new(
+                            WarningCode::LiteralTruncation,
+                            format!(
+                                "Value {} will be truncated to {} when cast to {}",
+                                val,
+                                val & 0xFF,
+                                target_type
+                            ),
+                            span.clone(),
+                        ));
+                    }
+                }
+            }
+
+            // Warning: Large integer to float may lose precision
+            (Type::Word, Type::Float) | (Type::Sword, Type::Float) => {
+                if let Some(val) = const_value {
+                    // IEEE-754 binary16 has 11 bits of mantissa precision
+                    // Values > 2048 may lose precision
+                    if val.abs() > 2048 {
+                        self.warning(CompileWarning::new(
+                            WarningCode::PrecisionLoss,
+                            format!(
+                                "Large value {} may lose precision when converted to float",
+                                val
+                            ),
+                            span.clone(),
+                        ));
+                    }
+                }
+            }
+
+            // Warning: Value overflows fixed-point range
+            (Type::Word, Type::Fixed) | (Type::Sword, Type::Fixed) => {
+                if let Some(val) = const_value {
+                    if !(-2048..=2047).contains(&val) {
+                        self.warning(CompileWarning::new(
+                            WarningCode::FixedPointOverflow,
+                            format!(
+                                "Value {} overflows fixed-point range (-2048 to 2047)",
+                                val
+                            ),
+                            span.clone(),
+                        ));
+                    }
+                }
+            }
+
+            // Warning: Negative value cast to unsigned (same size)
+            (Type::Sbyte, Type::Byte) | (Type::Sword, Type::Word) => {
+                if let Some(val) = const_value {
+                    if val < 0 {
+                        let wrapped = if *target_type == Type::Byte {
+                            (val as i8 as u8) as i64
+                        } else {
+                            (val as i16 as u16) as i64
+                        };
+                        self.warning(CompileWarning::new(
+                            WarningCode::NegativeToUnsigned,
+                            format!(
+                                "Negative value {} will wrap to {} when cast to {}",
+                                val, wrapped, target_type
+                            ),
+                            span.clone(),
+                        ));
+                    }
+                } else {
+                    // Variable conversion - warn about potential issues
+                    self.warning(CompileWarning::new(
+                        WarningCode::SignedToUnsigned,
+                        format!(
+                            "Converting {} to {} may produce unexpected results for negative values",
+                            source_type, target_type
+                        ),
+                        span.clone(),
+                    ));
+                }
+            }
+
+            // Warning: Signed to wider unsigned may change value (for variables)
+            (Type::Sbyte, Type::Word) => {
+                if const_value.is_none() {
+                    self.warning(CompileWarning::new(
+                        WarningCode::SignedToUnsigned,
+                        format!(
+                            "Converting {} to {} may produce unexpected results for negative values",
+                            source_type, target_type
+                        ),
+                        span.clone(),
+                    ));
+                }
+            }
+
+            _ => {}
         }
     }
 }

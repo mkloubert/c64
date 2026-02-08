@@ -65,7 +65,10 @@ pub mod parser;
 
 // Re-export commonly used types
 pub use ast::{Program, Type};
-pub use error::{format_error, CompileError, ErrorCode, Result, SourceLocation, Span};
+pub use error::{
+    format_error, format_warning, CompileError, CompileWarning, ErrorCode, Result, SourceLocation,
+    Span, WarningCode,
+};
 pub use lexer::Token;
 
 /// The version of the Cobra64 compiler.
@@ -101,18 +104,30 @@ pub const NAME: &str = "Cobra64";
 /// }
 /// ```
 pub fn compile(source: &str) -> std::result::Result<Vec<u8>, CompileError> {
+    let (code, _warnings) = compile_with_warnings(source)?;
+    Ok(code)
+}
+
+/// Compile source code and return both machine code and warnings.
+///
+/// This is similar to `compile()` but also returns any warnings generated
+/// during compilation. Warnings do not prevent compilation from succeeding.
+pub fn compile_with_warnings(
+    source: &str,
+) -> std::result::Result<(Vec<u8>, Vec<CompileWarning>), CompileError> {
     // Tokenize
     let tokens = lexer::tokenize(source)?;
 
     // Parse
     let ast = parser::parse(&tokens)?;
 
-    // Analyze
-    analyzer::analyze(&ast)
-        .map_err(|errors| errors.into_iter().next().expect("At least one error"))?;
+    // Analyze with warnings
+    let (result, warnings) = analyzer::analyze_with_warnings(&ast);
+    result.map_err(|errors| errors.into_iter().next().expect("At least one error"))?;
 
     // Generate code
-    codegen::generate(&ast)
+    let code = codegen::generate(&ast)?;
+    Ok((code, warnings))
 }
 
 #[cfg(test)]

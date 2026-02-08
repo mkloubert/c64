@@ -76,6 +76,147 @@ impl From<Span> for Range<usize> {
     }
 }
 
+/// Warning codes for the compiler.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WarningCode {
+    // Type conversion warnings (W001-W010)
+    /// Literal value will be truncated when cast to target type
+    LiteralTruncation,
+    /// Large integer to float conversion may lose precision
+    PrecisionLoss,
+    /// Value overflows fixed-point range (-2048 to 2047)
+    FixedPointOverflow,
+    /// Negative value cast to unsigned type (wraps around)
+    NegativeToUnsigned,
+    /// Signed to unsigned conversion may change value
+    SignedToUnsigned,
+}
+
+impl std::fmt::Display for WarningCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.code())
+    }
+}
+
+impl WarningCode {
+    /// Get the numeric code for this warning.
+    pub fn code(&self) -> &'static str {
+        match self {
+            WarningCode::LiteralTruncation => "W001",
+            WarningCode::PrecisionLoss => "W002",
+            WarningCode::FixedPointOverflow => "W003",
+            WarningCode::NegativeToUnsigned => "W004",
+            WarningCode::SignedToUnsigned => "W005",
+        }
+    }
+}
+
+/// A compiler warning with source location.
+#[derive(Debug)]
+pub struct CompileWarning {
+    /// The warning code.
+    pub code: WarningCode,
+    /// The warning message.
+    pub message: String,
+    /// The source span where the warning occurred.
+    pub span: Span,
+}
+
+impl CompileWarning {
+    /// Create a new compile warning.
+    pub fn new(code: WarningCode, message: impl Into<String>, span: Span) -> Self {
+        Self {
+            code,
+            message: message.into(),
+            span,
+        }
+    }
+}
+
+/// Format a warning with source context.
+pub fn format_warning(warning: &CompileWarning, source: &str, filename: Option<&str>) -> String {
+    let loc = SourceLocation::from_offset(source, warning.span.start);
+    let filename = filename.unwrap_or("<input>");
+
+    let mut output = String::new();
+
+    // Warning header
+    output.push_str(&format!(
+        "warning[{}]: {}\n",
+        warning.code.code(),
+        warning.message
+    ));
+
+    // Location
+    output.push_str(&format!("  --> {}:{}:{}\n", filename, loc.line, loc.column));
+
+    // Source context
+    let line_num_width = loc.line.to_string().len();
+    output.push_str(&format!("{:>width$} |\n", "", width = line_num_width));
+    output.push_str(&format!(
+        "{:>width$} | {}\n",
+        loc.line,
+        loc.line_content,
+        width = line_num_width
+    ));
+
+    // Underline the warning span
+    let underline_start = loc.column - 1;
+    let underline_len = (warning.span.end - warning.span.start)
+        .max(1)
+        .min(loc.line_content.len().saturating_sub(underline_start));
+    output.push_str(&format!(
+        "{:>width$} | {:>start$}{}\n",
+        "",
+        "",
+        "^".repeat(underline_len),
+        width = line_num_width,
+        start = underline_start
+    ));
+
+    output
+}
+
+/// A collection of compile warnings.
+#[derive(Debug, Default)]
+pub struct Warnings {
+    warnings: Vec<CompileWarning>,
+}
+
+impl Warnings {
+    /// Create a new empty warning collection.
+    pub fn new() -> Self {
+        Self {
+            warnings: Vec::new(),
+        }
+    }
+
+    /// Add a warning to the collection.
+    pub fn push(&mut self, warning: CompileWarning) {
+        self.warnings.push(warning);
+    }
+
+    /// Check if there are any warnings.
+    pub fn has_warnings(&self) -> bool {
+        !self.warnings.is_empty()
+    }
+
+    /// Get the number of warnings.
+    pub fn len(&self) -> usize {
+        self.warnings.len()
+    }
+
+    /// Check if the collection is empty.
+    pub fn is_empty(&self) -> bool {
+        self.warnings.is_empty()
+    }
+
+    /// Get an iterator over the warnings.
+    pub fn iter(&self) -> impl Iterator<Item = &CompileWarning> {
+        self.warnings.iter()
+    }
+}
+
 /// Error codes for the compiler.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorCode {

@@ -446,7 +446,9 @@ impl<'a> ExpressionParser for Parser<'a> {
             | Token::Sbyte
             | Token::Sword
             | Token::Fixed
-            | Token::Float => {
+            | Token::Float
+            | Token::Bool
+            | Token::Str => {
                 let target_type = match token {
                     Token::Byte => Type::Byte,
                     Token::Word => Type::Word,
@@ -454,6 +456,8 @@ impl<'a> ExpressionParser for Parser<'a> {
                     Token::Sword => Type::Sword,
                     Token::Fixed => Type::Fixed,
                     Token::Float => Type::Float,
+                    Token::Bool => Type::Bool,
+                    Token::Str => Type::String,
                     _ => unreachable!(),
                 };
 

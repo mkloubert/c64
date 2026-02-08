@@ -90,9 +90,11 @@ impl<'a> TypeParser<'a> for Parser<'a> {
                 Type::Bool => Ok(Type::BoolArray(size)),
                 Type::Sbyte => Ok(Type::SbyteArray(size)),
                 Type::Sword => Ok(Type::SwordArray(size)),
+                Type::Fixed => Ok(Type::FixedArray(size)),
+                Type::Float => Ok(Type::FloatArray(size)),
                 _ => Err(self.error(
                     ErrorCode::InvalidType,
-                    "Only byte, word, bool, sbyte, and sword arrays are supported",
+                    "Only byte, word, bool, sbyte, sword, fixed, and float arrays are supported",
                 )),
             }
         } else {

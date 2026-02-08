@@ -334,6 +334,79 @@ export const COBRA64_BUILTINS: BuiltinFunction[] = [
         parameters: [],
         returnType: null,
     },
+    // Type conversion functions
+    {
+        name: 'str',
+        signature: 'str(value) -> string',
+        description: 'Converts a numeric value to its string representation.',
+        parameters: [
+            { name: 'value', type: 'numeric', description: 'Value to convert (byte, word, sbyte, sword, fixed, float, bool)' },
+        ],
+        returnType: 'string',
+    },
+    {
+        name: 'bool',
+        signature: 'bool(value) -> bool',
+        description: 'Converts a value to boolean. Returns true if value is non-zero.',
+        parameters: [
+            { name: 'value', type: 'numeric', description: 'Value to convert to boolean' },
+        ],
+        returnType: 'bool',
+    },
+    {
+        name: 'byte',
+        signature: 'byte(value) -> byte',
+        description: 'Converts a value to byte. Truncates larger values to 8 bits. Parses strings as numbers.',
+        parameters: [
+            { name: 'value', type: 'any', description: 'Value to convert (numeric or string)' },
+        ],
+        returnType: 'byte',
+    },
+    {
+        name: 'word',
+        signature: 'word(value) -> word',
+        description: 'Converts a value to word. Truncates larger values to 16 bits. Parses strings as numbers.',
+        parameters: [
+            { name: 'value', type: 'any', description: 'Value to convert (numeric or string)' },
+        ],
+        returnType: 'word',
+    },
+    {
+        name: 'sbyte',
+        signature: 'sbyte(value) -> sbyte',
+        description: 'Converts a value to signed byte.',
+        parameters: [
+            { name: 'value', type: 'numeric', description: 'Value to convert' },
+        ],
+        returnType: 'sbyte',
+    },
+    {
+        name: 'sword',
+        signature: 'sword(value) -> sword',
+        description: 'Converts a value to signed word.',
+        parameters: [
+            { name: 'value', type: 'numeric', description: 'Value to convert' },
+        ],
+        returnType: 'sword',
+    },
+    {
+        name: 'fixed',
+        signature: 'fixed(value) -> fixed',
+        description: 'Converts a value to fixed-point (12.4 format). Range: -2048.0 to 2047.9375.',
+        parameters: [
+            { name: 'value', type: 'numeric', description: 'Value to convert' },
+        ],
+        returnType: 'fixed',
+    },
+    {
+        name: 'float',
+        signature: 'float(value) -> float',
+        description: 'Converts a value to IEEE-754 binary16 float.',
+        parameters: [
+            { name: 'value', type: 'numeric', description: 'Value to convert' },
+        ],
+        returnType: 'float',
+    },
 ];
 
 /**

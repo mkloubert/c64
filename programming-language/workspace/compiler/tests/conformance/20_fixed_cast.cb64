@@ -21,6 +21,27 @@ def main():
     println("SBYTE TO FIXED:")
     println(f3)  # -50.0
 
+    # Additional sbyte to fixed edge cases
+    sb_min: sbyte = -128
+    f3a: fixed = fixed(sb_min)
+    println("SBYTE MIN TO FIXED:")
+    println(f3a)  # -128.0
+
+    sb_neg1: sbyte = -1
+    f3b: fixed = fixed(sb_neg1)
+    println("SBYTE -1 TO FIXED:")
+    println(f3b)  # -1.0
+
+    sb_neg10: sbyte = -10
+    f3c: fixed = fixed(sb_neg10)
+    println("SBYTE -10 TO FIXED:")
+    println(f3c)  # -10.0
+
+    sb_pos: sbyte = 127
+    f3d: fixed = fixed(sb_pos)
+    println("SBYTE MAX TO FIXED:")
+    println(f3d)  # 127.0
+
     # Sword to fixed
     sw: sword = -500
     f4: fixed = fixed(sw)

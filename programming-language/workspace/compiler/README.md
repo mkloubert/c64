@@ -369,13 +369,15 @@ Arrays allow storing multiple values of the same type in contiguous memory.
 
 #### Array Types
 
-| Type      | Element Size | Element Range   | Description           |
-| --------- | ------------ | --------------- | --------------------- |
-| `byte[]`  | 1 byte       | 0-255           | Unsigned 8-bit array  |
-| `word[]`  | 2 bytes      | 0-65535         | Unsigned 16-bit array |
-| `bool[]`  | 1 byte       | true/false      | Boolean array         |
-| `sbyte[]` | 1 byte       | -128 to 127     | Signed 8-bit array    |
-| `sword[]` | 2 bytes      | -32768 to 32767 | Signed 16-bit array   |
+| Type      | Element Size | Element Range        | Description           |
+| --------- | ------------ | -------------------- | --------------------- |
+| `byte[]`  | 1 byte       | 0-255                | Unsigned 8-bit array  |
+| `word[]`  | 2 bytes      | 0-65535              | Unsigned 16-bit array |
+| `bool[]`  | 1 byte       | true/false           | Boolean array         |
+| `sbyte[]` | 1 byte       | -128 to 127          | Signed 8-bit array    |
+| `sword[]` | 2 bytes      | -32768 to 32767      | Signed 16-bit array   |
+| `fixed[]` | 2 bytes      | -2048.0 to 2047.9375 | Fixed-point array     |
+| `float[]` | 2 bytes      | ±65504               | IEEE-754 float array  |
 
 #### Array Declaration
 
@@ -396,6 +398,12 @@ def main():
     # Signed arrays (type inferred from negative values)
     temps: sbyte[] = [-10, 0, 25, 50]
     offsets: sword[] = [-1000, 500, 2000]
+
+    # Fixed-point array (for game coordinates, speeds, etc.)
+    positions: fixed[] = [0.0, 1.5, 3.25, 5.0]
+
+    # Float array (for scientific calculations)
+    values: float[] = [3.14, 2.718, 1.414]
 ```
 
 #### Array Access
@@ -587,7 +595,9 @@ def main():
 
 ### Type Casting
 
-Convert values between types using the type name as a function:
+Convert values between types using the type name as a function.
+
+#### Basic Syntax
 
 ```python
 def main():
@@ -603,23 +613,188 @@ def main():
     fx: fixed = fixed(f)  # float to fixed
     i: word = word(f)     # float to word (truncates decimal)
 
-    # Array element conversion
-    scores: word[] = [1000, 2000]
-    low_byte: byte = byte(scores[0])
+    # Boolean conversions
+    x: byte = 42
+    flag: bool = bool(x)  # true if x != 0
+    num: byte = byte(flag) # 1 if true, 0 if false
+
+    # String conversions
+    n: word = 12345
+    s1: string = str(n)   # "12345"
+    s2: string = "99"
+    b2: byte = byte(s2)   # 99
 ```
 
-**Available casts:**
+#### Implicit Conversions (Automatic)
 
-| From    | To      | Notes                      |
-| ------- | ------- | -------------------------- |
-| `word`  | `byte`  | Truncates to low 8 bits    |
-| `sbyte` | `word`  | Sign-extends to 16 bits    |
-| `sbyte` | `sword` | Sign-extends to 16 bits    |
-| `float` | `fixed` | May lose precision         |
-| `float` | `word`  | Truncates decimal part     |
-| `fixed` | `word`  | Truncates fractional part  |
-| `fixed` | `float` | Converts to floating-point |
-| `byte`  | `word`  | Zero-extends to 16 bits    |
+These conversions happen automatically when assigning or in expressions:
+
+| From    | To      | Notes                            |
+| ------- | ------- | -------------------------------- |
+| `byte`  | `word`  | Zero-extends to 16 bits          |
+| `byte`  | `sword` | Zero-extends to 16 bits          |
+| `sbyte` | `sword` | Sign-extends to 16 bits          |
+| `byte`  | `fixed` | Integer to 12.4 format (value.0) |
+| `sbyte` | `fixed` | Integer to 12.4 format (value.0) |
+| `byte`  | `float` | Integer to IEEE-754 binary16     |
+| `sbyte` | `float` | Integer to IEEE-754 binary16     |
+| `fixed` | `float` | Widening conversion              |
+| `bool`  | `byte`  | true=1, false=0                  |
+| `bool`  | `word`  | true=1, false=0                  |
+| `bool`  | `sbyte` | true=1, false=0                  |
+| `bool`  | `sword` | true=1, false=0                  |
+
+```python
+def main():
+    b: byte = 100
+    w: word = b           # Implicit: byte → word (zero-extend)
+
+    s: sbyte = -50
+    sw: sword = s         # Implicit: sbyte → sword (sign-extend)
+
+    i: byte = 42
+    f: fixed = i          # Implicit: byte → fixed (42.0)
+    fl: float = f         # Implicit: fixed → float
+
+    flag: bool = true
+    n: byte = flag        # Implicit: bool → byte (1)
+```
+
+#### Explicit Conversions (Require Cast)
+
+These conversions require explicit `type()` syntax because they may lose data:
+
+| From     | To      | Notes                               |
+| -------- | ------- | ----------------------------------- |
+| `word`   | `byte`  | Truncates to low 8 bits             |
+| `sword`  | `sbyte` | Truncates to low 8 bits             |
+| `word`   | `fixed` | May overflow (-2048..2047 range)    |
+| `sword`  | `fixed` | May overflow (-2048..2047 range)    |
+| `word`   | `float` | May lose precision (>11 bits)       |
+| `sword`  | `float` | May lose precision (>11 bits)       |
+| `float`  | `fixed` | Range and precision loss            |
+| `float`  | `byte`  | Truncates decimal, may overflow     |
+| `float`  | `word`  | Truncates decimal, may overflow     |
+| `float`  | `sbyte` | Truncates decimal, may overflow     |
+| `float`  | `sword` | Truncates decimal, may overflow     |
+| `fixed`  | `byte`  | Truncates to integer part           |
+| `fixed`  | `word`  | Truncates to integer part           |
+| `fixed`  | `sbyte` | Truncates to integer part           |
+| `fixed`  | `sword` | Truncates to integer part           |
+| `byte`   | `sbyte` | Reinterpret (>127 becomes negative) |
+| `sbyte`  | `byte`  | Reinterpret (negative becomes >127) |
+| `byte`   | `bool`  | true if != 0                        |
+| `word`   | `bool`  | true if != 0                        |
+| `string` | `byte`  | Parse string as number              |
+| `string` | `word`  | Parse string as number              |
+
+```python
+def main():
+    # Narrowing: requires explicit cast
+    w: word = 1000
+    b: byte = byte(w)     # 232 (1000 mod 256)
+
+    # Decimal to integer: truncates
+    f: fixed = 3.75
+    i: byte = byte(f)     # 3 (integer part only)
+
+    # Integer to bool: any non-zero is true
+    x: byte = 42
+    flag: bool = bool(x)  # true
+
+    # String parsing
+    s: string = "123"
+    n: byte = byte(s)     # 123
+```
+
+#### String Conversions
+
+The `str()` function converts any numeric type to its string representation:
+
+```python
+def main():
+    # Numeric to string
+    b: byte = 42
+    s1: string = str(b)    # "42"
+
+    w: word = 12345
+    s2: string = str(w)    # "12345"
+
+    neg: sbyte = -50
+    s3: string = str(neg)  # "-50"
+
+    f: fixed = 3.5
+    s4: string = str(f)    # "3.5000"
+
+    flag: bool = true
+    s5: string = str(flag) # "1"
+
+    # String to numeric (explicit cast)
+    input: string = "255"
+    val: byte = byte(input) # 255
+
+    big: string = "54321"
+    num: word = word(big)   # 54321
+```
+
+**String parsing notes:**
+
+- Leading whitespace is skipped
+- Parsing stops at first non-digit character
+- Invalid strings return 0
+
+#### Bool Conversions
+
+Converting to `bool` tests for non-zero:
+
+```python
+def main():
+    # Integer to bool
+    x: byte = 0
+    a: bool = bool(x)      # false
+
+    y: byte = 1
+    b: bool = bool(y)      # true
+
+    z: word = 1000
+    c: bool = bool(z)      # true
+
+    # Bool to integer
+    flag: bool = true
+    n: byte = byte(flag)   # 1
+
+    # Bool to word
+    w: word = word(flag)   # 1
+```
+
+#### Forbidden Conversions
+
+These conversions are not allowed:
+
+| From     | To       | Reason                        |
+| -------- | -------- | ----------------------------- |
+| `array`  | `scalar` | Fundamentally different types |
+| `scalar` | `array`  | Fundamentally different types |
+| `byte[]` | `word[]` | Array element type mismatch   |
+| `void`   | any      | No value to convert           |
+
+#### Compile-Time Warnings
+
+The compiler emits warnings for potentially dangerous casts:
+
+```python
+def main():
+    # W001: Literal truncation
+    b: byte = byte(300)    # Warning: Value 300 will be truncated to 44
+
+    # W003: Fixed-point overflow
+    f: fixed = fixed(5000) # Warning: Value overflows fixed-point range
+
+    # W004: Negative to unsigned
+    b2: byte = byte(-10)   # Warning: Negative value -10 will wrap to 246
+```
+
+Warnings do not stop compilation but indicate potential issues.
 
 ### Control Flow
 
@@ -1429,6 +1604,16 @@ The generated PRG and D64 files should work with any C64 emulator that supports 
 
 ## Version History
 
+- **0.11.0** - Type Casting System Improvements
+  - **Fixed `sbyte → fixed` conversion bug**: Negative sbyte values now correctly convert to fixed-point
+  - **Removed dangerous implicit casts**: `byte ↔ sbyte` and `word/sword → fixed` now require explicit casts
+  - **Added bool conversions**: `bool()` cast function and implicit `bool → integer`
+  - **Added compile-time warnings**: W001-W005 for truncation, overflow, precision loss
+  - **Added `fixed[]` and `float[]` array types**: Full array support for decimal types
+  - **Added string conversions**: `str()` for numeric-to-string, `byte()`/`word()` for string-to-numeric
+  - **Improved DecimalLiteral handling**: Context-aware type inference in binary operations
+  - New conformance tests: `30_bool_cast.cb64`, `31_decimal_literal.cb64`, `32_fixed_array.cb64`, `33_float_array.cb64`, `34_string_cast.cb64`
+
 - **0.10.0** - String operations
   - Extended `len()` to work on strings (returns byte for strings, word for arrays)
   - Added `str_at(s: string, i: byte) -> byte` to get character at index
@@ -1578,7 +1763,8 @@ src/
     ├── declarations.rs # Declaration generation (DeclarationEmitter trait)
     ├── emit.rs         # Byte emission helpers
     ├── expressions.rs  # Expression generation (ExpressionEmitter trait)
-    ├── float_runtime.rs # Float operations runtime
+    ├── float_runtime.rs  # Float operations runtime
+    ├── string_runtime.rs # String conversion routines (str(), parse)
     ├── functions.rs    # Function call generation (FunctionCallEmitter trait)
     ├── labels.rs       # Label management
     ├── mos6510.rs      # 6510 instruction encoding

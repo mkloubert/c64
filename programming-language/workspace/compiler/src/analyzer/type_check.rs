@@ -139,6 +139,36 @@ impl TypeChecker for Analyzer {
             }
         }
 
+        // Integer literals can be assigned to compatible signed types if in range
+        // This allows `x: sbyte = 127` (literal fits in sbyte range)
+        // but prevents `x: sbyte = byte_var` (variable could be 128-255)
+        if let ExprKind::IntegerLiteral(value) = expr_kind {
+            let v = *value as i64;
+            match target_type {
+                Type::Sbyte if (-128..=127).contains(&v) => return true,
+                Type::Sword if (-32768..=32767).contains(&v) => return true,
+                Type::Fixed if (-2048..=2047).contains(&v) => return true,
+                _ => {}
+            }
+        }
+
+        // Handle negated integer literals: -10, etc.
+        if let ExprKind::UnaryOp {
+            op: UnaryOp::Negate,
+            operand,
+        } = expr_kind
+        {
+            if let ExprKind::IntegerLiteral(value) = &operand.kind {
+                let v = -(*value as i64);
+                match target_type {
+                    Type::Sbyte if (-128..=127).contains(&v) => return true,
+                    Type::Sword if (-32768..=32767).contains(&v) => return true,
+                    Type::Fixed if (-2048..=2047).contains(&v) => return true,
+                    _ => {}
+                }
+            }
+        }
+
         // Default to standard type assignability
         value_type.is_assignable_to(target_type)
     }

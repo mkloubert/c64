@@ -1,0 +1,68 @@
+# Conformance Test: Bool Type Conversions
+# Tests: Conversions between bool and integer types
+# Expected: Compiles without errors
+
+def main():
+    # Bool to byte (implicit)
+    t: bool = true
+    f: bool = false
+    b1: byte = t
+    b2: byte = f
+    println("BOOL TO BYTE:")
+    println(b1)  # 1
+    println(b2)  # 0
+
+    # Bool to word (implicit)
+    w1: word = t
+    w2: word = f
+    println("BOOL TO WORD:")
+    println(w1)  # 1
+    println(w2)  # 0
+
+    # Bool to sbyte (implicit)
+    sb1: sbyte = t
+    sb2: sbyte = f
+    println("BOOL TO SBYTE:")
+    println(sb1)  # 1
+    println(sb2)  # 0
+
+    # Bool to sword (implicit)
+    sw1: sword = t
+    sw2: sword = f
+    println("BOOL TO SWORD:")
+    println(sw1)  # 1
+    println(sw2)  # 0
+
+    # Byte to bool (explicit cast required)
+    zero: byte = 0
+    one: byte = 1
+    many: byte = 255
+    println("BYTE TO BOOL:")
+    if bool(zero):
+        println("ZERO TRUE")
+    else:
+        println("ZERO FALSE")  # Expected
+
+    if bool(one):
+        println("ONE TRUE")  # Expected
+    else:
+        println("ONE FALSE")
+
+    if bool(many):
+        println("MANY TRUE")  # Expected
+    else:
+        println("MANY FALSE")
+
+    # Word to bool (explicit cast required)
+    wz: word = 0
+    wv: word = 1000
+    println("WORD TO BOOL:")
+    if bool(wz):
+        println("WZ TRUE")
+    else:
+        println("WZ FALSE")  # Expected
+
+    if bool(wv):
+        println("WV TRUE")  # Expected
+    else:
+        println("WV FALSE")
