@@ -19,6 +19,7 @@
 //!
 //! This module provides code generation for function calls:
 //! - Built-in functions (cls, print, println, cursor, get_key, read, readln, poke, peek, len)
+//! - len() supports both arrays (compile-time) and strings (runtime)
 //! - User-defined functions
 
 use super::emit::EmitHelpers;
@@ -174,12 +175,31 @@ impl FunctionCallEmitter for CodeGenerator {
                 }
             }
             "len" => {
-                // Get array length as a word (16-bit) value
-                // Result: A = low byte, X = high byte
+                // len() works on both arrays and strings
                 if !args.is_empty() {
-                    let array_size = self.get_array_length(&args[0], span)?;
-                    self.emit_imm(opcodes::LDA_IMM, (array_size & 0xFF) as u8);
-                    self.emit_imm(opcodes::LDX_IMM, ((array_size >> 8) & 0xFF) as u8);
+                    let arg_type = self.infer_type_from_expr(&args[0]);
+
+                    if arg_type == Type::String {
+                        // String length: runtime calculation
+                        // Generate expression to get string address in A/X
+                        self.generate_expression(&args[0])?;
+
+                        // Store string address in TMP1/TMP1_HI
+                        self.emit_byte(opcodes::STA_ZP);
+                        self.emit_byte(zeropage::TMP1);
+                        self.emit_byte(opcodes::STX_ZP);
+                        self.emit_byte(zeropage::TMP1_HI);
+
+                        // Call string length routine
+                        // Result: A = length (byte)
+                        self.emit_jsr_label("__str_len");
+                    } else {
+                        // Array length: compile-time constant
+                        // Result: A = low byte, X = high byte
+                        let array_size = self.get_array_length(&args[0], span)?;
+                        self.emit_imm(opcodes::LDA_IMM, (array_size & 0xFF) as u8);
+                        self.emit_imm(opcodes::LDX_IMM, ((array_size >> 8) & 0xFF) as u8);
+                    }
                 }
             }
             "rand" => {
@@ -213,6 +233,31 @@ impl FunctionCallEmitter for CodeGenerator {
             "seed" => {
                 // seed() - reseed the PRNG from hardware entropy
                 self.emit_jsr_label("__prng_init");
+            }
+            "str_at" => {
+                // str_at(s, i) -> byte - get character at position i
+                if args.len() >= 2 {
+                    // First, evaluate index and save it
+                    self.generate_expression(&args[1])?;
+                    self.emit_byte(opcodes::PHA); // Save index on stack
+
+                    // Evaluate string expression (address in A/X)
+                    self.generate_expression(&args[0])?;
+
+                    // Store string address in TMP1/TMP1_HI
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_byte(opcodes::STX_ZP);
+                    self.emit_byte(zeropage::TMP1_HI);
+
+                    // Restore index into Y register
+                    self.emit_byte(opcodes::PLA);
+                    self.emit_byte(opcodes::TAY);
+
+                    // Load character at index: LDA (TMP1),Y
+                    self.emit_byte(opcodes::LDA_IZY);
+                    self.emit_byte(zeropage::TMP1);
+                }
             }
             _ => {
                 // User-defined function

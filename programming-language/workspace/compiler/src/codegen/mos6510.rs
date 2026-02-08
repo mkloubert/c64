@@ -302,6 +302,9 @@ pub mod c64 {
 
     /// Input buffer for readln (256 bytes at $C100).
     pub const INPUT_BUFFER: u16 = 0xC100;
+
+    /// String concatenation buffer (256 bytes at $C200).
+    pub const STR_CONCAT_BUFFER: u16 = 0xC200;
 }
 
 /// Zero page locations for temporary storage.

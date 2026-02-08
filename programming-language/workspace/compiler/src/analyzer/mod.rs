@@ -431,9 +431,17 @@ mod tests {
     // ========================================
 
     #[test]
-    fn test_error_add_string() {
-        let result = analyze_source("def main():\n    x: byte = \"a\" + \"b\"");
+    fn test_error_add_string_with_int() {
+        // String + int should fail (mixed types not allowed)
+        let result = analyze_source("def main():\n    x: string = \"a\" + 5");
         assert!(has_error_code(&result, ErrorCode::InvalidOperatorForType));
+    }
+
+    #[test]
+    fn test_string_concat_valid() {
+        // String + string should be valid
+        let result = analyze_source("def main():\n    x: string = \"a\" + \"b\"");
+        assert!(result.is_ok(), "String concatenation should be valid");
     }
 
     #[test]

@@ -49,6 +49,10 @@ pub trait RuntimeEmitter {
     fn emit_print_fixed_routine(&mut self);
     fn emit_print_float_routine(&mut self);
 
+    // String routines
+    fn emit_str_len_routine(&mut self);
+    fn emit_str_concat_routine(&mut self);
+
     // Arithmetic routines
     fn emit_multiply_byte_routine(&mut self);
     fn emit_multiply_word_routine(&mut self);
@@ -91,6 +95,10 @@ impl RuntimeEmitter for CodeGenerator {
         self.emit_print_sword_routine();
         self.emit_print_fixed_routine();
         self.emit_print_float_routine();
+
+        // String routines
+        self.emit_str_len_routine();
+        self.emit_str_concat_routine();
 
         // Multiply routines
         self.emit_multiply_byte_routine();
@@ -924,6 +932,120 @@ impl RuntimeEmitter for CodeGenerator {
         self.emit_abs(opcodes::JSR, kernal::CHROUT);
         self.emit_imm(opcodes::LDA_IMM, b'0');
         self.emit_abs(opcodes::JSR, kernal::CHROUT);
+
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit string length routine.
+    ///
+    /// Calculates the length of a null-terminated string.
+    /// Input: String address in TMP1/TMP1_HI
+    /// Output: A = length (0-255)
+    fn emit_str_len_routine(&mut self) {
+        self.define_label("__str_len");
+        self.runtime_addresses
+            .insert("str_len".to_string(), self.current_address);
+
+        // Initialize counter in Y
+        self.emit_imm(opcodes::LDY_IMM, 0);
+
+        // Loop: check each character
+        self.define_label("__str_len_loop");
+        self.emit_byte(opcodes::LDA_IZY);
+        self.emit_byte(zeropage::TMP1);
+
+        // If null terminator, we're done
+        self.emit_branch(opcodes::BEQ, "__str_len_done");
+
+        // Increment counter
+        self.emit_byte(opcodes::INY);
+
+        // Continue loop (BNE will always branch since Y wraps at 255)
+        self.emit_branch(opcodes::BNE, "__str_len_loop");
+
+        // Done: transfer Y to A
+        self.define_label("__str_len_done");
+        self.emit_byte(opcodes::TYA);
+
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit string concatenation routine.
+    ///
+    /// Concatenates two null-terminated strings into the string buffer.
+    /// Input: TMP1/TMP1_HI = first string address
+    ///        TMP3/TMP3_HI = second string address
+    /// Output: A = low byte of buffer address, X = high byte
+    ///         TMP1/TMP1_HI also set to buffer address
+    fn emit_str_concat_routine(&mut self) {
+        use super::mos6510::c64;
+
+        self.define_label("__str_concat");
+        self.runtime_addresses
+            .insert("str_concat".to_string(), self.current_address);
+
+        // Use TMP4 as index into destination buffer
+        self.emit_imm(opcodes::LDA_IMM, 0);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP4);
+
+        // Copy first string (from TMP1/TMP1_HI)
+        self.emit_imm(opcodes::LDY_IMM, 0);
+
+        self.define_label("__str_concat_copy1");
+        self.emit_byte(opcodes::LDA_IZY);
+        self.emit_byte(zeropage::TMP1);
+
+        // Check for null terminator
+        self.emit_branch(opcodes::BEQ, "__str_concat_second");
+
+        // Store to buffer using absolute indexed
+        self.emit_byte(opcodes::LDX_ZP);
+        self.emit_byte(zeropage::TMP4);
+        self.emit_abs(opcodes::STA_ABX, c64::STR_CONCAT_BUFFER);
+
+        // Increment both indices
+        self.emit_byte(opcodes::INY);
+        self.emit_byte(opcodes::INC_ZP);
+        self.emit_byte(zeropage::TMP4);
+
+        // Continue loop
+        self.emit_jmp("__str_concat_copy1");
+
+        // Copy second string (from TMP3/TMP3_HI)
+        self.define_label("__str_concat_second");
+        self.emit_imm(opcodes::LDY_IMM, 0);
+
+        self.define_label("__str_concat_copy2");
+        self.emit_byte(opcodes::LDA_IZY);
+        self.emit_byte(zeropage::TMP3);
+
+        // Store to buffer (including final null terminator)
+        self.emit_byte(opcodes::LDX_ZP);
+        self.emit_byte(zeropage::TMP4);
+        self.emit_abs(opcodes::STA_ABX, c64::STR_CONCAT_BUFFER);
+
+        // Check for null terminator (after storing it)
+        self.emit_branch(opcodes::BEQ, "__str_concat_done");
+
+        // Increment both indices
+        self.emit_byte(opcodes::INY);
+        self.emit_byte(opcodes::INC_ZP);
+        self.emit_byte(zeropage::TMP4);
+
+        // Continue loop
+        self.emit_jmp("__str_concat_copy2");
+
+        // Done: return buffer address
+        self.define_label("__str_concat_done");
+        self.emit_imm(opcodes::LDA_IMM, (c64::STR_CONCAT_BUFFER & 0xFF) as u8);
+        self.emit_imm(opcodes::LDX_IMM, ((c64::STR_CONCAT_BUFFER >> 8) & 0xFF) as u8);
+
+        // Also store in TMP1/TMP1_HI for compatibility
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::STX_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
 
         self.emit_byte(opcodes::RTS);
     }

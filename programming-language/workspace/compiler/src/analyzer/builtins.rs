@@ -93,6 +93,10 @@ impl BuiltinRegistry for Analyzer {
 
         // seed() - reseed the random number generator from hardware entropy
         self.define_builtin("seed", vec![], None);
+
+        // String operations
+        // str_at(s, i) -> byte - get character at position i
+        self.define_builtin("str_at", vec![Type::String, Type::Byte], Some(Type::Byte));
     }
 
     fn define_builtin(&mut self, name: &str, params: Vec<Type>, return_type: Option<Type>) {

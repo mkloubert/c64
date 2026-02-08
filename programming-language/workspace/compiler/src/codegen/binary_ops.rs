@@ -22,12 +22,14 @@
 //! - Bitwise: And, Or, Xor, ShiftLeft, ShiftRight
 //! - Comparison: Equal, NotEqual, Less, LessEqual, Greater, GreaterEqual
 //! - Logical: And, Or
+//! - String concatenation: string + string
 //!
 //! Supports:
 //! - 8-bit integer operations (byte/sbyte)
 //! - 16-bit integer operations (word/sword)
 //! - Fixed-point operations (12.4 format)
 //! - Float operations (IEEE-754 binary16)
+//! - String operations (concatenation)
 
 use super::comparisons::ComparisonHelpers;
 use super::emit::EmitHelpers;
@@ -36,7 +38,7 @@ use super::labels::LabelManager;
 use super::mos6510::{opcodes, zeropage};
 use super::type_inference::TypeInference;
 use super::CodeGenerator;
-use crate::ast::{BinaryOp, Expr};
+use crate::ast::{BinaryOp, Expr, Type};
 use crate::error::{CompileError, ErrorCode};
 
 /// Extension trait for binary operation code generation.
@@ -84,6 +86,12 @@ impl BinaryOpsEmitter for CodeGenerator {
         // Determine types
         let left_type = self.infer_type_from_expr(left);
         let right_type = self.infer_type_from_expr(right);
+
+        // String concatenation: string + string -> string
+        if op == BinaryOp::Add && left_type == Type::String && right_type == Type::String {
+            return self.generate_string_concat(left, right);
+        }
+
         let use_signed = self.is_signed_type(&left_type) || self.is_signed_type(&right_type);
         let use_fixed = self.is_fixed_type(&left_type) || self.is_fixed_type(&right_type);
         let use_float = self.is_float_type(&left_type) || self.is_float_type(&right_type);
@@ -555,6 +563,47 @@ impl BinaryOpsEmitter for CodeGenerator {
                 ));
             }
         }
+
+        Ok(())
+    }
+}
+
+/// Helper methods for string operations.
+impl CodeGenerator {
+    /// Generate code for string concatenation.
+    ///
+    /// Concatenates two strings using the runtime __str_concat routine.
+    /// Result is address of concatenated string in A/X (and TMP1/TMP1_HI).
+    fn generate_string_concat(&mut self, left: &Expr, right: &Expr) -> Result<(), CompileError> {
+        // Generate left string (address in A/X)
+        self.generate_expression(left)?;
+
+        // Save left string address on stack
+        self.emit_byte(opcodes::PHA); // Save low byte
+        self.emit_byte(opcodes::TXA);
+        self.emit_byte(opcodes::PHA); // Save high byte
+
+        // Generate right string (address in A/X)
+        self.generate_expression(right)?;
+
+        // Store right string address in TMP3/TMP3_HI
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::STX_ZP);
+        self.emit_byte(zeropage::TMP3_HI);
+
+        // Restore left string address to TMP1/TMP1_HI
+        self.emit_byte(opcodes::PLA); // High byte
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_byte(opcodes::PLA); // Low byte
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+
+        // Call string concatenation routine
+        // Input: TMP1/TMP1_HI = first string, TMP3/TMP3_HI = second string
+        // Output: A/X = buffer address, TMP1/TMP1_HI also set
+        self.emit_jsr_label("__str_concat");
 
         Ok(())
     }

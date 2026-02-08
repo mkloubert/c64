@@ -333,11 +333,11 @@ def main():
 
 #### Naming Rules
 
-| Type         | Rule                                          | Examples                             |
-| ------------ | --------------------------------------------- | ------------------------------------ |
-| **Constant** | Use `const` keyword                           | `const MAX: byte = 255`              |
-| **Variable** | No keyword, just type annotation              | `counter: byte = 0`                  |
-| **Invalid**  | Identifier consisting only of underscores     | `_`, `__`, `___`                     |
+| Type         | Rule                                      | Examples                |
+| ------------ | ----------------------------------------- | ----------------------- |
+| **Constant** | Use `const` keyword                       | `const MAX: byte = 255` |
+| **Variable** | No keyword, just type annotation          | `counter: byte = 0`     |
+| **Invalid**  | Identifier consisting only of underscores | `_`, `__`, `___`        |
 
 ```python
 # Valid constants (use 'const' keyword)
@@ -528,18 +528,18 @@ def main():
 
 Compound assignment operators combine an operation with assignment:
 
-| Operator | Description         | Equivalent     |
-| -------- | ------------------- | -------------- |
-| `+=`     | Add and assign      | `x = x + y`    |
-| `-=`     | Subtract and assign | `x = x - y`    |
-| `*=`     | Multiply and assign | `x = x * y`    |
-| `/=`     | Divide and assign   | `x = x / y`    |
-| `%=`     | Modulo and assign   | `x = x % y`    |
-| `&=`     | Bitwise AND assign  | `x = x & y`    |
-| `\|=`    | Bitwise OR assign   | `x = x \| y`   |
-| `^=`     | Bitwise XOR assign  | `x = x ^ y`    |
-| `<<=`    | Left shift assign   | `x = x << y`   |
-| `>>=`    | Right shift assign  | `x = x >> y`   |
+| Operator | Description         | Equivalent   |
+| -------- | ------------------- | ------------ |
+| `+=`     | Add and assign      | `x = x + y`  |
+| `-=`     | Subtract and assign | `x = x - y`  |
+| `*=`     | Multiply and assign | `x = x * y`  |
+| `/=`     | Divide and assign   | `x = x / y`  |
+| `%=`     | Modulo and assign   | `x = x % y`  |
+| `&=`     | Bitwise AND assign  | `x = x & y`  |
+| `\|=`    | Bitwise OR assign   | `x = x \| y` |
+| `^=`     | Bitwise XOR assign  | `x = x ^ y`  |
+| `<<=`    | Left shift assign   | `x = x << y` |
+| `>>=`    | Right shift assign  | `x = x >> y` |
 
 **Usage:**
 
@@ -870,17 +870,26 @@ def main():
     println(border)
 ```
 
-### Array Functions
+### Array and String Functions
 
-#### `len(array) -> word`
+#### `len(value) -> byte/word`
 
-Returns the length (number of elements) of an array.
+Returns the length of an array or string.
+
+- For **strings**: returns `byte` (0-255)
+- For **arrays**: returns `word` (0-65535)
 
 ```python
 def main():
+    # len() on arrays - returns word
     data: byte[] = [10, 20, 30, 40, 50]
     size: word = len(data)
     println(size)  # Prints: 5
+
+    # len() on strings - returns byte
+    name: string = "HELLO"
+    str_size: byte = len(name)
+    println(str_size)  # Prints: 5
 
     # Use in loop condition
     i: byte = 0
@@ -892,6 +901,50 @@ def main():
     buffer: byte[100]
     println(len(buffer))  # Prints: 100
 ```
+
+#### `str_at(s: string, i: byte) -> byte`
+
+Returns the character (byte value) at position i in the string.
+
+```python
+def main():
+    name: string = "HELLO"
+
+    # Get first character
+    first: byte = str_at(name, 0)  # 72 ('H' in PETSCII)
+
+    # Get last character
+    last: byte = str_at(name, 4)   # 79 ('O' in PETSCII)
+
+    # Print all characters
+    i: byte = 0
+    while i < len(name):
+        println(str_at(name, i))
+        i = i + 1
+```
+
+### String Concatenation
+
+Strings can be concatenated using the `+` operator:
+
+```python
+def main():
+    # Concatenate literals
+    greeting: string = "HELLO" + " " + "WORLD"
+    println(greeting)  # Prints: HELLO WORLD
+
+    # Concatenate variables
+    first: string = "HELLO"
+    second: string = "WORLD"
+    combined: string = first + " " + second
+    println(combined)
+
+    # Use in print
+    name: string = "PLAYER"
+    println("WELCOME, " + name + "!")
+```
+
+**Note:** String concatenation uses a temporary buffer. The result is valid until the next concatenation operation.
 
 ### Random Number Functions
 
@@ -1277,14 +1330,14 @@ def find_rank(scores: word[], new_score: word) -> byte:
 
 ### Lexer Errors
 
-| Error                        | Description                                                          |
-| ---------------------------- | -------------------------------------------------------------------- |
-| `Invalid character`          | Source contains an unsupported character                             |
-| `Unterminated string`        | String literal missing closing quote                                 |
-| `Invalid escape sequence`    | Unknown escape like `\x`                                             |
-| `Number overflow`            | Number too large for type                                            |
-| `Tabs not allowed`           | Use 4 spaces for indentation                                         |
-| `Identifier only underscore` | Identifier cannot be just `_` or `__`                                |
+| Error                        | Description                              |
+| ---------------------------- | ---------------------------------------- |
+| `Invalid character`          | Source contains an unsupported character |
+| `Unterminated string`        | String literal missing closing quote     |
+| `Invalid escape sequence`    | Unknown escape like `\x`                 |
+| `Number overflow`            | Number too large for type                |
+| `Tabs not allowed`           | Use 4 spaces for indentation             |
+| `Identifier only underscore` | Identifier cannot be just `_` or `__`    |
 
 ### Parser Errors
 
@@ -1376,6 +1429,13 @@ The generated PRG and D64 files should work with any C64 emulator that supports 
 
 ## Version History
 
+- **0.10.0** - String operations
+  - Extended `len()` to work on strings (returns byte for strings, word for arrays)
+  - Added `str_at(s: string, i: byte) -> byte` to get character at index
+  - Added `+` operator for string concatenation
+  - String concatenation uses buffer at $C200
+  - Maximum string length: 255 characters
+
 - **0.9.0** - Compound assignment operators
   - Added all 10 compound assignment operators: `+=`, `-=`, `*=`, `/=`, `%=`, `&=`, `|=`, `^=`, `<<=`, `>>=`
   - Compound assignment works on both variables and array elements
@@ -1429,7 +1489,7 @@ The generated PRG and D64 files should work with any C64 emulator that supports 
   - Signed array type inference from negative values
   - Array-specific error messages
 
-- **0.3.0** - Naming convention for constants *(superseded by 0.7.0)*
+- **0.3.0** - Naming convention for constants _(superseded by 0.7.0)_
   - Removed `const` keyword (reintroduced in 0.7.0)
   - Constants were identified by UPPERCASE naming convention
   - First letter uppercase + all letters uppercase = constant

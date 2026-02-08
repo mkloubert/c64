@@ -21,7 +21,7 @@
 //! - Function definition analysis
 //! - Function call analysis
 //! - Return statement handling
-//! - Built-in function support (len)
+//! - Built-in function support (len for arrays and strings)
 
 use super::expressions::ExpressionAnalyzer;
 use super::symbol::{Symbol, SymbolType};
@@ -43,6 +43,9 @@ pub trait FunctionAnalyzer {
 
     /// Analyze the built-in len() function call.
     fn analyze_len_call(&mut self, args: &[Expr], span: &Span) -> Option<Type>;
+
+    /// Analyze the built-in str_at() function call.
+    fn analyze_str_at_call(&mut self, args: &[Expr], span: &Span) -> Option<Type>;
 }
 
 impl FunctionAnalyzer for Analyzer {
@@ -125,6 +128,11 @@ impl FunctionAnalyzer for Analyzer {
         // Handle built-in len() function specially
         if name == "len" {
             return self.analyze_len_call(args, span);
+        }
+
+        // Handle built-in str_at() function specially
+        if name == "str_at" {
+            return self.analyze_str_at_call(args, span);
         }
 
         let symbol = self.symbols.lookup(name).cloned();
@@ -219,14 +227,19 @@ impl FunctionAnalyzer for Analyzer {
             return None;
         }
 
-        // Analyze the argument and check it's an array type
+        // Analyze the argument and check it's an array or string type
         let arg_type = self.analyze_expression(&args[0])?;
+
+        if arg_type == Type::String {
+            // String length returns byte (max 255 characters)
+            return Some(Type::Byte);
+        }
 
         if !arg_type.is_array() {
             self.error(CompileError::new(
                 ErrorCode::TypeMismatch,
                 format!(
-                    "Function 'len' expects an array argument, found {}",
+                    "Function 'len' expects an array or string argument, found {}",
                     arg_type
                 ),
                 span.clone(),
@@ -236,5 +249,51 @@ impl FunctionAnalyzer for Analyzer {
 
         // Return type is word (16-bit to support arrays up to 65535 elements)
         Some(Type::Word)
+    }
+
+    fn analyze_str_at_call(&mut self, args: &[Expr], span: &Span) -> Option<Type> {
+        // str_at() requires exactly two arguments
+        if args.len() != 2 {
+            self.error(CompileError::new(
+                ErrorCode::WrongNumberOfArguments,
+                format!(
+                    "Function 'str_at' expects 2 arguments, but {} were provided",
+                    args.len()
+                ),
+                span.clone(),
+            ));
+            return None;
+        }
+
+        // First argument must be a string
+        let arg0_type = self.analyze_expression(&args[0])?;
+        if arg0_type != Type::String {
+            self.error(CompileError::new(
+                ErrorCode::TypeMismatch,
+                format!(
+                    "First argument of 'str_at' must be a string, found {}",
+                    arg0_type
+                ),
+                args[0].span.clone(),
+            ));
+            return None;
+        }
+
+        // Second argument must be a byte (index)
+        let arg1_type = self.analyze_expression(&args[1])?;
+        if !arg1_type.is_integer() {
+            self.error(CompileError::new(
+                ErrorCode::TypeMismatch,
+                format!(
+                    "Second argument of 'str_at' must be an integer, found {}",
+                    arg1_type
+                ),
+                args[1].span.clone(),
+            ));
+            return None;
+        }
+
+        // Return type is byte (character code)
+        Some(Type::Byte)
     }
 }

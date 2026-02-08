@@ -270,11 +270,24 @@ def main():
 }
 
 #[test]
-fn test_analyze_error_string_compound_assign() {
+fn test_analyze_string_compound_assign_valid() {
+    // String += string now works (concatenation)
     let source = r#"
 def main():
     s: string = "hello"
-    s += "world"
+    s += " world"
+"#;
+    let result = analyze_source(source);
+    assert!(result.is_ok(), "String += string should work");
+}
+
+#[test]
+fn test_analyze_error_string_compound_assign_with_int() {
+    // String += int should still fail
+    let source = r#"
+def main():
+    s: string = "hello"
+    s += 5
 "#;
     let result = analyze_source(source);
     assert!(result.is_err());

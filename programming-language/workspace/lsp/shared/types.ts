@@ -258,15 +258,26 @@ export const COBRA64_BUILTINS: BuiltinFunction[] = [
         ],
         returnType: 'byte',
     },
-    // Array functions
+    // Array/String functions
     {
         name: 'len',
-        signature: 'len(array) -> word',
-        description: 'Returns the length (number of elements) of an array.',
+        signature: 'len(value) -> byte/word',
+        description: 'Returns the length. For strings: returns byte (0-255). For arrays: returns word (0-65535).',
         parameters: [
-            { name: 'array', type: 'array', description: 'Array to get length of' },
+            { name: 'value', type: 'array/string', description: 'Array or string to get length of' },
         ],
-        returnType: 'word',
+        returnType: 'byte/word',
+    },
+    // String functions
+    {
+        name: 'str_at',
+        signature: 'str_at(s: string, i: byte) -> byte',
+        description: 'Returns the character (byte value) at position i in the string.',
+        parameters: [
+            { name: 's', type: 'string', description: 'String to get character from' },
+            { name: 'i', type: 'byte', description: 'Index (0-based)' },
+        ],
+        returnType: 'byte',
     },
     // Random functions
     {

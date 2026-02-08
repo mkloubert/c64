@@ -76,8 +76,41 @@ impl OperatorChecker for Analyzer {
         span: &Span,
     ) -> Option<Type> {
         match op {
+            // Add operator - valid for numeric types AND strings (concatenation)
+            BinaryOp::Add => {
+                // String concatenation: string + string -> string
+                if *left == Type::String && *right == Type::String {
+                    return Some(Type::String);
+                }
+                // Mixed string + non-string is an error
+                if *left == Type::String || *right == Type::String {
+                    self.error(CompileError::new(
+                        ErrorCode::InvalidOperatorForType,
+                        format!(
+                            "Cannot concatenate {} and {} (both must be strings)",
+                            left, right
+                        ),
+                        span.clone(),
+                    ));
+                    return None;
+                }
+                // Numeric addition
+                if !left.is_numeric() || !right.is_numeric() {
+                    self.error(CompileError::new(
+                        ErrorCode::InvalidOperatorForType,
+                        format!(
+                            "Operator + requires numeric operands, found {} and {}",
+                            left, right
+                        ),
+                        span.clone(),
+                    ));
+                    return None;
+                }
+                Type::binary_result_type(left, right)
+            }
+
             // Arithmetic operators - valid for all numeric types (integers, fixed, float)
-            BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div => {
+            BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div => {
                 if !left.is_numeric() || !right.is_numeric() {
                     self.error(CompileError::new(
                         ErrorCode::InvalidOperatorForType,

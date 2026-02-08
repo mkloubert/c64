@@ -1,0 +1,70 @@
+# Cobra64 - String Operations Demo
+#
+# This example demonstrates the string operations:
+# - len() on strings
+# - str_at() for character access
+# - + operator for concatenation
+
+def main():
+    cls()
+    println("STRING OPERATIONS DEMO")
+    println("======================")
+    println("")
+
+    # String length with len()
+    println("1. STRING LENGTH (len)")
+    println("----------------------")
+    name: string = "COBRA64"
+    print("String: ")
+    println(name)
+    print("Length: ")
+    println(len(name))
+    println("")
+
+    # Character access with str_at()
+    println("2. CHARACTER ACCESS (str_at)")
+    println("----------------------------")
+    print("Characters in '")
+    print(name)
+    println("':")
+    i: byte = 0
+    while i < len(name):
+        print("  [")
+        print(i)
+        print("] = ")
+        println(str_at(name, i))
+        i += 1
+    println("")
+
+    # String concatenation with +
+    println("3. CONCATENATION (+)")
+    println("--------------------")
+    first: string = "HELLO"
+    second: string = "WORLD"
+    combined: string = first + " " + second
+    print("Combined: ")
+    println(combined)
+    print("Length: ")
+    println(len(combined))
+    println("")
+
+    # Practical example: greeting
+    println("4. GREETING EXAMPLE")
+    println("-------------------")
+    player: string = "PLAYER1"
+    greeting: string = "WELCOME, " + player + "!"
+    println(greeting)
+    println("")
+
+    # Check if first char is uppercase
+    println("5. FIRST CHARACTER CHECK")
+    println("------------------------")
+    test: string = "COBRA64"
+    first_char: byte = str_at(test, 0)
+    print("First char of '")
+    print(test)
+    print("': ")
+    println(first_char)
+
+    println("")
+    println("DONE!")
