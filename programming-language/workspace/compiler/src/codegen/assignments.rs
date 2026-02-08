@@ -172,57 +172,56 @@ impl AssignmentEmitter for CodeGenerator {
                 self.emit_store_to_address(var.address, &var.var_type);
             }
             AssignTarget::ArrayElement { name, index } => {
-                // For array assignment, we need to calculate the address
-                let var = self.get_variable(name).ok_or_else(|| {
-                    CompileError::new(
-                        ErrorCode::UndefinedVariable,
-                        format!("Undefined array '{}'", name),
-                        assign.span.clone(),
-                    )
-                })?;
+                self.generate_array_element_assignment(assign, name, index)?;
+            }
+        }
 
-                let is_word_array =
-                    matches!(var.var_type, Type::WordArray(_) | Type::SwordArray(_));
+        Ok(())
+    }
+}
 
-                // Only simple assignment is supported for arrays currently
-                if assign.op != AssignOp::Assign {
-                    return Err(CompileError::new(
-                        ErrorCode::NotImplemented,
-                        "Compound assignment operators on array elements not yet supported",
-                        assign.span.clone(),
-                    ));
-                }
+/// Helper methods for array element assignments.
+impl CodeGenerator {
+    /// Generate code for array element assignment (simple and compound).
+    fn generate_array_element_assignment(
+        &mut self,
+        assign: &Assignment,
+        name: &str,
+        index: &crate::ast::Expr,
+    ) -> Result<(), CompileError> {
+        let var = self.get_variable(name).ok_or_else(|| {
+            CompileError::new(
+                ErrorCode::UndefinedVariable,
+                format!("Undefined array '{}'", name),
+                assign.span.clone(),
+            )
+        })?;
 
-                // Generate value first and save it
+        let is_word_array = matches!(var.var_type, Type::WordArray(_) | Type::SwordArray(_));
+        let var_address = var.address;
+
+        match assign.op {
+            AssignOp::Assign => {
+                // Simple assignment - generate value first, then index
                 self.generate_expression(&assign.value)?;
                 if is_word_array {
-                    // Save both bytes (A=low, X=high)
                     self.emit_byte(opcodes::STA_ZP);
                     self.emit_byte(zeropage::TMP2);
                     self.emit_byte(opcodes::STX_ZP);
                     self.emit_byte(zeropage::TMP2_HI);
                 } else {
-                    self.emit_byte(opcodes::PHA); // Save 8-bit value
+                    self.emit_byte(opcodes::PHA);
                 }
 
-                // Generate index
                 self.generate_expression(index)?;
                 if is_word_array {
-                    // Multiply index by 2 for word arrays
                     self.emit_byte(opcodes::ASL_ACC);
                 }
-                self.emit_byte(opcodes::TAY); // Y = index (or index*2)
+                self.emit_byte(opcodes::TAY);
 
-                // Load base address into TMP1
-                self.emit_imm(opcodes::LDA_IMM, (var.address & 0xFF) as u8);
-                self.emit_byte(opcodes::STA_ZP);
-                self.emit_byte(zeropage::TMP1);
-                self.emit_imm(opcodes::LDA_IMM, (var.address >> 8) as u8);
-                self.emit_byte(opcodes::STA_ZP);
-                self.emit_byte(zeropage::TMP1_HI);
+                self.emit_array_base_address(var_address);
 
                 if is_word_array {
-                    // Store 16-bit value
                     self.emit_byte(opcodes::LDA_ZP);
                     self.emit_byte(zeropage::TMP2);
                     self.emit_byte(opcodes::STA_IZY);
@@ -233,13 +232,402 @@ impl AssignmentEmitter for CodeGenerator {
                     self.emit_byte(opcodes::STA_IZY);
                     self.emit_byte(zeropage::TMP1);
                 } else {
-                    // Store 8-bit value
                     self.emit_byte(opcodes::PLA);
                     self.emit_byte(opcodes::STA_IZY);
                     self.emit_byte(zeropage::TMP1);
                 }
             }
+            _ => {
+                // Compound assignment - need to load current value first
+                if is_word_array {
+                    self.generate_word_array_compound_assignment(
+                        assign,
+                        index,
+                        var_address,
+                    )?;
+                } else {
+                    self.generate_byte_array_compound_assignment(
+                        assign,
+                        index,
+                        var_address,
+                    )?;
+                }
+            }
         }
+
+        Ok(())
+    }
+
+    /// Emit base address loading into TMP1/TMP1_HI.
+    fn emit_array_base_address(&mut self, address: u16) {
+        self.emit_imm(opcodes::LDA_IMM, (address & 0xFF) as u8);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_imm(opcodes::LDA_IMM, (address >> 8) as u8);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+    }
+
+    /// Generate compound assignment for byte arrays.
+    fn generate_byte_array_compound_assignment(
+        &mut self,
+        assign: &Assignment,
+        index: &crate::ast::Expr,
+        var_address: u16,
+    ) -> Result<(), CompileError> {
+        // Step 1: Calculate index and store in Y, save to TMP4
+        self.generate_expression(index)?;
+        self.emit_byte(opcodes::TAY);
+        self.emit_byte(opcodes::STY_ZP);
+        self.emit_byte(zeropage::TMP4);
+
+        // Step 2: Load base address into TMP1
+        self.emit_array_base_address(var_address);
+
+        // Step 3: Load current array element value into TMP3
+        self.emit_byte(opcodes::LDA_IZY);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP3);
+
+        // Step 4: Generate RHS expression and store in TMP2
+        self.generate_expression(&assign.value)?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+
+        // Step 5: Restore Y register
+        self.emit_byte(opcodes::LDY_ZP);
+        self.emit_byte(zeropage::TMP4);
+
+        // Step 6: Perform the compound operation
+        match assign.op {
+            AssignOp::AddAssign => {
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::CLC);
+                self.emit_byte(opcodes::ADC_ZP);
+                self.emit_byte(zeropage::TMP2);
+            }
+            AssignOp::SubAssign => {
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::SEC);
+                self.emit_byte(opcodes::SBC_ZP);
+                self.emit_byte(zeropage::TMP2);
+            }
+            AssignOp::MulAssign => {
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::TAX);
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP2);
+                self.emit_jsr_label("__mul_byte");
+            }
+            AssignOp::DivAssign => {
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP2);
+                self.emit_byte(opcodes::TAX);
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_jsr_label("__div_byte");
+            }
+            AssignOp::ModAssign => {
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP2);
+                self.emit_byte(opcodes::TAX);
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_jsr_label("__div_byte");
+                self.emit_byte(opcodes::TXA); // Remainder is in X
+            }
+            AssignOp::BitAndAssign => {
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::AND_ZP);
+                self.emit_byte(zeropage::TMP2);
+            }
+            AssignOp::BitOrAssign => {
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::ORA_ZP);
+                self.emit_byte(zeropage::TMP2);
+            }
+            AssignOp::BitXorAssign => {
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::EOR_ZP);
+                self.emit_byte(zeropage::TMP2);
+            }
+            AssignOp::ShiftLeftAssign => {
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::LDX_ZP);
+                self.emit_byte(zeropage::TMP2);
+                let loop_label = self.make_label("arr_shl_loop");
+                let done_label = self.make_label("arr_shl_done");
+                self.define_label(&loop_label);
+                self.emit_byte(opcodes::CPX_IMM);
+                self.emit_byte(0);
+                self.emit_branch(opcodes::BEQ, &done_label);
+                self.emit_byte(opcodes::ASL_ACC);
+                self.emit_byte(opcodes::DEX);
+                self.emit_jmp(&loop_label);
+                self.define_label(&done_label);
+            }
+            AssignOp::ShiftRightAssign => {
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::LDX_ZP);
+                self.emit_byte(zeropage::TMP2);
+                let loop_label = self.make_label("arr_shr_loop");
+                let done_label = self.make_label("arr_shr_done");
+                self.define_label(&loop_label);
+                self.emit_byte(opcodes::CPX_IMM);
+                self.emit_byte(0);
+                self.emit_branch(opcodes::BEQ, &done_label);
+                self.emit_byte(opcodes::LSR_ACC);
+                self.emit_byte(opcodes::DEX);
+                self.emit_jmp(&loop_label);
+                self.define_label(&done_label);
+            }
+            AssignOp::Assign => unreachable!(),
+        }
+
+        // Step 7: Restore Y and store result back to array element
+        self.emit_byte(opcodes::LDY_ZP);
+        self.emit_byte(zeropage::TMP4);
+        self.emit_byte(opcodes::STA_IZY);
+        self.emit_byte(zeropage::TMP1);
+
+        Ok(())
+    }
+
+    /// Generate compound assignment for word arrays.
+    fn generate_word_array_compound_assignment(
+        &mut self,
+        assign: &Assignment,
+        index: &crate::ast::Expr,
+        var_address: u16,
+    ) -> Result<(), CompileError> {
+        // Step 1: Calculate index*2 and store in Y, save to TMP4
+        self.generate_expression(index)?;
+        self.emit_byte(opcodes::ASL_ACC); // index * 2 for word arrays
+        self.emit_byte(opcodes::TAY);
+        self.emit_byte(opcodes::STY_ZP);
+        self.emit_byte(zeropage::TMP4);
+
+        // Step 2: Load base address into TMP1
+        self.emit_array_base_address(var_address);
+
+        // Step 3: Load current 16-bit array element value into TMP3/TMP3_HI
+        self.emit_byte(opcodes::LDA_IZY);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::INY);
+        self.emit_byte(opcodes::LDA_IZY);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP3_HI);
+
+        // Step 4: Generate RHS expression and store in TMP2/TMP2_HI
+        self.generate_expression(&assign.value)?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::STX_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+
+        // Step 5: Restore Y register
+        self.emit_byte(opcodes::LDY_ZP);
+        self.emit_byte(zeropage::TMP4);
+
+        // Step 6: Perform the compound operation (16-bit)
+        match assign.op {
+            AssignOp::AddAssign => {
+                // 16-bit addition
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::CLC);
+                self.emit_byte(opcodes::ADC_ZP);
+                self.emit_byte(zeropage::TMP2);
+                self.emit_byte(opcodes::STA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3_HI);
+                self.emit_byte(opcodes::ADC_ZP);
+                self.emit_byte(zeropage::TMP2_HI);
+                self.emit_byte(opcodes::STA_ZP);
+                self.emit_byte(zeropage::TMP3_HI);
+            }
+            AssignOp::SubAssign => {
+                // 16-bit subtraction
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::SEC);
+                self.emit_byte(opcodes::SBC_ZP);
+                self.emit_byte(zeropage::TMP2);
+                self.emit_byte(opcodes::STA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3_HI);
+                self.emit_byte(opcodes::SBC_ZP);
+                self.emit_byte(zeropage::TMP2_HI);
+                self.emit_byte(opcodes::STA_ZP);
+                self.emit_byte(zeropage::TMP3_HI);
+            }
+            AssignOp::MulAssign => {
+                // 16-bit multiplication via runtime function
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::LDX_ZP);
+                self.emit_byte(zeropage::TMP3_HI);
+                self.emit_byte(opcodes::PHA);
+                self.emit_byte(opcodes::TXA);
+                self.emit_byte(opcodes::PHA);
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP2);
+                self.emit_byte(opcodes::LDX_ZP);
+                self.emit_byte(zeropage::TMP2_HI);
+                self.emit_jsr_label("__mul_word");
+                self.emit_byte(opcodes::STA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::STX_ZP);
+                self.emit_byte(zeropage::TMP3_HI);
+            }
+            AssignOp::DivAssign => {
+                // 16-bit division via runtime function
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::LDX_ZP);
+                self.emit_byte(zeropage::TMP3_HI);
+                self.emit_byte(opcodes::PHA);
+                self.emit_byte(opcodes::TXA);
+                self.emit_byte(opcodes::PHA);
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP2);
+                self.emit_byte(opcodes::LDX_ZP);
+                self.emit_byte(zeropage::TMP2_HI);
+                self.emit_jsr_label("__div_word");
+                self.emit_byte(opcodes::STA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::STX_ZP);
+                self.emit_byte(zeropage::TMP3_HI);
+            }
+            AssignOp::ModAssign => {
+                // 16-bit modulo via runtime function
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::LDX_ZP);
+                self.emit_byte(zeropage::TMP3_HI);
+                self.emit_byte(opcodes::PHA);
+                self.emit_byte(opcodes::TXA);
+                self.emit_byte(opcodes::PHA);
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP2);
+                self.emit_byte(opcodes::LDX_ZP);
+                self.emit_byte(zeropage::TMP2_HI);
+                self.emit_jsr_label("__mod_word");
+                self.emit_byte(opcodes::STA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::STX_ZP);
+                self.emit_byte(zeropage::TMP3_HI);
+            }
+            AssignOp::BitAndAssign => {
+                // 16-bit AND
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::AND_ZP);
+                self.emit_byte(zeropage::TMP2);
+                self.emit_byte(opcodes::STA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3_HI);
+                self.emit_byte(opcodes::AND_ZP);
+                self.emit_byte(zeropage::TMP2_HI);
+                self.emit_byte(opcodes::STA_ZP);
+                self.emit_byte(zeropage::TMP3_HI);
+            }
+            AssignOp::BitOrAssign => {
+                // 16-bit OR
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::ORA_ZP);
+                self.emit_byte(zeropage::TMP2);
+                self.emit_byte(opcodes::STA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3_HI);
+                self.emit_byte(opcodes::ORA_ZP);
+                self.emit_byte(zeropage::TMP2_HI);
+                self.emit_byte(opcodes::STA_ZP);
+                self.emit_byte(zeropage::TMP3_HI);
+            }
+            AssignOp::BitXorAssign => {
+                // 16-bit XOR
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::EOR_ZP);
+                self.emit_byte(zeropage::TMP2);
+                self.emit_byte(opcodes::STA_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::LDA_ZP);
+                self.emit_byte(zeropage::TMP3_HI);
+                self.emit_byte(opcodes::EOR_ZP);
+                self.emit_byte(zeropage::TMP2_HI);
+                self.emit_byte(opcodes::STA_ZP);
+                self.emit_byte(zeropage::TMP3_HI);
+            }
+            AssignOp::ShiftLeftAssign => {
+                // 16-bit shift left
+                self.emit_byte(opcodes::LDX_ZP);
+                self.emit_byte(zeropage::TMP2);
+                let loop_label = self.make_label("warr_shl_loop");
+                let done_label = self.make_label("warr_shl_done");
+                self.define_label(&loop_label);
+                self.emit_byte(opcodes::CPX_IMM);
+                self.emit_byte(0);
+                self.emit_branch(opcodes::BEQ, &done_label);
+                self.emit_byte(opcodes::ASL_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::ROL_ZP);
+                self.emit_byte(zeropage::TMP3_HI);
+                self.emit_byte(opcodes::DEX);
+                self.emit_jmp(&loop_label);
+                self.define_label(&done_label);
+            }
+            AssignOp::ShiftRightAssign => {
+                // 16-bit shift right
+                self.emit_byte(opcodes::LDX_ZP);
+                self.emit_byte(zeropage::TMP2);
+                let loop_label = self.make_label("warr_shr_loop");
+                let done_label = self.make_label("warr_shr_done");
+                self.define_label(&loop_label);
+                self.emit_byte(opcodes::CPX_IMM);
+                self.emit_byte(0);
+                self.emit_branch(opcodes::BEQ, &done_label);
+                self.emit_byte(opcodes::LSR_ZP);
+                self.emit_byte(zeropage::TMP3_HI);
+                self.emit_byte(opcodes::ROR_ZP);
+                self.emit_byte(zeropage::TMP3);
+                self.emit_byte(opcodes::DEX);
+                self.emit_jmp(&loop_label);
+                self.define_label(&done_label);
+            }
+            AssignOp::Assign => unreachable!(),
+        }
+
+        // Step 7: Restore Y and store 16-bit result back to array element
+        self.emit_byte(opcodes::LDY_ZP);
+        self.emit_byte(zeropage::TMP4);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::STA_IZY);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::INY);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3_HI);
+        self.emit_byte(opcodes::STA_IZY);
+        self.emit_byte(zeropage::TMP1);
 
         Ok(())
     }

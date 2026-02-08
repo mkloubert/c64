@@ -594,3 +594,215 @@ def main():
     let code = cobra64::compile(source).expect("Compilation should succeed");
     assert!(!code.is_empty(), "Generated code should not be empty");
 }
+
+// ============================================================================
+// Compound Assignment Integration Tests
+// ============================================================================
+
+/// Test all compound assignment operators on byte variables.
+#[test]
+fn test_compile_compound_assign_byte_all_ops() {
+    let source = r#"
+def main():
+    x: byte = 100
+    x += 10
+    x -= 5
+    x *= 2
+    x /= 4
+    x %= 7
+    x &= 15
+    x |= 240
+    x ^= 85
+    x <<= 2
+    x >>= 1
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+    assert!(code.len() > 100, "Code should include all compound ops");
+}
+
+/// Test compound assignment on word variables.
+#[test]
+fn test_compile_compound_assign_word() {
+    let source = r#"
+def main():
+    x: word = 1000
+    x += 500
+    x -= 200
+    x *= 2
+    x /= 4
+    x &= 255
+    x |= 256
+    x ^= 128
+    x <<= 4
+    x >>= 2
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+    assert!(code.len() > 150, "Code should include word compound ops");
+}
+
+/// Test compound assignment on signed types.
+#[test]
+fn test_compile_compound_assign_signed() {
+    let source = r#"
+def main():
+    x: sbyte = 50
+    x += 10
+    x -= 100
+
+    y: sword = 1000
+    y += 500
+    y -= 2000
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+    assert!(!code.is_empty(), "Code should compile signed compound ops");
+}
+
+/// Test compound assignment on byte array elements.
+#[test]
+fn test_compile_compound_assign_byte_array() {
+    let source = r#"
+def main():
+    arr: byte[10]
+    arr[0] = 100
+    arr[0] += 10
+    arr[1] = 50
+    arr[1] -= 5
+    arr[2] = 5
+    arr[2] *= 3
+    arr[3] = 100
+    arr[3] /= 4
+    arr[4] = 17
+    arr[4] %= 5
+    arr[5] = 255
+    arr[5] &= 15
+    arr[6] = 0
+    arr[6] |= 170
+    arr[7] = 255
+    arr[7] ^= 85
+    arr[8] = 1
+    arr[8] <<= 4
+    arr[9] = 128
+    arr[9] >>= 3
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+    assert!(code.len() > 200, "Code should include byte array compound ops");
+}
+
+/// Test compound assignment on word array elements.
+#[test]
+fn test_compile_compound_assign_word_array() {
+    let source = r#"
+def main():
+    arr: word[5]
+    arr[0] = 1000
+    arr[0] += 500
+    arr[1] = 2000
+    arr[1] -= 500
+    arr[2] = 100
+    arr[2] *= 10
+    arr[3] = 65535
+    arr[3] &= 255
+    arr[4] = 1
+    arr[4] <<= 8
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+    assert!(code.len() > 200, "Code should include word array compound ops");
+}
+
+/// Test compound assignment with variable index.
+#[test]
+fn test_compile_compound_assign_variable_index() {
+    let source = r#"
+def main():
+    arr: byte[10]
+    i: byte = 5
+    arr[i] = 10
+    arr[i] += 5
+    arr[i] -= 2
+    arr[i] *= 2
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+    assert!(!code.is_empty(), "Code should compile variable index compound ops");
+}
+
+/// Test compound assignment with expression index.
+#[test]
+fn test_compile_compound_assign_expression_index() {
+    let source = r#"
+def main():
+    arr: byte[20]
+    i: byte = 2
+    arr[i + 3] = 10
+    arr[i + 3] += 5
+    arr[i * 2] = 20
+    arr[i * 2] -= 10
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+    assert!(!code.is_empty(), "Code should compile expression index compound ops");
+}
+
+/// Test compound assignment in while loop.
+#[test]
+fn test_compile_compound_assign_in_loop() {
+    let source = r#"
+def main():
+    sum: word = 0
+    i: byte = 1
+    while i <= 10:
+        sum += i
+        i += 1
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+    assert!(code.len() > 50, "Code should include loop with compound ops");
+}
+
+/// Test compound assignment with expression on RHS.
+#[test]
+fn test_compile_compound_assign_expression_rhs() {
+    let source = r#"
+def main():
+    x: byte = 10
+    y: byte = 3
+    x += y * 2
+    x -= y + 1
+    x *= y - 1
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+    assert!(!code.is_empty(), "Code should compile expression RHS compound ops");
+}
+
+/// Test compound assignment in conditional.
+#[test]
+fn test_compile_compound_assign_in_if() {
+    let source = r#"
+def main():
+    x: byte = 10
+    if x > 5:
+        x += 10
+    else:
+        x -= 5
+
+    if x < 100:
+        x *= 2
+"#;
+
+    let code = cobra64::compile(source).expect("Compilation should succeed");
+    assert!(!code.is_empty(), "Code should compile conditional compound ops");
+}
+
+/// Test the compound_assignment.cb64 example compiles.
+#[test]
+fn test_compile_compound_assignment_example() {
+    let source = include_str!("../examples/compound_assignment.cb64");
+    let code = cobra64::compile(source).expect("Example should compile");
+    assert!(code.len() > 500, "Example should generate substantial code");
+}

@@ -524,6 +524,53 @@ def main():
 
 **Note:** Bitwise operators only work with integer types (`byte`, `sbyte`, `word`, `sword`). They are not supported for `fixed` or `float`.
 
+#### Compound Assignment Operators
+
+Compound assignment operators combine an operation with assignment:
+
+| Operator | Description         | Equivalent     |
+| -------- | ------------------- | -------------- |
+| `+=`     | Add and assign      | `x = x + y`    |
+| `-=`     | Subtract and assign | `x = x - y`    |
+| `*=`     | Multiply and assign | `x = x * y`    |
+| `/=`     | Divide and assign   | `x = x / y`    |
+| `%=`     | Modulo and assign   | `x = x % y`    |
+| `&=`     | Bitwise AND assign  | `x = x & y`    |
+| `\|=`    | Bitwise OR assign   | `x = x \| y`   |
+| `^=`     | Bitwise XOR assign  | `x = x ^ y`    |
+| `<<=`    | Left shift assign   | `x = x << y`   |
+| `>>=`    | Right shift assign  | `x = x >> y`   |
+
+**Usage:**
+
+```python
+def main():
+    # Variable compound assignment
+    x: byte = 10
+    x += 5      # x is now 15
+    x *= 2      # x is now 30
+    x &= 15     # x is now 14
+
+    # Array element compound assignment
+    arr: byte[5]
+    arr[0] = 10
+    arr[0] += 5     # arr[0] is now 15
+
+    # Word array compound assignment
+    scores: word[3]
+    scores[0] = 1000
+    scores[0] += 500    # scores[0] is now 1500
+
+    # In loops (common pattern)
+    sum: word = 0
+    i: byte = 1
+    while i <= 10:
+        sum += i    # Accumulate sum
+        i += 1      # Increment counter
+```
+
+**Note:** Compound assignment works with all integer types (`byte`, `sbyte`, `word`, `sword`) on both variables and array elements. Bitwise compound operators (`&=`, `|=`, `^=`, `<<=`, `>>=`) only work with integer types.
+
 #### Operator Precedence (highest to lowest)
 
 1. `()` - Parentheses
@@ -1328,6 +1375,14 @@ The generated PRG and D64 files should work with any C64 emulator that supports 
 ---
 
 ## Version History
+
+- **0.9.0** - Compound assignment operators
+  - Added all 10 compound assignment operators: `+=`, `-=`, `*=`, `/=`, `%=`, `&=`, `|=`, `^=`, `<<=`, `>>=`
+  - Compound assignment works on both variables and array elements
+  - Supports all integer types: `byte`, `sbyte`, `word`, `sword`
+  - Byte array element compound assignment with proper index preservation
+  - Word array element compound assignment with 16-bit operations
+  - New example program: `examples/compound_assignment.cb64`
 
 - **0.8.0** - elif bug fix
   - **BUG FIX:** elif statements now work correctly

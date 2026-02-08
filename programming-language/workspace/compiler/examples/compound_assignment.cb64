@@ -1,0 +1,80 @@
+# Compound Assignment Operators Demo
+# Demonstrates all 10 compound assignment operators in Cobra64
+
+def main():
+    cls()
+    println("COMPOUND ASSIGNMENT DEMO")
+    println("")
+
+    # Arithmetic operators on variables
+    println("ARITHMETIC OPERATORS")
+    x: byte = 10
+    x += 5      # x = 15
+    x -= 3      # x = 12
+    x *= 2      # x = 24
+    x /= 4      # x = 6
+    x %= 4      # x = 2
+
+    # Bitwise operators
+    println("BITWISE OPERATORS")
+    y: byte = 255
+    y &= 15     # y = 15
+    y |= 240    # y = 255
+    y ^= 170    # y = 85
+
+    # Shift operators
+    println("SHIFT OPERATORS")
+    z: byte = 1
+    z <<= 4     # z = 16
+    z >>= 2     # z = 4
+
+    # Word operations
+    println("WORD OPERATIONS")
+    w: word = 1000
+    w += 500    # w = 1500
+    w -= 200    # w = 1300
+    w *= 2      # w = 2600
+
+    # Array compound assignment (byte)
+    println("BYTE ARRAY OPS")
+    arr: byte[5]
+    arr[0] = 10
+    arr[1] = 20
+    arr[2] = 8
+    arr[3] = 255
+    arr[4] = 1
+
+    arr[0] += 5     # arr[0] = 15
+    arr[1] -= 5     # arr[1] = 15
+    arr[2] *= 3     # arr[2] = 24
+    arr[3] &= 15    # arr[3] = 15
+    arr[4] <<= 4    # arr[4] = 16
+
+    # Array compound assignment (word)
+    println("WORD ARRAY OPS")
+    warr: word[3]
+    warr[0] = 1000
+    warr[1] = 2000
+    warr[2] = 256
+
+    warr[0] += 500  # warr[0] = 1500
+    warr[1] -= 500  # warr[1] = 1500
+    warr[2] <<= 4   # warr[2] = 4096
+
+    # Compound assignment in loop
+    println("LOOP WITH +=")
+    sum: word = 0
+    i: byte = 1
+    while i <= 10:
+        sum += i
+        i += 1
+    # sum should be 55 (1+2+3+...+10)
+
+    # Compound assignment with expressions
+    println("EXPRESSION RHS")
+    a: byte = 10
+    b: byte = 3
+    a += b * 2  # a = 16
+
+    println("")
+    println("ALL TESTS COMPLETE!")
