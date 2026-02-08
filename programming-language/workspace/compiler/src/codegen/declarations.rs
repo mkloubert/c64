@@ -72,14 +72,11 @@ impl DeclarationEmitter for CodeGenerator {
     }
 
     fn generate_var_decl(&mut self, decl: &VarDecl) -> Result<(), CompileError> {
-        // Use explicit type or infer from initializer
-        let mut var_type = if let Some(ref t) = decl.var_type {
-            t.clone()
-        } else if let Some(ref init) = decl.initializer {
-            self.infer_type_from_expr(init)
-        } else {
-            Type::Byte // Fallback
-        };
+        // Explicit type is required (parser enforces this)
+        let mut var_type = decl
+            .var_type
+            .clone()
+            .expect("Variable declaration must have explicit type");
 
         // If the type is an array without a size but we have an array literal,
         // update the type to include the size from the literal
@@ -114,12 +111,11 @@ impl DeclarationEmitter for CodeGenerator {
     }
 
     fn generate_const_decl(&mut self, decl: &ConstDecl) -> Result<(), CompileError> {
-        // Use explicit type or infer from value
-        let const_type = if let Some(ref t) = decl.const_type {
-            t.clone()
-        } else {
-            self.infer_type_from_expr(&decl.value)
-        };
+        // Explicit type is required (parser enforces this)
+        let const_type = decl
+            .const_type
+            .clone()
+            .expect("Constant declaration must have explicit type");
 
         let address = self.allocate_variable(&decl.name, &const_type, true);
 

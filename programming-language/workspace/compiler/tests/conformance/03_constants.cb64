@@ -2,12 +2,12 @@
 # Tests: uppercase naming convention for constants, constant usage in expressions
 # Expected: Compiles without errors, constants work in expressions
 
-# Global constants (UPPERCASE names without 'const' keyword)
-MAX_VALUE = 255
-SCREEN_WIDTH = 40
-SCREEN_HEIGHT = 25
-VIC_BASE = $D000
-SPRITE_ENABLE = $D015
+# Global constants with explicit type annotation
+MAX_VALUE: byte = 255
+SCREEN_WIDTH: byte = 40
+SCREEN_HEIGHT: byte = 25
+VIC_BASE: word = $D000
+SPRITE_ENABLE: word = $D015
 
 def main():
     x: byte = MAX_VALUE  # Use constants in expressions

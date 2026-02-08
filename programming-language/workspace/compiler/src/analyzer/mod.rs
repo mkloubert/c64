@@ -300,7 +300,7 @@ mod tests {
 
     #[test]
     fn test_valid_constant_declaration() {
-        let result = analyze_source("MAX = 100\ndef main():\n    pass");
+        let result = analyze_source("MAX: byte = 100\ndef main():\n    pass");
         assert!(result.is_ok());
     }
 
@@ -448,7 +448,7 @@ mod tests {
 
     #[test]
     fn test_error_assign_to_constant() {
-        let result = analyze_source("X = 5\ndef main():\n    X = 10");
+        let result = analyze_source("X: byte = 5\ndef main():\n    X = 10");
         assert!(has_error_code(&result, ErrorCode::CannotAssignToConstant));
     }
 
@@ -917,7 +917,7 @@ mod tests {
 
     #[test]
     fn test_valid_const_negative() {
-        let result = analyze_source("MIN = -128\ndef main():\n    pass");
+        let result = analyze_source("MIN: sbyte = -128\ndef main():\n    pass");
         assert!(result.is_ok());
     }
 
@@ -1213,142 +1213,141 @@ mod tests {
     }
 
     // ========================================
-    // Type Inference Tests
+    // Explicit Type Annotation Tests
     // ========================================
 
     #[test]
-    fn test_type_inference_var_byte() {
-        // Value 0-255 should infer to byte
-        let result = analyze_source("x = 10\ndef main():\n    pass");
+    fn test_explicit_type_var_byte() {
+        // Variable with explicit byte type
+        let result = analyze_source("x: byte = 10\ndef main():\n    pass");
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_type_inference_var_byte_max() {
-        // Value 255 should infer to byte
-        let result = analyze_source("x = 255\ndef main():\n    pass");
+    fn test_explicit_type_var_byte_max() {
+        // Variable with explicit byte type at max value
+        let result = analyze_source("x: byte = 255\ndef main():\n    pass");
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_type_inference_var_word() {
-        // Value 256-65535 should infer to word
-        let result = analyze_source("x = 1000\ndef main():\n    pass");
+    fn test_explicit_type_var_word() {
+        // Variable with explicit word type
+        let result = analyze_source("x: word = 1000\ndef main():\n    pass");
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_type_inference_var_word_boundary() {
-        // Value 256 should infer to word (first value over byte range)
-        let result = analyze_source("x = 256\ndef main():\n    pass");
+    fn test_explicit_type_var_word_boundary() {
+        // Variable with explicit word type at boundary value
+        let result = analyze_source("x: word = 256\ndef main():\n    pass");
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_type_inference_var_negative_sbyte() {
-        // Negative value -128 to -1 should infer to sbyte
-        let result = analyze_source("x = -50\ndef main():\n    pass");
+    fn test_explicit_type_var_negative_sbyte() {
+        // Variable with explicit sbyte type for negative value
+        let result = analyze_source("x: sbyte = -50\ndef main():\n    pass");
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_type_inference_var_negative_sword() {
-        // Negative value below -128 should infer to sword
-        let result = analyze_source("x = -1000\ndef main():\n    pass");
+    fn test_explicit_type_var_negative_sword() {
+        // Variable with explicit sword type for large negative value
+        let result = analyze_source("x: sword = -1000\ndef main():\n    pass");
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_type_inference_var_float() {
-        // Decimal literal should infer to float
-        let result = analyze_source("x = 3.14\ndef main():\n    pass");
+    fn test_explicit_type_var_float() {
+        // Variable with explicit float type for decimal literal
+        let result = analyze_source("x: float = 3.14\ndef main():\n    pass");
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_type_inference_var_bool() {
-        // Boolean literal should infer to bool
-        let result = analyze_source("x = true\ndef main():\n    pass");
+    fn test_explicit_type_var_bool() {
+        // Variable with explicit bool type
+        let result = analyze_source("x: bool = true\ndef main():\n    pass");
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_type_inference_var_string() {
-        // String literal should infer to string
-        let result = analyze_source("x = \"hello\"\ndef main():\n    pass");
+    fn test_explicit_type_var_string() {
+        // Variable with explicit string type
+        let result = analyze_source("x: string = \"hello\"\ndef main():\n    pass");
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_type_inference_const_explicit_type() {
+    fn test_explicit_type_const_word() {
         // Constant with explicit type
         let result = analyze_source("MAX: word = 255\ndef main():\n    pass");
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_type_inference_const_fixed() {
+    fn test_explicit_type_const_fixed() {
         // Constant with explicit fixed type
         let result = analyze_source("PI: fixed = 3.14\ndef main():\n    pass");
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_type_inference_const_float() {
+    fn test_explicit_type_const_float() {
         // Constant with explicit float type
         let result = analyze_source("E: float = 2.718\ndef main():\n    pass");
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_type_inference_const_inferred() {
-        // Constant with inferred type (existing behavior)
-        let result = analyze_source("MIN = 0\ndef main():\n    pass");
+    fn test_explicit_type_const_byte() {
+        // Constant with explicit byte type
+        let result = analyze_source("MIN: byte = 0\ndef main():\n    pass");
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_type_inference_var_use_inferred_type() {
-        // Use an inferred variable in an expression
-        let result = analyze_source("x = 10\ndef main():\n    y: byte = x + 5");
+    fn test_explicit_type_var_use_in_expression() {
+        // Use an explicitly typed variable in an expression
+        let result = analyze_source("x: byte = 10\ndef main():\n    y: byte = x + 5");
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_type_inference_const_use_explicit_type() {
+    fn test_explicit_type_const_use_in_expression() {
         // Use a constant with explicit type in an expression
         let result = analyze_source("MAX: word = 1000\ndef main():\n    y: word = MAX + 1");
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_type_inference_mixed_declarations() {
-        // Mix of explicit and inferred types
+    fn test_explicit_type_mixed_declarations() {
+        // Multiple declarations with explicit types
         let result = analyze_source(
-            "MAX: word = 255\ncount = 0\nPI: fixed = 3.14\nE = 2.718\ndef main():\n    pass",
+            "MAX: word = 255\ncount: byte = 0\nPI: fixed = 3.14\nE: float = 2.718\ndef main():\n    pass",
         );
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_type_inference_error_without_init() {
-        // Variable without type and without initializer should fail
-        // Note: This is caught by the parser, not the analyzer
+    fn test_explicit_type_error_without_type() {
+        // Variable without type annotation should fail at parser level
         let result = analyze_source("x\ndef main():\n    pass");
         assert!(result.is_err());
     }
 
     #[test]
-    fn test_type_inference_const_type_mismatch() {
+    fn test_explicit_type_const_type_mismatch() {
         // Constant with explicit type that doesn't match value type
         let result = analyze_source("PI: byte = 3.14\ndef main():\n    pass");
         assert!(result.is_err());
     }
 
     #[test]
-    fn test_type_inference_negative_decimal() {
-        // Negative decimal should infer to float
-        let result = analyze_source("x = -3.14\ndef main():\n    pass");
+    fn test_explicit_type_negative_decimal() {
+        // Negative decimal with explicit float type
+        let result = analyze_source("x: float = -3.14\ndef main():\n    pass");
         assert!(result.is_ok());
     }
 

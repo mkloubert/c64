@@ -6,26 +6,23 @@
 # - lowercase names (first letter lowercase) = Variables
 # - Constants are immutable after declaration
 # - Constants are declared at top-level only
-#
-# Type annotation is optional for constants:
-# - NAME = value          -> Type inferred from value
-# - NAME: type = value    -> Explicit type
+# - All constants require explicit type annotation
 
-# Constants with type inference (type determined from value)
-MAX_VALUE = 255                 # byte (0-255)
-SCREEN_WIDTH = 40               # byte
-SCREEN_HEIGHT = 25              # byte
-VIC_BASE = $D000                # word (hex values > 255)
-BORDER_COLOR = $D020            # word
-BACKGROUND_COLOR = $D021        # word
+# Constants with explicit types
+MAX_VALUE: byte = 255
+SCREEN_WIDTH: byte = 40
+SCREEN_HEIGHT: byte = 25
+VIC_BASE: word = $D000
+BORDER_COLOR: word = $D020
+BACKGROUND_COLOR: word = $D021
 
-# Constants with explicit type (override inference)
+# Word type for values that need 16-bit storage
 SMALL_AS_WORD: word = 100       # Force word type for small value
 PI: fixed = 3.14159             # Use fixed instead of float
 
 # Constants with underscore prefix
-_MAX_SPRITES = 8
-_4K = 4096
+_MAX_SPRITES: byte = 8
+_4K: word = 4096
 
 def main():
     cls()

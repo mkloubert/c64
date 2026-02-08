@@ -134,6 +134,7 @@ pub enum ErrorCode {
     BreakOutsideLoop,
     ContinueOutsideLoop,
     ReturnOutsideFunction,
+    MissingTypeAnnotation,
 
     // Semantic errors (E200-E242)
     UndefinedVariable,
@@ -230,6 +231,7 @@ impl ErrorCode {
             ErrorCode::BreakOutsideLoop => "E144",
             ErrorCode::ContinueOutsideLoop => "E145",
             ErrorCode::ReturnOutsideFunction => "E146",
+            ErrorCode::MissingTypeAnnotation => "E147",
 
             // Semantic errors
             ErrorCode::UndefinedVariable => "E200",

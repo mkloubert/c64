@@ -423,8 +423,8 @@ fn test_long_identifier() {
 
 #[test]
 fn test_uppercase_constant() {
-    // Note: 'const' keyword is no longer used; uppercase names are automatically constants
-    let source = "MAX_VALUE = 255\n\ndef main():\n    x: byte = MAX_VALUE\n";
+    // Constants require explicit type annotation
+    let source = "MAX_VALUE: byte = 255\n\ndef main():\n    x: byte = MAX_VALUE\n";
     let result = cobra64::compile(source);
     assert!(result.is_ok(), "uppercase constants should be valid");
 }

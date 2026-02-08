@@ -107,32 +107,17 @@ impl StatementAnalyzer for Analyzer {
     }
 
     fn analyze_var_decl(&mut self, decl: &VarDecl) {
-        // Determine the variable type (explicit or inferred)
+        // Explicit type is required (parser enforces this)
         let var_type = if let Some(ref explicit_type) = decl.var_type {
-            // Explicit type provided
             explicit_type.clone()
         } else {
-            // Type inference - infer from initializer
-            if let Some(init) = &decl.initializer {
-                let init_type = self.analyze_expression(init);
-                if let Some(inferred) = init_type {
-                    self.infer_type_from_expr(init, &inferred)
-                } else {
-                    self.error(CompileError::new(
-                        ErrorCode::TypeMismatch,
-                        "Cannot infer type from expression",
-                        decl.span.clone(),
-                    ));
-                    Type::Byte // Fallback
-                }
-            } else {
-                self.error(CompileError::new(
-                    ErrorCode::TypeMismatch,
-                    "Variable declaration without type requires an initializer for type inference",
-                    decl.span.clone(),
-                ));
-                Type::Byte // Fallback
-            }
+            // This branch should never be reached as the parser now requires explicit types
+            self.error(CompileError::new(
+                ErrorCode::MissingTypeAnnotation,
+                "Variable declaration requires explicit type annotation",
+                decl.span.clone(),
+            ));
+            Type::Byte // Fallback for error recovery
         };
 
         // Check initializer type if present
@@ -188,9 +173,9 @@ impl StatementAnalyzer for Analyzer {
         // Analyze the value expression
         let value_type = self.analyze_expression(&decl.value);
 
-        // Determine the constant type (explicit or inferred)
+        // Explicit type is required (parser enforces this)
         let const_type = if let Some(ref explicit_type) = decl.const_type {
-            // Explicit type provided - check compatibility
+            // Check type compatibility
             if let Some(ref val_type) = value_type {
                 if !self.is_expr_assignable_to(&decl.value.kind, val_type, explicit_type) {
                     self.error(CompileError::new(
@@ -205,12 +190,13 @@ impl StatementAnalyzer for Analyzer {
             }
             explicit_type.clone()
         } else {
-            // Type inference from value
-            if let Some(ref val_type) = value_type {
-                self.infer_type_from_expr(&decl.value, val_type)
-            } else {
-                Type::Word // Fallback
-            }
+            // This branch should never be reached as the parser now requires explicit types
+            self.error(CompileError::new(
+                ErrorCode::MissingTypeAnnotation,
+                "Constant declaration requires explicit type annotation",
+                decl.span.clone(),
+            ));
+            Type::Byte // Fallback for error recovery
         };
 
         // Add to symbol table
@@ -289,11 +275,17 @@ impl StatementAnalyzer for Analyzer {
                 if let Some(symbol) = self.symbols.lookup(name) {
                     symbol.get_type().cloned()
                 } else {
-                    self.error(CompileError::new(
-                        ErrorCode::UndefinedVariable,
-                        format!("Undefined variable '{}'", name),
-                        span.clone(),
-                    ));
+                    self.error(
+                        CompileError::new(
+                            ErrorCode::UndefinedVariable,
+                            format!("Undefined variable '{}'", name),
+                            span.clone(),
+                        )
+                        .with_hint(format!(
+                            "To declare a new variable, use: {}: <type> = <value>",
+                            name
+                        )),
+                    );
                     None
                 }
             }

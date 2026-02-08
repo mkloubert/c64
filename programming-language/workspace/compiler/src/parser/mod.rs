@@ -93,6 +93,7 @@ mod tests {
     use crate::ast::{
         AssignOp, AssignTarget, BinaryOp, ExprKind, StatementKind, TopLevelItem, Type, UnaryOp,
     };
+    use crate::error::ErrorCode;
     use crate::lexer::tokenize;
 
     /// Helper to parse source code directly.
@@ -511,9 +512,10 @@ mod tests {
     #[test]
     fn test_parse_const_decl() {
         // Constant declarations are only allowed at top-level
-        let program = parse_source("MAX = 100\ndef main():\n    pass").unwrap();
+        let program = parse_source("MAX: byte = 100\ndef main():\n    pass").unwrap();
         if let TopLevelItem::Constant(decl) = &program.items[0] {
             assert_eq!(decl.name, "MAX");
+            assert_eq!(decl.const_type, Some(Type::Byte));
         } else {
             panic!("Expected const decl at top-level");
         }
@@ -689,7 +691,7 @@ mod tests {
 
     #[test]
     fn test_parse_top_level_const() {
-        let program = parse_source("MAX = 255\ndef main():\n    pass").unwrap();
+        let program = parse_source("MAX: byte = 255\ndef main():\n    pass").unwrap();
         assert_eq!(program.items.len(), 2);
         assert!(matches!(program.items[0], TopLevelItem::Constant(_)));
     }
@@ -956,9 +958,10 @@ mod tests {
 
     #[test]
     fn test_parse_const_negative_value() {
-        let program = parse_source("MIN_SBYTE = -128\ndef main():\n    pass").unwrap();
+        let program = parse_source("MIN_SBYTE: sbyte = -128\ndef main():\n    pass").unwrap();
         if let TopLevelItem::Constant(decl) = &program.items[0] {
             assert_eq!(decl.name, "MIN_SBYTE");
+            assert_eq!(decl.const_type, Some(Type::Sbyte));
             assert!(matches!(
                 decl.value.kind,
                 ExprKind::UnaryOp {
@@ -1397,17 +1400,26 @@ mod tests {
     }
 
     // ========================================
-    // Type Inference Syntax Tests
+    // Explicit Type Annotation Tests
     // ========================================
 
     #[test]
-    fn test_parse_var_decl_type_inference() {
-        // Variable at top-level with type inference: name = value
-        let program = parse_source("x = 10\ndef main():\n    pass").unwrap();
+    fn test_parse_var_decl_requires_explicit_type() {
+        // Variable without explicit type should fail
+        let result = parse_source("x = 10\ndef main():\n    pass");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.code, ErrorCode::MissingTypeAnnotation);
+    }
+
+    #[test]
+    fn test_parse_var_decl_with_explicit_type() {
+        // Variable with explicit type should work
+        let program = parse_source("x: byte = 10\ndef main():\n    pass").unwrap();
         assert_eq!(program.items.len(), 2);
         if let TopLevelItem::Variable(decl) = &program.items[0] {
             assert_eq!(decl.name, "x");
-            assert_eq!(decl.var_type, None); // Type will be inferred
+            assert_eq!(decl.var_type, Some(Type::Byte));
             assert!(decl.initializer.is_some());
         } else {
             panic!("Expected variable declaration");
@@ -1415,12 +1427,12 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_var_decl_type_inference_word_range() {
-        // Variable with value in word range
-        let program = parse_source("y = 1000\ndef main():\n    pass").unwrap();
+    fn test_parse_var_decl_word_with_explicit_type() {
+        // Variable with explicit word type
+        let program = parse_source("y: word = 1000\ndef main():\n    pass").unwrap();
         if let TopLevelItem::Variable(decl) = &program.items[0] {
             assert_eq!(decl.name, "y");
-            assert_eq!(decl.var_type, None);
+            assert_eq!(decl.var_type, Some(Type::Word));
             if let Some(init) = &decl.initializer {
                 assert!(matches!(init.kind, ExprKind::IntegerLiteral(1000)));
             } else {
@@ -1432,12 +1444,12 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_var_decl_type_inference_negative() {
-        // Variable with negative value
-        let program = parse_source("temp = -50\ndef main():\n    pass").unwrap();
+    fn test_parse_var_decl_negative_with_explicit_type() {
+        // Variable with negative value and explicit signed type
+        let program = parse_source("temp: sbyte = -50\ndef main():\n    pass").unwrap();
         if let TopLevelItem::Variable(decl) = &program.items[0] {
             assert_eq!(decl.name, "temp");
-            assert_eq!(decl.var_type, None);
+            assert_eq!(decl.var_type, Some(Type::Sbyte));
             assert!(decl.initializer.is_some());
         } else {
             panic!("Expected variable");
@@ -1470,25 +1482,22 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_const_decl_type_inference() {
-        // Constant with type inference (existing behavior)
-        let program = parse_source("MIN = 0\ndef main():\n    pass").unwrap();
-        if let TopLevelItem::Constant(decl) = &program.items[0] {
-            assert_eq!(decl.name, "MIN");
-            assert_eq!(decl.const_type, None); // Type will be inferred
-        } else {
-            panic!("Expected constant");
-        }
+    fn test_parse_const_decl_requires_explicit_type() {
+        // Constant without explicit type should fail
+        let result = parse_source("MIN = 0\ndef main():\n    pass");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.code, ErrorCode::MissingTypeAnnotation);
     }
 
     #[test]
-    fn test_parse_mixed_type_declarations() {
-        // Mix of explicit and inferred types
+    fn test_parse_mixed_explicit_type_declarations() {
+        // All declarations with explicit types
         let source = r#"
 MAX: word = 255
-count = 0
+count: byte = 0
 PI: fixed = 3.14
-E = 2.718
+E: float = 2.718
 def main():
     pass
 "#;
@@ -1503,10 +1512,10 @@ def main():
             panic!("Expected constant MAX");
         }
 
-        // count = 0 (variable with inferred type)
+        // count: byte = 0 (variable with explicit type)
         if let TopLevelItem::Variable(decl) = &program.items[1] {
             assert_eq!(decl.name, "count");
-            assert_eq!(decl.var_type, None);
+            assert_eq!(decl.var_type, Some(Type::Byte));
         } else {
             panic!("Expected variable count");
         }
@@ -1519,18 +1528,18 @@ def main():
             panic!("Expected constant PI");
         }
 
-        // E = 2.718 (constant with inferred type)
+        // E: float = 2.718 (constant with explicit type)
         if let TopLevelItem::Constant(decl) = &program.items[3] {
             assert_eq!(decl.name, "E");
-            assert_eq!(decl.const_type, None);
+            assert_eq!(decl.const_type, Some(Type::Float));
         } else {
             panic!("Expected constant E");
         }
     }
 
     #[test]
-    fn test_parse_var_decl_type_inference_requires_init() {
-        // Variable without type and without initializer should fail
+    fn test_parse_var_decl_without_type_fails() {
+        // Variable without type annotation should fail
         let result = parse_source("x\ndef main():\n    pass");
         assert!(result.is_err());
     }

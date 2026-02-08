@@ -17,11 +17,14 @@
 
 //! Type checking utilities for the semantic analyzer.
 //!
-//! This module provides type inference and checking functionality:
-//! - Type inference from expressions
+//! This module provides type checking functionality:
+//! - Expression type determination (for code generation)
 //! - Assignment compatibility checking
 //! - Constant evaluation at compile time
 //! - Value range checking
+//!
+//! Note: Type inference for declarations has been removed.
+//! All variable and constant declarations now require explicit type annotations.
 
 use super::Analyzer;
 use crate::ast::{BinaryOp, Expr, ExprKind, Type, UnaryOp};
@@ -29,7 +32,14 @@ use crate::error::{CompileError, ErrorCode, Span};
 
 /// Extension trait for type checking utilities.
 pub trait TypeChecker {
-    /// Infer the type of an expression.
+    /// Determine the natural type of an expression based on its value.
+    ///
+    /// This is used by the code generator to determine appropriate
+    /// machine code when the expression type needs to be inferred
+    /// from the value (e.g., for array literals or intermediate calculations).
+    ///
+    /// Note: This is NOT used for variable/constant declarations,
+    /// which now require explicit type annotations.
     ///
     /// For literals:
     /// - Integer literal → byte (0-255) or word (256-65535)

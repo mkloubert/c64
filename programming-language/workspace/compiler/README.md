@@ -290,52 +290,44 @@ g: float = 3.14    # float (default for decimals)
 
 ### Variables
 
-Variables can be declared with an explicit type or use type inference:
+All variable declarations require an explicit type annotation:
 
 ```python
-# Top-level variables with explicit type
+# Top-level variables
 counter: byte = 0
 score: word = 1000
-
-# Top-level variables with type inference
-x = 10          # Inferred as byte (0-255)
-y = 1000        # Inferred as word (256-65535)
-z = -50         # Inferred as sbyte (-128 to -1)
-big = -1000     # Inferred as sword (-32768 to -129)
-pi = 3.14       # Inferred as float
-flag = true     # Inferred as bool
+temperature: sbyte = -10
+offset: sword = -1000
+pi: float = 3.14
+active: bool = true
 
 def main():
-    # Inside functions, explicit type is required
+    # Variables inside functions
     a: byte = 1
     b: byte = 2
     c: byte = a + b
 ```
 
-**Note:** Type inference for variables is only available at top-level. Inside functions, explicit type annotation is required.
+**Note:** Explicit type annotations are always required for variable declarations.
 
 ### Constants
 
 Constants are identified by their **naming convention**: names that start with an uppercase letter and have ALL letters in uppercase are constants.
 
-Constants support both type inference and explicit type annotation:
+All constant declarations require an explicit type annotation:
 
 ```python
-# Constants with type inference (type determined from value)
-MAX_SCORE = 255         # Inferred as byte
-SCREEN_WIDTH = 40       # Inferred as byte
-LARGE_VALUE = 1000      # Inferred as word
-NEGATIVE = -100         # Inferred as sbyte
-E = 2.718               # Inferred as float
-
-# Constants with explicit type (can override inference)
-MAX: word = 255         # Force word type for small value
-PI: fixed = 3.14159     # Use fixed instead of float
-GOLDEN: float = 1.618   # Explicitly float
+# Constants with explicit types
+MAX_SCORE: byte = 255
+SCREEN_WIDTH: byte = 40
+LARGE_VALUE: word = 1000
+NEGATIVE: sbyte = -100
+PI: fixed = 3.14159
+E: float = 2.718
 
 def main():
     x: byte = MAX_SCORE
-    y: word = MAX + 1
+    y: word = LARGE_VALUE + 1
 ```
 
 #### Naming Rules
@@ -368,41 +360,6 @@ _temp: byte = 5        # First letter 't' is lowercase
 - Constants are declared at **top-level only** (not inside functions)
 - Constants are **immutable** - they cannot be reassigned
 - Constants can have any type (byte, word, sbyte, sword, fixed, float, bool, string)
-
-### Type Inference
-
-When declaring variables or constants without an explicit type, the compiler infers the type from the value:
-
-| Value                 | Inferred Type |
-| --------------------- | ------------- |
-| `0` to `255`          | `byte`        |
-| `256` to `65535`      | `word`        |
-| `-128` to `-1`        | `sbyte`       |
-| `-32768` to `-129`    | `sword`       |
-| Decimal (e.g. `3.14`) | `float`       |
-| `true` / `false`      | `bool`        |
-| `"text"`              | `string`      |
-
-```python
-# Type inference examples
-small = 10          # byte (value fits in 0-255)
-medium = 1000       # word (value fits in 256-65535)
-negative = -50      # sbyte (value fits in -128 to -1)
-big_neg = -1000     # sword (value fits in -32768 to -129)
-decimal = 3.14      # float (decimal values default to float)
-flag = true         # bool
-text = "hello"      # string
-
-# Use explicit type to override inference
-MAX: word = 255     # Force word instead of byte
-PI: fixed = 3.14    # Force fixed instead of float
-```
-
-**When to use explicit types:**
-
-- When you need a larger type than inferred (e.g., `word` for value `100`)
-- When you want `fixed` instead of the default `float` for decimals
-- Inside functions (type inference only works at top-level)
 
 ### Arrays
 
@@ -1010,9 +967,9 @@ def main():
 ### Color Cycler
 
 ```python
-# Constants use UPPERCASE names (no 'const' keyword needed)
-BORDER = $D020
-BACKGROUND = $D021
+# Constants use UPPERCASE names
+BORDER: word = $D020
+BACKGROUND: word = $D021
 
 def main():
     cls()
@@ -1135,9 +1092,8 @@ def main():
 
 ```python
 # Example using fixed-point for smooth sprite movement
-# Constants use UPPERCASE names
 
-SCREEN_WIDTH = 320
+SCREEN_WIDTH: word = 320
 
 def main():
     cls()
@@ -1378,6 +1334,14 @@ The generated PRG and D64 files should work with any C64 emulator that supports 
 ---
 
 ## Version History
+
+- **0.6.0** - Explicit type annotations required
+  - **BREAKING CHANGE:** Type inference for declarations has been removed
+  - All variable declarations now require explicit type annotations
+  - All constant declarations now require explicit type annotations
+  - Old syntax `x = 10` must be updated to `x: byte = 10`
+  - Old syntax `MAX = 255` must be updated to `MAX: byte = 255`
+  - New error code E147 (MissingTypeAnnotation) for declarations without types
 
 - **0.5.0** - Random number generation improvements
   - Added `seed()` function to reseed PRNG from hardware entropy

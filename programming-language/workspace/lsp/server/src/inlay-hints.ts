@@ -78,13 +78,17 @@ export function getInlayHints(
 
 /**
  * Add type hint for variable declarations without explicit type.
+ *
+ * Note: Since type inference was removed in v0.6.0, all declarations
+ * now require explicit types. This function will rarely match, but is
+ * kept for backwards compatibility with files that have parse errors.
  */
 function addVarDeclTypeHint(hints: InlayHint[], decl: VarDecl, text: string): void {
-    // Only add hint if type is inferred (no explicit type annotation)
+    // Only add hint if type is missing (parser error case)
     if (decl.type) return;
     if (!decl.initializer) return;
 
-    // Infer type from initializer
+    // Infer type from initializer for the hint
     const inferredType = inferExpressionType(decl.initializer);
     if (!inferredType) return;
 

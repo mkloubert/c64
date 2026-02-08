@@ -7,3 +7,4 @@ error[E200]: Undefined variable 'x'
   |
 3 |     x = undefined_var
   |     ^^^^^^^^^^^^^^^^^
+  = hint: To declare a new variable, use: x: <type> = <value>

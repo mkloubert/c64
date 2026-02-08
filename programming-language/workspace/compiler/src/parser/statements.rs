@@ -18,8 +18,8 @@
 //! Statement parsing for the parser.
 //!
 //! This module provides statement parsing functionality:
-//! - Variable declarations (with type inference or explicit type)
-//! - Constant declarations
+//! - Variable declarations (with explicit type annotation)
+//! - Constant declarations (with explicit type annotation)
 //! - Assignment statements (simple and compound)
 //! - Expression statements
 
@@ -194,50 +194,33 @@ impl<'a> StatementParser for Parser<'a> {
             _ => return Err(self.error(ErrorCode::ExpectedIdentifier, "Expected variable name")),
         };
 
-        // Optional type annotation
-        let var_type = if self.match_token(&Token::Colon) {
-            Some(self.parse_type()?)
-        } else {
-            None
+        // Type annotation is now required
+        if !self.match_token(&Token::Colon) {
+            return Err(self.error(
+                ErrorCode::MissingTypeAnnotation,
+                "Variable declaration requires explicit type annotation",
+            ).with_hint("Add a type annotation, e.g.: x: byte = 10"));
+        }
+
+        let var_type = self.parse_type()?;
+
+        // Check for array size in declaration
+        let array_size = match &var_type {
+            Type::ByteArray(Some(n)) | Type::WordArray(Some(n)) => Some(*n),
+            _ => None,
         };
 
-        // Check for array size in declaration (only if type is specified)
-        let array_size = if let Some(ref vt) = var_type {
-            if matches!(vt, Type::ByteArray(Some(_)) | Type::WordArray(Some(_))) {
-                match vt {
-                    Type::ByteArray(Some(n)) | Type::WordArray(Some(n)) => Some(*n),
-                    _ => None,
-                }
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        // Initializer (required for type inference, optional for explicit type)
+        // Optional initializer
         let initializer = if self.match_token(&Token::Equal) {
             Some(self.parse_expression()?)
         } else {
             None
         };
 
-        // Type inference requires initializer
-        if var_type.is_none() && initializer.is_none() {
-            return Err(self.error(
-                ErrorCode::TypeMismatch,
-                "Variable declaration without type requires an initializer for type inference",
-            ));
-        }
-
         let end_span = self.previous_span();
         let span = start_span.merge(&end_span);
 
-        let mut decl = if let Some(t) = var_type {
-            VarDecl::new(name, t, span)
-        } else {
-            VarDecl::new_inferred(name, span)
-        };
+        let mut decl = VarDecl::new(name, var_type, span);
 
         if let Some(init) = initializer {
             decl = decl.with_initializer(init);
@@ -257,23 +240,22 @@ impl<'a> StatementParser for Parser<'a> {
             _ => return Err(self.error(ErrorCode::ExpectedIdentifier, "Expected constant name")),
         };
 
-        // Optional type annotation
-        let const_type = if self.match_token(&Token::Colon) {
-            Some(self.parse_type()?)
-        } else {
-            None
-        };
+        // Type annotation is now required
+        if !self.match_token(&Token::Colon) {
+            return Err(self.error(
+                ErrorCode::MissingTypeAnnotation,
+                "Constant declaration requires explicit type annotation",
+            ).with_hint("Add a type annotation, e.g.: MAX_VALUE: byte = 255"));
+        }
 
-        self.expect(&Token::Equal, "Expected '=' after constant name")?;
+        let const_type = self.parse_type()?;
+
+        self.expect(&Token::Equal, "Expected '=' after constant type")?;
         let value = self.parse_expression()?;
 
         let end_span = value.span.clone();
         let span = start_span.merge(&end_span);
 
-        if let Some(t) = const_type {
-            Ok(ConstDecl::new_typed(name, t, value, span))
-        } else {
-            Ok(ConstDecl::new(name, value, span))
-        }
+        Ok(ConstDecl::new_typed(name, const_type, value, span))
     }
 }

@@ -15,28 +15,38 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-//! Type inference utilities for code generation.
+//! Type utilities for code generation.
 //!
-//! This module provides methods for inferring types from expressions
+//! This module provides methods for determining types from expressions
 //! during code generation. It includes:
-//! - Type inference from expression kinds
+//! - Expression type determination (for intermediate calculations)
 //! - Array length extraction
 //! - Helper utilities for array literal analysis
+//!
+//! Note: Type inference for declarations has been removed.
+//! All variable and constant declarations now require explicit type annotations.
+//! The `infer_type_from_expr` function is kept for determining types of
+//! sub-expressions during code generation (e.g., array literals, function calls).
 
 use super::variables::VariableManager;
 use super::CodeGenerator;
 use crate::ast::{Expr, ExprKind, Type, UnaryOp};
 use crate::error::{CompileError, ErrorCode, Span};
 
-/// Extension trait for type inference operations during code generation.
+/// Extension trait for type operations during code generation.
 ///
 /// This trait provides methods for determining types from expressions
-/// and extracting array information.
+/// and extracting array information. Note that this is NOT used for
+/// variable/constant declarations (which require explicit types).
 pub trait TypeInference {
-    /// Infer type from an expression (simplified).
+    /// Determine the type of an expression.
     ///
     /// This is used during code generation to determine the appropriate
-    /// machine code to emit for operations.
+    /// machine code to emit for sub-expressions (e.g., array literals,
+    /// binary operations, function calls).
+    ///
+    /// Note: This is NOT used for variable/constant declarations,
+    /// which now require explicit type annotations.
     fn infer_type_from_expr(&self, expr: &Expr) -> Type;
 
     /// Get the length of an array from an expression.

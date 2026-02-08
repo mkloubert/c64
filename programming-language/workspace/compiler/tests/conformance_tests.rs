@@ -181,9 +181,9 @@ conformance_test!(
 );
 
 conformance_test!(
-    test_26_type_inference,
-    "26_type_inference.cb64",
-    "Type inference for variables and constants"
+    test_26_explicit_types,
+    "26_explicit_types.cb64",
+    "Explicit type annotations for variables and constants"
 );
 
 conformance_test!(

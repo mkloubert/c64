@@ -249,8 +249,8 @@ fn test_semantic_duplicate_function() {
 /// Test constant reassignment errors.
 #[test]
 fn test_semantic_constant_reassignment() {
-    // Note: 'const' keyword removed - uppercase names are automatically constants
-    let source = "X = 10\n\ndef main():\n    X = 20\n";
+    // Constants require explicit type annotation
+    let source = "X: byte = 10\n\ndef main():\n    X = 20\n";
     let err = compile_and_get_error(source);
     assert!(err.is_some(), "Expected error for constant reassignment");
     assert_eq!(err.unwrap(), ErrorCode::CannotAssignToConstant);

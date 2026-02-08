@@ -78,7 +78,7 @@ pub enum StatementKind {
 pub struct VarDecl {
     /// The variable name.
     pub name: String,
-    /// The declared type (None if type inference is used).
+    /// The declared type (always required).
     pub var_type: Option<Type>,
     /// Optional initial value.
     pub initializer: Option<Expr>,
@@ -101,6 +101,10 @@ impl VarDecl {
     }
 
     /// Create a new variable declaration with type inference.
+    ///
+    /// # Deprecated
+    /// Type inference has been removed. Use `VarDecl::new()` with explicit type instead.
+    #[deprecated(since = "0.2.0", note = "Type inference removed. Use VarDecl::new() with explicit type.")]
     pub fn new_inferred(name: String, span: Span) -> Self {
         Self {
             name,
@@ -134,7 +138,7 @@ impl VarDecl {
 pub struct ConstDecl {
     /// The constant name.
     pub name: String,
-    /// The optional explicit type (None means type inference).
+    /// The explicit type (always required).
     pub const_type: Option<Type>,
     /// The constant value.
     pub value: Expr,
@@ -144,6 +148,10 @@ pub struct ConstDecl {
 
 impl ConstDecl {
     /// Create a new constant declaration with type inference.
+    ///
+    /// # Deprecated
+    /// Type inference has been removed. Use `ConstDecl::new_typed()` with explicit type instead.
+    #[deprecated(since = "0.2.0", note = "Type inference removed. Use ConstDecl::new_typed() with explicit type.")]
     pub fn new(name: String, value: Expr, span: Span) -> Self {
         Self {
             name,
@@ -520,7 +528,9 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_display_var_decl_inferred() {
+        // This test uses deprecated API - kept for backwards compatibility testing
         let span = Span::new(0, 10);
         let init = Expr::new(ExprKind::IntegerLiteral(42), Span::new(4, 6));
         let decl = VarDecl::new_inferred("x".to_string(), span).with_initializer(init);
@@ -528,7 +538,9 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_display_const_decl() {
+        // This test uses deprecated API - kept for backwards compatibility testing
         let span = Span::new(0, 15);
         let value = Expr::new(ExprKind::IntegerLiteral(100), Span::new(12, 15));
         let decl = ConstDecl::new("MAX".to_string(), value, span);

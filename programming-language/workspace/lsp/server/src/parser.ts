@@ -438,6 +438,7 @@ export class Parser {
         let type: string | null = null;
         let arraySize: number | null = null;
 
+        // Type annotation is required (no type inference)
         if (this.match(TokenType.Colon)) {
             if (this.check(TokenType.Type)) {
                 type = this.current().value;
@@ -457,6 +458,10 @@ export class Parser {
             } else {
                 this.addError(this.current().span, 'E101', 'Expected type after ":"');
             }
+        } else {
+            // No colon found - type annotation is required
+            this.addError({ start, end: this.previous().span.end },
+                'E147', `${isConstant ? 'Constant' : 'Variable'} declaration requires explicit type annotation`);
         }
 
         let initializer: Expression | null = null;

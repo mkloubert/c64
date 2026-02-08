@@ -82,10 +82,9 @@ use expressions::ExpressionEmitter;
 use labels::{LabelManager, LoopContext, PendingBranch, PendingJump};
 use runtime::RuntimeEmitter;
 use strings::{PendingStringRef, StringManager};
-use type_inference::TypeInference;
 use variables::{Function, Variable, VariableManager};
 
-use crate::ast::{Block, Program, Statement, StatementKind, TopLevelItem, Type};
+use crate::ast::{Block, Program, Statement, StatementKind, TopLevelItem};
 use crate::error::CompileError;
 use mos6510::opcodes;
 use std::collections::HashMap;
@@ -169,23 +168,19 @@ impl CodeGenerator {
                     );
                 }
                 TopLevelItem::Variable(decl) => {
-                    // Use explicit type or infer from initializer
-                    let var_type = if let Some(ref t) = decl.var_type {
-                        t.clone()
-                    } else if let Some(ref init) = decl.initializer {
-                        self.infer_type_from_expr(init)
-                    } else {
-                        Type::Byte // Fallback (analyzer should have caught this)
-                    };
+                    // Explicit type is required (parser enforces this)
+                    let var_type = decl
+                        .var_type
+                        .clone()
+                        .expect("Variable declaration must have explicit type");
                     self.allocate_variable(&decl.name, &var_type, false);
                 }
                 TopLevelItem::Constant(decl) => {
-                    // Use explicit type or infer from value
-                    let const_type = if let Some(ref t) = decl.const_type {
-                        t.clone()
-                    } else {
-                        self.infer_type_from_expr(&decl.value)
-                    };
+                    // Explicit type is required (parser enforces this)
+                    let const_type = decl
+                        .const_type
+                        .clone()
+                        .expect("Constant declaration must have explicit type");
                     self.allocate_variable(&decl.name, &const_type, true);
                 }
             }
@@ -302,8 +297,9 @@ pub fn generate(program: &Program) -> Result<Vec<u8>, CompileError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::{Expr, ExprKind, UnaryOp};
+    use crate::ast::{Expr, ExprKind, Type, UnaryOp};
     use crate::codegen::comparisons::ComparisonHelpers;
+    use crate::codegen::type_inference::TypeInference;
     use crate::error::Span;
 
     #[test]

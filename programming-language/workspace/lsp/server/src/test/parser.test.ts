@@ -38,12 +38,16 @@ describe('Parser', () => {
             assert.strictEqual(varDecl.type, 'byte');
         });
 
-        it('should parse variable without type (inferred)', () => {
+        it('should report error for variable without type', () => {
             const result = parseCode('x = 42\ndef main():\n    pass');
             assert.ok(result.program);
+            // Variable is still parsed for error recovery
             const varDecl = result.program.items[0] as any;
             assert.strictEqual(varDecl.name, 'x');
             assert.strictEqual(varDecl.type, null);
+            // But an error should be reported (E147)
+            assert.ok(result.diagnostics.length > 0);
+            assert.ok(result.diagnostics.some((d: any) => d.code === 'E147'));
         });
     });
 

@@ -222,6 +222,7 @@ function getRefactoringActions(
     const text = document.getText();
 
     // Find variable declarations without type annotation in the selection
+    // These are now parse errors (E147), but we provide quickfix to add the type
     for (const item of program.items) {
         if (item.kind === 'VarDecl' && !item.type && item.initializer) {
             const itemStart = offsetToPosition(text, item.span.start);
@@ -239,8 +240,8 @@ function getRefactoringActions(
                     const insertPos = offsetToPosition(text, nameEnd);
 
                     actions.push({
-                        title: `Add type annotation ': ${inferredType}'`,
-                        kind: CodeActionKind.RefactorRewrite,
+                        title: `Fix: Add type annotation ': ${inferredType}'`,
+                        kind: CodeActionKind.QuickFix,
                         edit: {
                             changes: {
                                 [document.uri]: [
@@ -272,8 +273,8 @@ function getRefactoringActions(
                             const insertPos = offsetToPosition(text, nameEnd);
 
                             actions.push({
-                                title: `Add type annotation ': ${inferredType}'`,
-                                kind: CodeActionKind.RefactorRewrite,
+                                title: `Fix: Add type annotation ': ${inferredType}'`,
+                                kind: CodeActionKind.QuickFix,
                                 edit: {
                                     changes: {
                                         [document.uri]: [
