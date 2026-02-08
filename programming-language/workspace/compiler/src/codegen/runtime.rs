@@ -1108,14 +1108,106 @@ impl RuntimeEmitter for CodeGenerator {
         self.emit_byte(opcodes::RTS);
     }
 
-    /// Emit 16-bit multiply routine (simplified).
+    /// Emit 16-bit multiply routine.
+    ///
+    /// Input: A/X = first operand (A=low, X=high)
+    ///        TMP3/TMP3_HI = second operand
+    /// Output: A/X = result (low 16 bits of 32-bit product)
+    ///
+    /// Uses shift-and-add algorithm for 16x16 -> 32 bit multiplication.
+    /// Only returns low 16 bits (suitable for word multiplication).
     fn emit_multiply_word_routine(&mut self) {
         self.define_label("__mul_word");
         self.runtime_addresses
             .insert("mul_word".to_string(), self.current_address);
 
-        // Simplified: just do byte multiply for now
-        self.emit_jsr_label("__mul_byte");
+        // Store first operand (multiplicand) in TMP1/TMP1_HI
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::STX_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+
+        // Store second operand (multiplier) already in TMP3/TMP3_HI
+
+        // Initialize 32-bit result to 0
+        // Use $04-$07 for result (FP_WORK_LO/HI and $06/$07)
+        self.emit_imm(opcodes::LDA_IMM, 0);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(0x04); // result byte 0 (lowest)
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(0x05); // result byte 1
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(0x06); // result byte 2
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(0x07); // result byte 3 (highest)
+
+        // Loop 16 times
+        self.emit_imm(opcodes::LDY_IMM, 16);
+
+        let loop_label = self.make_label("mw_loop");
+        let skip_add = self.make_label("mw_skip");
+
+        self.define_label(&loop_label);
+
+        // Shift 32-bit result left by 1
+        self.emit_byte(opcodes::ASL_ZP);
+        self.emit_byte(0x04);
+        self.emit_byte(opcodes::ROL_ZP);
+        self.emit_byte(0x05);
+        self.emit_byte(opcodes::ROL_ZP);
+        self.emit_byte(0x06);
+        self.emit_byte(opcodes::ROL_ZP);
+        self.emit_byte(0x07);
+
+        // Shift multiplier left, check if high bit was set
+        self.emit_byte(opcodes::ASL_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::ROL_ZP);
+        self.emit_byte(zeropage::TMP3_HI);
+        self.emit_branch(opcodes::BCC, &skip_add);
+
+        // Add multiplicand to result (16-bit add to low 16 bits of result)
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(0x04);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(0x04);
+
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(0x05);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(0x05);
+
+        // Propagate carry to high bytes
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(0x06);
+        self.emit_byte(opcodes::ADC_IMM);
+        self.emit_byte(0);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(0x06);
+
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(0x07);
+        self.emit_byte(opcodes::ADC_IMM);
+        self.emit_byte(0);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(0x07);
+
+        self.define_label(&skip_add);
+
+        self.emit_byte(opcodes::DEY);
+        self.emit_branch(opcodes::BNE, &loop_label);
+
+        // Return low 16 bits of result
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(0x04);
+        self.emit_byte(opcodes::LDX_ZP);
+        self.emit_byte(0x05);
+
         self.emit_byte(opcodes::RTS);
     }
 
@@ -1193,13 +1285,132 @@ impl RuntimeEmitter for CodeGenerator {
         self.emit_byte(opcodes::RTS);
     }
 
-    /// Emit signed 16-bit multiply routine (simplified).
+    /// Emit signed 16-bit multiply routine.
+    ///
+    /// Input: A/X = first operand (A=low, X=high)
+    ///        TMP3/TMP3_HI = second operand
+    /// Output: A/X = result (signed 16-bit)
+    ///
+    /// Handles signs, then uses unsigned multiply, then applies sign to result.
     fn emit_multiply_sword_routine(&mut self) {
         self.define_label("__mul_sword");
         self.runtime_addresses
             .insert("mul_sword".to_string(), self.current_address);
 
-        self.emit_jsr_label("__mul_sbyte");
+        // Store first operand
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::STX_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+
+        // Use TMP2 as sign flag (0 = positive, 1 = negative)
+        self.emit_imm(opcodes::LDA_IMM, 0);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+
+        // Check sign of first operand (in TMP1_HI bit 7)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_branch(opcodes::BPL, "__msw_first_pos");
+
+        // First operand is negative, negate it (two's complement)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::EOR_IMM);
+        self.emit_byte(0xFF);
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_IMM);
+        self.emit_byte(1);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_byte(opcodes::EOR_IMM);
+        self.emit_byte(0xFF);
+        self.emit_byte(opcodes::ADC_IMM);
+        self.emit_byte(0);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+
+        // Toggle sign flag
+        self.emit_byte(opcodes::INC_ZP);
+        self.emit_byte(zeropage::TMP2);
+
+        self.define_label("__msw_first_pos");
+
+        // Check sign of second operand (in TMP3_HI bit 7)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3_HI);
+        self.emit_branch(opcodes::BPL, "__msw_second_pos");
+
+        // Second operand is negative, negate it
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::EOR_IMM);
+        self.emit_byte(0xFF);
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_IMM);
+        self.emit_byte(1);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3_HI);
+        self.emit_byte(opcodes::EOR_IMM);
+        self.emit_byte(0xFF);
+        self.emit_byte(opcodes::ADC_IMM);
+        self.emit_byte(0);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP3_HI);
+
+        // Toggle sign flag
+        self.emit_byte(opcodes::DEC_ZP);
+        self.emit_byte(zeropage::TMP2);
+
+        self.define_label("__msw_second_pos");
+
+        // Perform unsigned multiply (operands in TMP1/TMP1_HI and TMP3/TMP3_HI)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::LDX_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_jsr_label("__mul_word");
+
+        // Check sign flag - if non-zero, negate result
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::STX_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_branch(opcodes::BEQ, "__msw_done");
+
+        // Negate result (two's complement)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::EOR_IMM);
+        self.emit_byte(0xFF);
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_IMM);
+        self.emit_byte(1);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_byte(opcodes::EOR_IMM);
+        self.emit_byte(0xFF);
+        self.emit_byte(opcodes::ADC_IMM);
+        self.emit_byte(0);
+        self.emit_byte(opcodes::TAX);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::RTS);
+
+        self.define_label("__msw_done");
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::LDX_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
         self.emit_byte(opcodes::RTS);
     }
 

@@ -100,18 +100,23 @@ impl CodeGenerator {
     /// 4. Add or subtract mantissas based on signs
     /// 5. Normalize result
     /// 6. Handle overflow (→ infinity) and underflow (→ zero)
+    ///
+    /// IEEE-754 binary16: sign(1) + exp(5) + mantissa(10)
+    /// Mantissa has implicit leading 1 for normalized numbers.
     fn emit_float_add_routine(&mut self) {
         self.define_label("__float_add");
         self.runtime_addresses
             .insert("float_add".to_string(), self.current_address);
 
-        // For a simplified implementation, we'll convert to a common format,
-        // perform the operation, and convert back.
-        //
-        // This is a simplified version - a full implementation would handle
-        // all edge cases properly.
+        // Zero page usage for this routine:
+        // FP_EXP1 ($FD): exponent of operand 1 / result exponent
+        // FP_EXP2 ($FE): exponent of operand 2
+        // FP_WORK_LO ($04): mantissa 1 low / result mantissa low
+        // FP_WORK_HI ($05): mantissa 1 high / result mantissa high / result sign
+        // TMP2 ($FB): mantissa 2 low
+        // TMP2+1 ($FC): mantissa 2 high
+        // We'll use $06/$07 for extended mantissa during alignment
 
-        // Check if either operand is zero
         let arg1_zero = self.make_label("fadd_a1z");
         let arg2_zero = self.make_label("fadd_a2z");
         let do_add = self.make_label("fadd_do");
@@ -157,8 +162,7 @@ impl CodeGenerator {
         // Perform the actual addition
         self.define_label(&do_add);
 
-        // Extract exponents
-        // Exponent = (high_byte >> 2) & 0x1F
+        // Extract exponents: exp = (high_byte >> 2) & 0x1F
         self.emit_byte(opcodes::LDA_ZP);
         self.emit_byte(zeropage::TMP1_HI);
         self.emit_byte(opcodes::LSR_ACC);
@@ -177,73 +181,363 @@ impl CodeGenerator {
         self.emit_byte(opcodes::STA_ZP);
         self.emit_byte(fp_zeropage::FP_EXP2);
 
-        // Compare exponents
+        // Extract mantissas with implicit leading 1
+        // Mantissa = (high & 0x03) | 0x04 for high byte (adds implicit 1)
+        // Plus low byte for full 11-bit mantissa
+
+        // Mantissa 1 -> FP_WORK_LO/HI
         self.emit_byte(opcodes::LDA_ZP);
-        self.emit_byte(fp_zeropage::FP_EXP1);
-        self.emit_byte(opcodes::CMP_ZP);
-        self.emit_byte(fp_zeropage::FP_EXP2);
-
-        // For simplicity, if exponents differ significantly, return the larger
-        // A full implementation would shift and add properly
-        let exp_similar = self.make_label("fadd_exp_sim");
-        self.emit_branch(opcodes::BEQ, &exp_similar);
-
-        // Exponents differ - return the one with larger exponent (simplified)
-        self.emit_branch(opcodes::BCS, &arg2_zero.clone()); // EXP1 >= EXP2, return ARG1
-        self.emit_jmp(&arg1_zero); // EXP1 < EXP2, return ARG2
-
-        // Exponents are equal - add mantissas (simplified)
-        self.define_label(&exp_similar);
-
-        // For equal exponents with same sign, add mantissas
-        // Extract sign bits
-        self.emit_byte(opcodes::LDA_ZP);
-        self.emit_byte(zeropage::TMP1_HI);
-        self.emit_byte(opcodes::AND_IMM);
-        self.emit_byte(0x80);
+        self.emit_byte(zeropage::TMP1);
         self.emit_byte(opcodes::STA_ZP);
-        self.emit_byte(fp_zeropage::FP_WORK_LO); // Store sign1
-
-        self.emit_byte(opcodes::LDA_ZP);
-        self.emit_byte(zeropage::TMP3_HI);
-        self.emit_byte(opcodes::AND_IMM);
-        self.emit_byte(0x80);
-
-        // Compare signs
-        self.emit_byte(opcodes::CMP_ZP);
         self.emit_byte(fp_zeropage::FP_WORK_LO);
-        let same_sign = self.make_label("fadd_same");
-        self.emit_branch(opcodes::BEQ, &same_sign);
 
-        // Different signs - subtract mantissas (simplified: return ARG1)
         self.emit_byte(opcodes::LDA_ZP);
-        self.emit_byte(zeropage::TMP1);
-        self.emit_byte(opcodes::LDX_ZP);
         self.emit_byte(zeropage::TMP1_HI);
-        self.emit_jmp(&done);
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x03); // mantissa high 2 bits
+        self.emit_byte(opcodes::ORA_IMM);
+        self.emit_byte(0x04); // add implicit 1
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_HI);
 
-        // Same sign - add mantissas
-        self.define_label(&same_sign);
-
-        // Add the low bytes
-        self.emit_byte(opcodes::CLC);
+        // Mantissa 2 -> TMP2/TMP2+1 (using $FB/$FC)
         self.emit_byte(opcodes::LDA_ZP);
-        self.emit_byte(zeropage::TMP1);
-        self.emit_byte(opcodes::ADC_ZP);
         self.emit_byte(zeropage::TMP3);
         self.emit_byte(opcodes::STA_ZP);
-        self.emit_byte(fp_zeropage::FP_WORK_LO);
+        self.emit_byte(zeropage::TMP2);
 
-        // Add the high bytes (keeping sign and exponent intact is tricky)
-        // This is a simplified version - just add the raw values
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3_HI);
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x03);
+        self.emit_byte(opcodes::ORA_IMM);
+        self.emit_byte(0x04);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2 + 1);
+
+        // Extract and save signs
+        // Sign 1 in bit 7 of $06, Sign 2 in bit 6 of $06
         self.emit_byte(opcodes::LDA_ZP);
         self.emit_byte(zeropage::TMP1_HI);
-        self.emit_byte(opcodes::ADC_ZP);
-        self.emit_byte(zeropage::TMP3_HI);
-        self.emit_byte(opcodes::TAX);
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x80);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(0x06); // sign1 in bit 7
 
         self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3_HI);
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x80);
+        self.emit_byte(opcodes::LSR_ACC); // move to bit 6
+        self.emit_byte(opcodes::ORA_ZP);
+        self.emit_byte(0x06);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(0x06); // signs in bits 7 and 6
+
+        // Compare exponents and align mantissas
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(fp_zeropage::FP_EXP1);
+        self.emit_byte(opcodes::CMP_ZP);
+        self.emit_byte(fp_zeropage::FP_EXP2);
+
+        let exp_equal = self.make_label("fadd_exp_eq");
+        let exp1_bigger = self.make_label("fadd_e1_big");
+        let do_align = self.make_label("fadd_align");
+
+        self.emit_branch(opcodes::BEQ, &exp_equal);
+        self.emit_branch(opcodes::BCS, &exp1_bigger);
+
+        // EXP2 > EXP1: shift mantissa1 right, use EXP2 as result exponent
+        // Shift amount = EXP2 - EXP1
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(fp_zeropage::FP_EXP2);
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(fp_zeropage::FP_EXP1);
+        self.emit_byte(opcodes::TAY); // Y = shift count
+
+        // Update result exponent to the larger one
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(fp_zeropage::FP_EXP2);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(fp_zeropage::FP_EXP1);
+
+        // If shift > 11, mantissa1 becomes 0 (too small to matter)
+        self.emit_byte(opcodes::CPY_IMM);
+        self.emit_byte(12);
+        let skip_shift1 = self.make_label("fadd_skip1");
+        self.emit_branch(opcodes::BCS, &skip_shift1);
+
+        // Shift mantissa1 right by Y bits
+        let shift1_loop = self.make_label("fadd_sh1");
+        self.define_label(&shift1_loop);
+        self.emit_byte(opcodes::CPY_IMM);
+        self.emit_byte(0);
+        self.emit_branch(opcodes::BEQ, &do_align);
+        self.emit_byte(opcodes::LSR_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_HI);
+        self.emit_byte(opcodes::ROR_ZP);
         self.emit_byte(fp_zeropage::FP_WORK_LO);
+        self.emit_byte(opcodes::DEY);
+        self.emit_jmp(&shift1_loop);
+
+        self.define_label(&skip_shift1);
+        // Mantissa1 is too small, set to 0
+        self.emit_imm(opcodes::LDA_IMM, 0);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_LO);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_HI);
+        self.emit_jmp(&do_align);
+
+        // EXP1 > EXP2: shift mantissa2 right, keep EXP1 as result exponent
+        self.define_label(&exp1_bigger);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(fp_zeropage::FP_EXP1);
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(fp_zeropage::FP_EXP2);
+        self.emit_byte(opcodes::TAY); // Y = shift count
+
+        // If shift > 11, mantissa2 becomes 0
+        self.emit_byte(opcodes::CPY_IMM);
+        self.emit_byte(12);
+        let skip_shift2 = self.make_label("fadd_skip2");
+        self.emit_branch(opcodes::BCS, &skip_shift2);
+
+        // Shift mantissa2 right by Y bits
+        let shift2_loop = self.make_label("fadd_sh2");
+        self.define_label(&shift2_loop);
+        self.emit_byte(opcodes::CPY_IMM);
+        self.emit_byte(0);
+        self.emit_branch(opcodes::BEQ, &do_align);
+        self.emit_byte(opcodes::LSR_ZP);
+        self.emit_byte(zeropage::TMP2 + 1);
+        self.emit_byte(opcodes::ROR_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::DEY);
+        self.emit_jmp(&shift2_loop);
+
+        self.define_label(&skip_shift2);
+        // Mantissa2 is too small, set to 0
+        self.emit_imm(opcodes::LDA_IMM, 0);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2 + 1);
+        self.emit_jmp(&do_align);
+
+        // Exponents are equal, no alignment needed
+        self.define_label(&exp_equal);
+
+        // Add or subtract mantissas based on signs
+        self.define_label(&do_align);
+
+        // Check if signs are the same (bits 7 and 6 of $06)
+        // If both same (00xx xxxx or 11xx xxxx), add. If different, subtract.
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(0x06);
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0xC0); // isolate sign bits
+        self.emit_byte(opcodes::CMP_IMM);
+        self.emit_byte(0x40); // only bit 6 set = signs differ (+ and -)
+        let signs_differ1 = self.make_label("fadd_sdiff");
+        self.emit_branch(opcodes::BEQ, &signs_differ1);
+        self.emit_byte(opcodes::CMP_IMM);
+        self.emit_byte(0x80); // only bit 7 set = signs differ (- and +)
+        self.emit_branch(opcodes::BEQ, &signs_differ1);
+
+        // Same signs: add mantissas
+        let do_add_mant = self.make_label("fadd_addm");
+        self.emit_jmp(&do_add_mant);
+
+        // Different signs: subtract mantissas (smaller from larger)
+        self.define_label(&signs_differ1);
+
+        // Compare mantissas to determine which is larger
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_HI);
+        self.emit_byte(opcodes::CMP_ZP);
+        self.emit_byte(zeropage::TMP2 + 1);
+        let m1_bigger = self.make_label("fadd_m1big");
+        let m2_bigger = self.make_label("fadd_m2big");
+        self.emit_branch(opcodes::BCC, &m2_bigger);
+        self.emit_branch(opcodes::BNE, &m1_bigger);
+
+        // High bytes equal, check low
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_LO);
+        self.emit_byte(opcodes::CMP_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_branch(opcodes::BCC, &m2_bigger);
+        // Fall through to m1_bigger (or equal)
+
+        // Mantissa1 >= Mantissa2: result = M1 - M2, sign = sign1
+        self.define_label(&m1_bigger);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_LO);
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_LO);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_HI);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(zeropage::TMP2 + 1);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_HI);
+        // Sign = sign1 (bit 7 of $06), already there
+        let normalize = self.make_label("fadd_norm");
+        self.emit_jmp(&normalize);
+
+        // Mantissa2 > Mantissa1: result = M2 - M1, sign = sign2
+        self.define_label(&m2_bigger);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_LO);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_LO);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2 + 1);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_HI);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_HI);
+        // Sign = sign2: copy bit 6 to bit 7 of $06
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(0x06);
+        self.emit_byte(opcodes::ASL_ACC); // bit 6 -> bit 7
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x80);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(0x06);
+        self.emit_jmp(&normalize);
+
+        // Same signs: add mantissas
+        self.define_label(&do_add_mant);
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_LO);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_LO);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_HI);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP2 + 1);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_HI);
+
+        // Check for carry (overflow in mantissa addition)
+        let no_carry = self.make_label("fadd_nocar");
+        self.emit_branch(opcodes::BCC, &no_carry);
+
+        // Carry occurred: shift right and increment exponent
+        self.emit_byte(opcodes::ROR_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_HI);
+        self.emit_byte(opcodes::ROR_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_LO);
+        self.emit_byte(opcodes::INC_ZP);
+        self.emit_byte(fp_zeropage::FP_EXP1);
+
+        // Check for exponent overflow
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(fp_zeropage::FP_EXP1);
+        self.emit_byte(opcodes::CMP_IMM);
+        self.emit_byte(31);
+        let no_exp_overflow = self.make_label("fadd_noexp");
+        self.emit_branch(opcodes::BCC, &no_exp_overflow);
+
+        // Exponent overflow: return infinity with correct sign
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(0x06);
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x80); // get sign
+        self.emit_byte(opcodes::ORA_IMM);
+        self.emit_byte(0x7C); // infinity exponent
+        self.emit_byte(opcodes::TAX);
+        self.emit_imm(opcodes::LDA_IMM, 0);
+        self.emit_jmp(&done);
+
+        self.define_label(&no_exp_overflow);
+        self.define_label(&no_carry);
+
+        // Normalize result: shift left until bit 2 of high byte is set (implicit 1 position)
+        // For 11-bit mantissa with implicit 1, we need bit 2 set
+        self.define_label(&normalize);
+
+        // Check if mantissa is zero (result of subtraction of equal values)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_LO);
+        self.emit_byte(opcodes::ORA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_HI);
+        let not_zero = self.make_label("fadd_nz");
+        self.emit_branch(opcodes::BNE, &not_zero);
+
+        // Result is zero
+        self.emit_imm(opcodes::LDA_IMM, 0);
+        self.emit_imm(opcodes::LDX_IMM, 0);
+        self.emit_jmp(&done);
+
+        self.define_label(&not_zero);
+
+        // Normalize loop: shift left until bit 2 of high byte is set
+        let norm_loop = self.make_label("fadd_nloop");
+        let norm_done = self.make_label("fadd_ndone");
+
+        self.define_label(&norm_loop);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_HI);
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x04); // check if bit 2 is set
+        self.emit_branch(opcodes::BNE, &norm_done);
+
+        // Shift mantissa left
+        self.emit_byte(opcodes::ASL_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_LO);
+        self.emit_byte(opcodes::ROL_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_HI);
+
+        // Decrement exponent
+        self.emit_byte(opcodes::DEC_ZP);
+        self.emit_byte(fp_zeropage::FP_EXP1);
+
+        // Check for exponent underflow
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(fp_zeropage::FP_EXP1);
+        self.emit_branch(opcodes::BNE, &norm_loop);
+
+        // Exponent underflow: return zero
+        self.emit_imm(opcodes::LDA_IMM, 0);
+        self.emit_imm(opcodes::LDX_IMM, 0);
+        self.emit_jmp(&done);
+
+        self.define_label(&norm_done);
+
+        // Pack result: sign | (exp << 2) | (mantissa_hi & 0x03)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(fp_zeropage::FP_EXP1);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP3); // temp store exp << 2
+
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_HI);
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x03); // mantissa high 2 bits (remove implicit 1)
+        self.emit_byte(opcodes::ORA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::ORA_ZP);
+        self.emit_byte(0x06); // add sign
+        self.emit_byte(opcodes::TAX); // X = high byte
+
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_LO); // A = low byte
 
         self.define_label(&done);
         self.emit_byte(opcodes::RTS);
@@ -275,8 +569,11 @@ impl CodeGenerator {
     /// Algorithm:
     /// 1. XOR signs for result sign
     /// 2. Add exponents, subtract bias (15)
-    /// 3. Multiply mantissas
+    /// 3. Multiply mantissas (11x11 -> 22 bit, take top 11)
     /// 4. Normalize and round
+    ///
+    /// For 11-bit mantissas (with implicit 1), we multiply to get 22 bits,
+    /// then take the top 11 bits as the result mantissa.
     fn emit_float_mul_routine(&mut self) {
         self.define_label("__float_mul");
         self.runtime_addresses
@@ -310,7 +607,7 @@ impl CodeGenerator {
         self.emit_byte(opcodes::AND_IMM);
         self.emit_byte(0x80);
         self.emit_byte(opcodes::STA_ZP);
-        self.emit_byte(fp_zeropage::FP_WORK_HI); // Store result sign
+        self.emit_byte(0x06); // Store result sign in $06
 
         // Extract and add exponents
         self.emit_byte(opcodes::LDA_ZP);
@@ -337,8 +634,10 @@ impl CodeGenerator {
         self.emit_byte(opcodes::SBC_IMM);
         self.emit_byte(15); // Subtract bias
 
-        // Check for overflow/underflow
-        self.emit_branch(opcodes::BMI, &return_zero); // Underflow
+        // Check for underflow (result < 0)
+        self.emit_branch(opcodes::BMI, &return_zero);
+
+        // Check for overflow (result >= 31)
         self.emit_byte(opcodes::CMP_IMM);
         self.emit_byte(31);
         let no_overflow = self.make_label("fmul_no_ovf");
@@ -346,7 +645,7 @@ impl CodeGenerator {
 
         // Overflow - return infinity with correct sign
         self.emit_byte(opcodes::LDA_ZP);
-        self.emit_byte(fp_zeropage::FP_WORK_HI);
+        self.emit_byte(0x06);
         self.emit_byte(opcodes::ORA_IMM);
         self.emit_byte(0x7C); // Infinity exponent (31 << 2)
         self.emit_byte(opcodes::TAX);
@@ -357,21 +656,184 @@ impl CodeGenerator {
         self.emit_byte(opcodes::STA_ZP);
         self.emit_byte(fp_zeropage::FP_EXP1); // Store result exponent
 
-        // Simplified mantissa multiply: just return an approximation
-        // A full implementation would do proper 11x11 bit multiply
+        // Extract mantissas with implicit 1
+        // Mantissa 1 -> FP_WORK_LO/HI (11 bits: low 8 in LO, high 3 in HI)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_LO);
 
-        // Pack result: sign | (exp << 2) | (mantissa_hi)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x03);
+        self.emit_byte(opcodes::ORA_IMM);
+        self.emit_byte(0x04); // add implicit 1
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_HI);
+
+        // Mantissa 2 -> TMP2/TMP2+1
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3_HI);
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x03);
+        self.emit_byte(opcodes::ORA_IMM);
+        self.emit_byte(0x04);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2 + 1);
+
+        // Perform 11x11 bit multiplication using shift-and-add
+        // Result will be 22 bits in $07/$08/$09 (low to high)
+        // Initialize result to 0
+        self.emit_imm(opcodes::LDA_IMM, 0);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(0x07); // result low
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(0x08); // result mid
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(0x09); // result high
+
+        // Loop 11 times (11-bit multiplier)
+        self.emit_imm(opcodes::LDY_IMM, 11);
+
+        let mul_loop = self.make_label("fmul_loop");
+        let mul_no_add = self.make_label("fmul_noadd");
+        let mul_shift = self.make_label("fmul_shift");
+
+        self.define_label(&mul_loop);
+        // Check LSB of multiplier (mantissa 2)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x01);
+        self.emit_branch(opcodes::BEQ, &mul_no_add);
+
+        // Add multiplicand (mantissa 1) to result
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(0x07);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_LO);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(0x07);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(0x08);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_HI);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(0x08);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(0x09);
+        self.emit_byte(opcodes::ADC_IMM);
+        self.emit_byte(0);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(0x09);
+
+        self.define_label(&mul_no_add);
+        // Shift multiplicand left
+        self.emit_byte(opcodes::ASL_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_LO);
+        self.emit_byte(opcodes::ROL_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_HI);
+
+        // Shift multiplier right
+        self.emit_byte(opcodes::LSR_ZP);
+        self.emit_byte(zeropage::TMP2 + 1);
+        self.emit_byte(opcodes::ROR_ZP);
+        self.emit_byte(zeropage::TMP2);
+
+        self.define_label(&mul_shift);
+        self.emit_byte(opcodes::DEY);
+        self.emit_branch(opcodes::BNE, &mul_loop);
+
+        // Result is in $07/$08/$09 (22 bits)
+        // For normalized result, bit 21 (the product of two implicit 1s) should be set
+        // We need to extract bits 21-11 for the result mantissa
+
+        // Check if bit 5 of $09 is set (bit 21 of 22-bit result)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(0x09);
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x20); // bit 5
+        let no_extra_shift = self.make_label("fmul_noex");
+        self.emit_branch(opcodes::BNE, &no_extra_shift);
+
+        // Not set, shift left once and decrement exponent
+        self.emit_byte(opcodes::ASL_ZP);
+        self.emit_byte(0x07);
+        self.emit_byte(opcodes::ROL_ZP);
+        self.emit_byte(0x08);
+        self.emit_byte(opcodes::ROL_ZP);
+        self.emit_byte(0x09);
+        self.emit_byte(opcodes::DEC_ZP);
+        self.emit_byte(fp_zeropage::FP_EXP1);
+
+        // Check for exponent underflow
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(fp_zeropage::FP_EXP1);
+        self.emit_branch(opcodes::BNE, &no_extra_shift);
+        // Underflow to zero
+        self.emit_jmp(&return_zero);
+
+        self.define_label(&no_extra_shift);
+
+        // Extract result mantissa from bits 21-11 of the 22-bit product
+        // Bit 21 is the implicit 1, bits 20-11 are the mantissa
+        // $09 has bits 21-16, $08 has bits 15-8, $07 has bits 7-0
+        // Result mantissa high 2 bits = bits 20-19 = ($09 >> 3) & 0x03
+        // Result mantissa low 8 bits = bits 18-11 = (($09 & 0x07) << 5) | ($08 >> 3)
+
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(0x09);
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x03); // mantissa high 2 bits
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_HI);
+
+        // Get low 8 bits of mantissa
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(0x09);
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x07);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_LO);
+
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(0x08);
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::ORA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_LO);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_LO);
+
+        // Pack result: sign | (exp << 2) | mantissa_hi
         self.emit_byte(opcodes::LDA_ZP);
         self.emit_byte(fp_zeropage::FP_EXP1);
         self.emit_byte(opcodes::ASL_ACC);
         self.emit_byte(opcodes::ASL_ACC);
         self.emit_byte(opcodes::ORA_ZP);
-        self.emit_byte(fp_zeropage::FP_WORK_HI); // Add sign
+        self.emit_byte(fp_zeropage::FP_WORK_HI);
+        self.emit_byte(opcodes::ORA_ZP);
+        self.emit_byte(0x06); // Add sign
         self.emit_byte(opcodes::TAX);
 
-        // Low byte from mantissa multiply (simplified)
         self.emit_byte(opcodes::LDA_ZP);
-        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(fp_zeropage::FP_WORK_LO);
         self.emit_jmp(&done);
 
         // Return zero
@@ -384,6 +846,15 @@ impl CodeGenerator {
     }
 
     /// Emit float division routine.
+    ///
+    /// Algorithm:
+    /// 1. Handle special cases (zero dividend, zero divisor)
+    /// 2. XOR signs for result sign
+    /// 3. Subtract exponents, add bias (15)
+    /// 4. Divide mantissas (11-bit / 11-bit)
+    /// 5. Normalize result
+    ///
+    /// Division uses restoring division algorithm.
     fn emit_float_div_routine(&mut self) {
         self.define_label("__float_div");
         self.runtime_addresses
@@ -411,7 +882,7 @@ impl CodeGenerator {
         self.emit_byte(0x7F);
         self.emit_branch(opcodes::BEQ, &return_inf);
 
-        // Calculate result sign
+        // Calculate result sign (XOR of both signs)
         self.emit_byte(opcodes::LDA_ZP);
         self.emit_byte(zeropage::TMP1_HI);
         self.emit_byte(opcodes::EOR_ZP);
@@ -419,7 +890,7 @@ impl CodeGenerator {
         self.emit_byte(opcodes::AND_IMM);
         self.emit_byte(0x80);
         self.emit_byte(opcodes::STA_ZP);
-        self.emit_byte(fp_zeropage::FP_WORK_HI);
+        self.emit_byte(0x06); // Store result sign
 
         // Extract exponents
         self.emit_byte(opcodes::LDA_ZP);
@@ -441,6 +912,7 @@ impl CodeGenerator {
         self.emit_byte(fp_zeropage::FP_EXP2);
 
         // Subtract exponents and add bias
+        // result_exp = exp1 - exp2 + 15
         self.emit_byte(opcodes::LDA_ZP);
         self.emit_byte(fp_zeropage::FP_EXP1);
         self.emit_byte(opcodes::SEC);
@@ -448,7 +920,7 @@ impl CodeGenerator {
         self.emit_byte(fp_zeropage::FP_EXP2);
         self.emit_byte(opcodes::CLC);
         self.emit_byte(opcodes::ADC_IMM);
-        self.emit_byte(15); // Add bias
+        self.emit_byte(15);
 
         // Check bounds
         self.emit_branch(opcodes::BMI, &return_zero);
@@ -459,16 +931,191 @@ impl CodeGenerator {
         self.emit_byte(opcodes::STA_ZP);
         self.emit_byte(fp_zeropage::FP_EXP1);
 
-        // Pack result (simplified)
+        // Extract mantissas with implicit 1
+        // Dividend (mantissa 1) -> FP_WORK_LO/HI
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_LO);
+
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x03);
+        self.emit_byte(opcodes::ORA_IMM);
+        self.emit_byte(0x04);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_HI);
+
+        // Divisor (mantissa 2) -> TMP2/TMP2+1
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3_HI);
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x03);
+        self.emit_byte(opcodes::ORA_IMM);
+        self.emit_byte(0x04);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2 + 1);
+
+        // Perform 11-bit division using restoring division
+        // Quotient will be built up in $07/$08 (result mantissa)
+        // Remainder in FP_WORK_LO/HI (we extend with $09 for extra bits)
+
+        // Initialize quotient to 0
+        self.emit_imm(opcodes::LDA_IMM, 0);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(0x07);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(0x08);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(0x09); // extension for remainder
+
+        // We need 12 iterations to get 11 bits of quotient (one extra for normalization)
+        self.emit_imm(opcodes::LDY_IMM, 12);
+
+        let div_loop = self.make_label("fdiv_loop");
+        let div_no_sub = self.make_label("fdiv_nosub");
+
+        self.define_label(&div_loop);
+
+        // Shift dividend (remainder) left by 1
+        self.emit_byte(opcodes::ASL_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_LO);
+        self.emit_byte(opcodes::ROL_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_HI);
+        self.emit_byte(opcodes::ROL_ZP);
+        self.emit_byte(0x09);
+
+        // Try to subtract divisor from remainder
+        // Compare first: if remainder >= divisor, subtract and set quotient bit
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(0x09);
+        self.emit_byte(opcodes::CMP_ZP);
+        self.emit_byte(zeropage::TMP2 + 1);
+        self.emit_branch(opcodes::BCC, &div_no_sub); // remainder < divisor
+        self.emit_branch(opcodes::BNE, "__fdiv_do_sub"); // remainder > divisor
+
+        // High bytes equal, compare low
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_HI);
+        self.emit_byte(opcodes::CMP_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_branch(opcodes::BCC, &div_no_sub);
+
+        // Subtract divisor from remainder
+        self.define_label("__fdiv_do_sub");
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_HI);
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_HI);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(0x09);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(zeropage::TMP2 + 1);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(0x09);
+
+        // Set quotient bit (shift 1 into quotient)
+        self.emit_byte(opcodes::SEC);
+        let div_shift_q = self.make_label("fdiv_shq");
+        self.emit_jmp(&div_shift_q);
+
+        self.define_label(&div_no_sub);
+        // Don't set quotient bit (shift 0 into quotient)
+        self.emit_byte(opcodes::CLC);
+
+        self.define_label(&div_shift_q);
+        self.emit_byte(opcodes::ROL_ZP);
+        self.emit_byte(0x07);
+        self.emit_byte(opcodes::ROL_ZP);
+        self.emit_byte(0x08);
+
+        self.emit_byte(opcodes::DEY);
+        self.emit_branch(opcodes::BNE, &div_loop);
+
+        // Quotient is in $07/$08 (12 bits, we need top 11)
+        // Check if we need to normalize (bit 11 should be set for implicit 1)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(0x08);
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x08); // bit 3 of $08 = bit 11 of quotient
+        let div_normalized = self.make_label("fdiv_norm");
+        self.emit_branch(opcodes::BNE, &div_normalized);
+
+        // Not normalized, shift left and decrement exponent
+        self.emit_byte(opcodes::ASL_ZP);
+        self.emit_byte(0x07);
+        self.emit_byte(opcodes::ROL_ZP);
+        self.emit_byte(0x08);
+        self.emit_byte(opcodes::DEC_ZP);
+        self.emit_byte(fp_zeropage::FP_EXP1);
+
+        // Check for underflow
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(fp_zeropage::FP_EXP1);
+        self.emit_branch(opcodes::BNE, &div_normalized);
+        self.emit_jmp(&return_zero);
+
+        self.define_label(&div_normalized);
+
+        // Extract result mantissa from quotient
+        // Quotient has bit 11 as implicit 1, bits 10-1 as mantissa (we ignore bit 0)
+        // Result mantissa high 2 bits = (quotient >> 9) & 0x03
+        // Result mantissa low 8 bits = (quotient >> 1) & 0xFF
+
+        // Get high 2 bits of mantissa
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(0x08);
+        self.emit_byte(opcodes::LSR_ACC); // bit 11 -> bit 10, bits 10-9 -> bits 9-8
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x03);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_HI);
+
+        // Get low 8 bits of mantissa
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(0x08);
+        self.emit_byte(opcodes::AND_IMM);
+        self.emit_byte(0x01); // bit 8 of quotient
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_LO);
+
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(0x07);
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::ORA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_LO);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(fp_zeropage::FP_WORK_LO);
+
+        // Pack result: sign | (exp << 2) | mantissa_hi
         self.emit_byte(opcodes::LDA_ZP);
         self.emit_byte(fp_zeropage::FP_EXP1);
         self.emit_byte(opcodes::ASL_ACC);
         self.emit_byte(opcodes::ASL_ACC);
         self.emit_byte(opcodes::ORA_ZP);
         self.emit_byte(fp_zeropage::FP_WORK_HI);
+        self.emit_byte(opcodes::ORA_ZP);
+        self.emit_byte(0x06); // Add sign
         self.emit_byte(opcodes::TAX);
+
         self.emit_byte(opcodes::LDA_ZP);
-        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(fp_zeropage::FP_WORK_LO);
         self.emit_jmp(&done);
 
         // Return zero
@@ -480,7 +1127,7 @@ impl CodeGenerator {
         // Return infinity
         self.define_label(&return_inf);
         self.emit_byte(opcodes::LDA_ZP);
-        self.emit_byte(fp_zeropage::FP_WORK_HI);
+        self.emit_byte(0x06);
         self.emit_byte(opcodes::ORA_IMM);
         self.emit_byte(0x7C);
         self.emit_byte(opcodes::TAX);

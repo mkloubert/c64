@@ -1,0 +1,68 @@
+# Conformance Test: Float Arithmetic Precision
+# Tests: proper mantissa operations in float add/mul/div
+# Expected: Compiles without errors, results are accurate
+
+def main():
+    # Test 1: Float addition with same exponent
+    println("TEST1:")
+    a: float = 1.0
+    b: float = 1.0
+    c: float = a + b
+    # 1.0 + 1.0 = 2.0
+    # In float16: 1.0 = 0x3C00, 2.0 = 0x4000
+    println(c)
+
+    # Test 2: Float addition with different exponents
+    println("TEST2:")
+    d: float = 4.0
+    e: float = 0.5
+    f: float = d + e
+    # 4.0 + 0.5 = 4.5
+    # This tests mantissa alignment
+    println(f)
+
+    # Test 3: Float subtraction (via addition of negative)
+    println("TEST3:")
+    g: float = 5.0
+    h: float = 2.0
+    i: float = g - h
+    # 5.0 - 2.0 = 3.0
+    println(i)
+
+    # Test 4: Float multiplication
+    println("TEST4:")
+    j: float = 2.0
+    k: float = 3.0
+    l: float = j * k
+    # 2.0 * 3.0 = 6.0
+    # Tests proper mantissa multiply
+    println(l)
+
+    # Test 5: Float division
+    println("TEST5:")
+    m: float = 6.0
+    n: float = 2.0
+    o: float = m / n
+    # 6.0 / 2.0 = 3.0
+    # Tests proper mantissa divide
+    println(o)
+
+    # Test 6: Combined operations
+    println("TEST6:")
+    p: float = 2.0
+    q: float = 3.0
+    r: float = 1.0
+    s: float = p * q + r
+    # 2.0 * 3.0 + 1.0 = 7.0
+    println(s)
+
+    # Test 7: Addition with larger value difference
+    println("TEST7:")
+    t: float = 8.0
+    u: float = 1.0
+    v: float = t + u
+    # 8.0 + 1.0 = 9.0
+    # Exponent difference of 3 (8=2^3, 1=2^0)
+    println(v)
+
+    println("DONE")

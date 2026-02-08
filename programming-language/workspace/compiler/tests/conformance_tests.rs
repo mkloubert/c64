@@ -234,10 +234,11 @@ fn test_conformance_basic_stub_present() {
 fn test_conformance_code_size_reasonable() {
     // Test that generated code sizes are reasonable
     // Note: sizes increased to accommodate fixed-point, float, and PRNG runtime routines
+    // Size increased to 3500 to accommodate proper IEEE-754 float arithmetic routines
     let test_cases = [
-        ("01_literals.cb64", 100, 3000),
-        ("02_variables.cb64", 100, 3000),
-        ("07_while.cb64", 100, 3000),
+        ("01_literals.cb64", 100, 3500),
+        ("02_variables.cb64", 100, 3500),
+        ("07_while.cb64", 100, 3500),
     ];
 
     for (file, min_size, max_size) in test_cases {

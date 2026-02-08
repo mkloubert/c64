@@ -559,9 +559,10 @@ def main():
     let code = result.unwrap();
     // Code should be reasonable size (runtime + actual code)
     // Note: size increased to accommodate fixed-point and float runtime routines
+    // with proper IEEE-754 mantissa arithmetic
     assert!(
-        code.len() < 2500,
-        "Generated code should be under 2500 bytes"
+        code.len() < 3200,
+        "Generated code should be under 3200 bytes"
     );
     assert!(
         code.len() > 100,

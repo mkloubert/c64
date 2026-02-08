@@ -180,11 +180,13 @@ impl ControlFlowEmitter for CodeGenerator {
             self.emit_branch(opcodes::BCC, &end_label);
         } else {
             // For to: exit when loop_var > end
+            // Use unique label to support nested for-loops
+            let continue_label = self.make_label("for_continue");
             self.emit_byte(opcodes::CMP_ZP);
             self.emit_byte(zeropage::TMP1);
-            self.emit_branch(opcodes::BEQ, "__for_continue");
+            self.emit_branch(opcodes::BEQ, &continue_label);
             self.emit_branch(opcodes::BCS, &end_label);
-            self.define_label("__for_continue");
+            self.define_label(&continue_label);
         }
 
         // Generate body

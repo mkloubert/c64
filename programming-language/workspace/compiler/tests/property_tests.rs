@@ -251,12 +251,12 @@ proptest! {
             // Base size increased to account for full runtime library
             // (print_word 16-bit support, print_bool TRUE/FALSE output,
             // signed types: print_sbyte, print_sword, mul_sbyte, div_sbyte, etc.,
-            // fixed-point 12.4 routines, IEEE-754 binary16 float routines,
-            // float/fixed/int conversion routines, print_fixed, print_float,
-            // rand() with inline branch structure instead of lookup table,
-            // string conversion routines: str(), byte(), word() for strings)
+            // fixed-point 12.4 routines, IEEE-754 binary16 float routines with
+            // proper mantissa arithmetic, float/fixed/int conversion routines,
+            // print_fixed, print_float, rand() with inline branch structure
+            // instead of lookup table, string conversion routines)
             let min_expected = 20 + count * 5;
-            let max_expected = 2400 + count * 50;
+            let max_expected = 3100 + count * 50;
 
             prop_assert!(
                 code.len() >= min_expected,

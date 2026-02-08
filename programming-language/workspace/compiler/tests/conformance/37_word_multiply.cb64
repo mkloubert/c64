@@ -1,0 +1,62 @@
+# Conformance Test: 16-bit Word Multiplication
+# Tests: proper 16x16 bit multiplication for values > 255
+# Expected: Compiles without errors, results are accurate
+
+def main():
+    # Test 1: Small values (should work with old routine too)
+    println("TEST1:")
+    a: word = 10
+    b: word = 5
+    c: word = a * b
+    # 10 * 5 = 50
+    println(c)
+
+    # Test 2: Values > 255 (requires proper 16-bit multiply)
+    println("TEST2:")
+    d: word = 256
+    e: word = 2
+    f: word = d * e
+    # 256 * 2 = 512
+    println(f)
+
+    # Test 3: Both operands > 255
+    println("TEST3:")
+    g: word = 300
+    h: word = 100
+    i: word = g * h
+    # 300 * 100 = 30000
+    println(i)
+
+    # Test 4: Maximum without overflow (255 * 256 = 65280)
+    println("TEST4:")
+    j: word = 255
+    k: word = 256
+    l: word = j * k
+    # 255 * 256 = 65280
+    println(l)
+
+    # Test 5: Signed multiplication with negative values
+    println("TEST5:")
+    m: sword = -10
+    n: sword = 5
+    o: sword = m * n
+    # -10 * 5 = -50
+    println(o)
+
+    # Test 6: Signed multiplication both negative
+    println("TEST6:")
+    p: sword = -100
+    q: sword = -20
+    r: sword = p * q
+    # -100 * -20 = 2000
+    println(r)
+
+    # Test 7: Larger signed values
+    println("TEST7:")
+    s: sword = 300
+    t: sword = -10
+    u: sword = s * t
+    # 300 * -10 = -3000
+    println(u)
+
+    println("DONE")

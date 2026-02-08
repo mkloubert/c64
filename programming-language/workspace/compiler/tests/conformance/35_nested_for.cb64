@@ -1,0 +1,46 @@
+# Conformance Test: Nested For Loops
+# Tests: for statement with nesting, correct label generation
+# Expected: Compiles without errors, each loop iterates correctly
+
+def main():
+    # Test 1: Simple nested for-loops (2 levels)
+    println("TEST1:")
+    i: byte = 0
+    j: byte = 0
+    for i in 0 to 2:
+        for j in 0 to 1:
+            print(i)
+            println(j)
+
+    # Test 2: Three levels of nesting
+    println("TEST2:")
+    a: byte = 0
+    b: byte = 0
+    c: byte = 0
+    for a in 0 to 1:
+        for b in 0 to 1:
+            for c in 0 to 1:
+                print(a)
+                print(b)
+                println(c)
+
+    # Test 3: Nested for with computation
+    println("TEST3:")
+    total: word = 0
+    x: byte = 0
+    y: byte = 0
+    for x in 1 to 3:
+        for y in 1 to 2:
+            total = total + 1
+    println(total)
+
+    # Test 4: Nested for with downto
+    println("TEST4:")
+    m: byte = 0
+    n: byte = 0
+    for m in 2 downto 0:
+        for n in 0 to 1:
+            print(m)
+            println(n)
+
+    println("DONE")
