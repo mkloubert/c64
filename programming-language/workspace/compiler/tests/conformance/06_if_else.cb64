@@ -1,7 +1,6 @@
-# Conformance Test: If/Else Statements
-# Tests: if, else, nested if
+# Conformance Test: If/Else/Elif Statements
+# Tests: if, elif, else, nested if
 # Expected: Compiles without errors, correct branch execution
-# Note: elif has known codegen bug, using nested if instead
 
 def main():
     x: byte = 5  # Test value for if/else conditions
@@ -14,14 +13,26 @@ def main():
     else:
         println("SMALL")
 
-    # Nested if (workaround for elif bug)
+    # Elif chains (fixed in v0.8.0)
     if x > 7:
         println("LARGE")
+    elif x > 3:
+        println("MEDIUM")
     else:
-        if x > 3:
-            println("MEDIUM")
-        else:
-            println("TINY")
+        println("TINY")
+
+    # Multiple elif branches
+    score: byte = 75
+    if score >= 90:
+        println("GRADE A")
+    elif score >= 80:
+        println("GRADE B")
+    elif score >= 70:
+        println("GRADE C")
+    elif score >= 60:
+        println("GRADE D")
+    else:
+        println("GRADE F")
 
     # Boolean conditions
     flag: bool = true

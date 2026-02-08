@@ -1,0 +1,28 @@
+# Conformance Test: Constants Inside Functions
+# Tests: const keyword inside function bodies (local constants)
+# Expected: Compiles without errors
+
+# Global constant
+const GLOBAL_MAX: byte = 100
+
+def calculate() -> word:
+    # Local constants inside function
+    const LOCAL_MULT: byte = 10
+    const LOCAL_ADD: word = 500
+
+    result: word = GLOBAL_MAX * LOCAL_MULT + LOCAL_ADD
+    return result
+
+def main():
+    # Local constant in main
+    const MESSAGE: string = "RESULT:"
+
+    # Use local constant
+    const OFFSET: word = 1000
+
+    # Call function and use result
+    value: word = calculate()
+    total: word = value + OFFSET
+
+    println(MESSAGE)
+    println(total)

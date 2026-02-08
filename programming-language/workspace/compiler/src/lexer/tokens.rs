@@ -54,6 +54,8 @@ pub enum Token {
     // Definition keywords
     /// `def` - function definition.
     Def,
+    /// `const` - constant declaration.
+    Const,
 
     // Control flow keywords
     /// `if` - conditional statement.
@@ -213,6 +215,7 @@ impl Token {
                 | Token::Fixed
                 | Token::Float
                 | Token::Def
+                | Token::Const
                 | Token::If
                 | Token::Elif
                 | Token::Else
@@ -279,6 +282,7 @@ impl Token {
 
             // Definition keywords
             "def" => Token::Def,
+            "const" => Token::Const,
 
             // Control flow keywords
             "if" => Token::If,
@@ -325,6 +329,7 @@ impl Token {
             Token::Fixed => "'fixed'",
             Token::Float => "'float'",
             Token::Def => "'def'",
+            Token::Const => "'const'",
             Token::If => "'if'",
             Token::Elif => "'elif'",
             Token::Else => "'else'",
@@ -382,77 +387,6 @@ impl Token {
             Token::Newline => "NEWLINE",
         }
     }
-}
-
-/// Result of identifier naming validation.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum IdentifierKind {
-    /// A constant (first letter uppercase, all letters uppercase).
-    Constant,
-    /// A variable (first letter lowercase).
-    Variable,
-}
-
-/// Validate an identifier name and determine if it's a constant or variable.
-///
-/// Rules:
-/// - Must start with `_` or letter (a-z, A-Z)
-/// - After that: `_`, letters (a-z, A-Z), digits (0-9)
-/// - Only `_` is invalid
-/// - If first letter is uppercase, ALL letters must be uppercase (constant)
-/// - If first letter is lowercase, it's a variable
-///
-/// Returns `Ok(IdentifierKind)` or `Err(error_message)`.
-pub fn validate_identifier_naming(name: &str) -> Result<IdentifierKind, &'static str> {
-    if name.is_empty() {
-        return Err("Identifier cannot be empty");
-    }
-
-    // Check if it's only underscores
-    if name.chars().all(|c| c == '_') {
-        return Err("Identifier cannot consist only of underscores");
-    }
-
-    // Find the first letter in the name
-    let first_letter = name.chars().find(|c| c.is_ascii_alphabetic());
-
-    match first_letter {
-        Some(c) if c.is_ascii_uppercase() => {
-            // First letter is uppercase - check that ALL letters are uppercase
-            for ch in name.chars() {
-                if ch.is_ascii_lowercase() {
-                    return Err("Constant names must have all letters in uppercase");
-                }
-            }
-            Ok(IdentifierKind::Constant)
-        }
-        Some(_) => {
-            // First letter is lowercase - it's a variable
-            Ok(IdentifierKind::Variable)
-        }
-        None => {
-            // No letters at all (only underscores and digits)
-            // This shouldn't happen due to the underscore-only check above,
-            // but let's handle it: treat as variable
-            Ok(IdentifierKind::Variable)
-        }
-    }
-}
-
-/// Check if an identifier name represents a constant.
-pub fn is_constant_name(name: &str) -> bool {
-    matches!(
-        validate_identifier_naming(name),
-        Ok(IdentifierKind::Constant)
-    )
-}
-
-/// Check if an identifier name represents a variable.
-pub fn is_variable_name(name: &str) -> bool {
-    matches!(
-        validate_identifier_naming(name),
-        Ok(IdentifierKind::Variable)
-    )
 }
 
 impl std::fmt::Display for Token {
@@ -526,6 +460,16 @@ mod tests {
     }
 
     #[test]
+    fn test_const_keyword_recognition() {
+        assert!(matches!(
+            Token::from_keyword_or_identifier("const"),
+            Token::Const
+        ));
+        assert!(Token::Const.is_keyword());
+        assert_eq!(Token::Const.name(), "'const'");
+    }
+
+    #[test]
     fn test_decimal_token_display() {
         let token = Token::Decimal("3.14".to_string());
         assert_eq!(format!("{}", token), "3.14");
@@ -537,110 +481,4 @@ mod tests {
         assert_eq!(token.name(), "decimal");
     }
 
-    // ========================================
-    // Identifier Naming Validation Tests
-    // ========================================
-
-    #[test]
-    fn test_validate_constant_names() {
-        // Valid constants
-        assert_eq!(
-            validate_identifier_naming("MY_CONST"),
-            Ok(IdentifierKind::Constant)
-        );
-        assert_eq!(
-            validate_identifier_naming("_MY_CONST"),
-            Ok(IdentifierKind::Constant)
-        );
-        assert_eq!(
-            validate_identifier_naming("_3MY_CONST"),
-            Ok(IdentifierKind::Constant)
-        );
-        assert_eq!(
-            validate_identifier_naming("A"),
-            Ok(IdentifierKind::Constant)
-        );
-        assert_eq!(
-            validate_identifier_naming("B2"),
-            Ok(IdentifierKind::Constant)
-        );
-        assert_eq!(
-            validate_identifier_naming("C_3"),
-            Ok(IdentifierKind::Constant)
-        );
-        assert_eq!(
-            validate_identifier_naming("_4D"),
-            Ok(IdentifierKind::Constant)
-        );
-    }
-
-    #[test]
-    fn test_validate_variable_names() {
-        // Valid variables
-        assert_eq!(
-            validate_identifier_naming("myVar"),
-            Ok(IdentifierKind::Variable)
-        );
-        assert_eq!(
-            validate_identifier_naming("myVar_5"),
-            Ok(IdentifierKind::Variable)
-        );
-        assert_eq!(
-            validate_identifier_naming("a"),
-            Ok(IdentifierKind::Variable)
-        );
-        assert_eq!(
-            validate_identifier_naming("b2"),
-            Ok(IdentifierKind::Variable)
-        );
-        assert_eq!(
-            validate_identifier_naming("c_3"),
-            Ok(IdentifierKind::Variable)
-        );
-        assert_eq!(
-            validate_identifier_naming("_4d"),
-            Ok(IdentifierKind::Variable)
-        );
-        assert_eq!(
-            validate_identifier_naming("_e666"),
-            Ok(IdentifierKind::Variable)
-        );
-    }
-
-    #[test]
-    fn test_validate_invalid_mixed_case() {
-        // Invalid: first letter uppercase but mixed case
-        assert!(validate_identifier_naming("MyConst").is_err());
-        assert!(validate_identifier_naming("_My_Const").is_err());
-        assert!(validate_identifier_naming("_3My_Const").is_err());
-        assert!(validate_identifier_naming("MY_Const").is_err());
-    }
-
-    #[test]
-    fn test_validate_underscore_only() {
-        // Invalid: only underscores
-        assert!(validate_identifier_naming("_").is_err());
-        assert!(validate_identifier_naming("__").is_err());
-        assert!(validate_identifier_naming("___").is_err());
-    }
-
-    #[test]
-    fn test_is_constant_name_helper() {
-        assert!(is_constant_name("MY_CONST"));
-        assert!(is_constant_name("A"));
-        assert!(is_constant_name("_4D"));
-        assert!(!is_constant_name("myVar"));
-        assert!(!is_constant_name("_4d"));
-        assert!(!is_constant_name("_"));
-    }
-
-    #[test]
-    fn test_is_variable_name_helper() {
-        assert!(is_variable_name("myVar"));
-        assert!(is_variable_name("a"));
-        assert!(is_variable_name("_4d"));
-        assert!(!is_variable_name("MY_CONST"));
-        assert!(!is_variable_name("_4D"));
-        assert!(!is_variable_name("_"));
-    }
 }

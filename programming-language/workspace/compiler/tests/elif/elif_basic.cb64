@@ -1,0 +1,13 @@
+# Test: Basic elif chain
+# Expected: Compiles and executes correctly
+# Tests: Simple if-elif-else with one elif branch
+
+def main():
+    x: byte = 50
+
+    if x > 100:
+        println("LARGE")
+    elif x > 25:
+        println("MEDIUM")
+    else:
+        println("SMALL")

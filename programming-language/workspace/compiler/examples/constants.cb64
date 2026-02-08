@@ -1,28 +1,27 @@
 # Constants Demo for Cobra64
-# Demonstrates the naming convention for constants vs variables
+# Demonstrates the 'const' keyword for constants
 #
 # Rules:
-# - UPPERCASE names (first letter uppercase, ALL letters uppercase) = Constants
-# - lowercase names (first letter lowercase) = Variables
+# - Use 'const' keyword to declare constants
 # - Constants are immutable after declaration
-# - Constants are declared at top-level only
+# - Constants can be declared at top-level or inside functions
 # - All constants require explicit type annotation
 
-# Constants with explicit types
-MAX_VALUE: byte = 255
-SCREEN_WIDTH: byte = 40
-SCREEN_HEIGHT: byte = 25
-VIC_BASE: word = $D000
-BORDER_COLOR: word = $D020
-BACKGROUND_COLOR: word = $D021
+# Constants with explicit types using 'const' keyword
+const MAX_VALUE: byte = 255
+const SCREEN_WIDTH: byte = 40
+const SCREEN_HEIGHT: byte = 25
+const VIC_BASE: word = $D000
+const BORDER_COLOR: word = $D020
+const BACKGROUND_COLOR: word = $D021
 
 # Word type for values that need 16-bit storage
-SMALL_AS_WORD: word = 100       # Force word type for small value
-PI: fixed = 3.14159             # Use fixed instead of float
+const SMALL_AS_WORD: word = 100       # Force word type for small value
+const PI: fixed = 3.14159             # Use fixed instead of float
 
 # Constants with underscore prefix
-_MAX_SPRITES: byte = 8
-_4K: word = 4096
+const _MAX_SPRITES: byte = 8
+const _4K: word = 4096
 
 def main():
     cls()
@@ -30,8 +29,11 @@ def main():
     println("==============")
     println("")
 
+    # Local constant inside function
+    const HEADER: string = "SCREEN SIZE:"
+
     # Using constants in expressions
-    println("SCREEN SIZE:")
+    println(HEADER)
     print("WIDTH: ")
     println(SCREEN_WIDTH)
     print("HEIGHT: ")
@@ -52,7 +54,7 @@ def main():
     println(BORDER_COLOR)
     println("")
 
-    # Variables (lowercase) can be modified
+    # Variables can be modified (no const keyword)
     counter: byte = 0
     println("COUNTING TO 5:")
     while counter < 5:

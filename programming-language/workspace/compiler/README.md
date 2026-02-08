@@ -312,52 +312,54 @@ def main():
 
 ### Constants
 
-Constants are identified by their **naming convention**: names that start with an uppercase letter and have ALL letters in uppercase are constants.
-
-All constant declarations require an explicit type annotation:
+Constants are declared using the `const` keyword. All constant declarations require an explicit type annotation.
 
 ```python
-# Constants with explicit types
-MAX_SCORE: byte = 255
-SCREEN_WIDTH: byte = 40
-LARGE_VALUE: word = 1000
-NEGATIVE: sbyte = -100
-PI: fixed = 3.14159
-E: float = 2.718
+# Constants with explicit types using 'const' keyword
+const MAX_SCORE: byte = 255
+const SCREEN_WIDTH: byte = 40
+const LARGE_VALUE: word = 1000
+const NEGATIVE: sbyte = -100
+const PI: fixed = 3.14159
+const E: float = 2.718
 
 def main():
+    # Local constants inside functions
+    const HEADER: string = "SCORE:"
+
     x: byte = MAX_SCORE
     y: word = LARGE_VALUE + 1
 ```
 
 #### Naming Rules
 
-| Type         | Rule                                                   | Examples                     |
-| ------------ | ------------------------------------------------------ | ---------------------------- |
-| **Constant** | First letter uppercase → ALL letters must be uppercase | `MAX`, `SCREEN_WIDTH`, `_4K` |
-| **Variable** | First letter lowercase                                 | `myVar`, `counter`, `_temp`  |
-| **Invalid**  | First letter uppercase but mixed case                  | `MyConst`, `MaxValue`        |
+| Type         | Rule                                          | Examples                             |
+| ------------ | --------------------------------------------- | ------------------------------------ |
+| **Constant** | Use `const` keyword                           | `const MAX: byte = 255`              |
+| **Variable** | No keyword, just type annotation              | `counter: byte = 0`                  |
+| **Invalid**  | Identifier consisting only of underscores     | `_`, `__`, `___`                     |
 
 ```python
-# Valid constants
-MAX_VALUE = 255        # All uppercase letters
-VIC_BASE = $D000       # All uppercase letters
-_SPRITE_COUNT = 8      # Underscore prefix, all letters uppercase
-_4K = 4096             # First letter is 'K' (uppercase)
+# Valid constants (use 'const' keyword)
+const MAX_VALUE: byte = 255
+const VIC_BASE: word = $D000
+const _SPRITE_COUNT: byte = 8
+const _4K: word = 4096
 
-# Valid variables
-counter: byte = 0      # First letter 'c' is lowercase
-myScore: word = 1000   # First letter 'm' is lowercase
-_temp: byte = 5        # First letter 't' is lowercase
+# Valid variables (no 'const' keyword)
+counter: byte = 0
+myScore: word = 1000
+_temp: byte = 5
+MaxValue: byte = 100    # Mixed case is now valid for variables
 
 # INVALID - will cause compile error
-# MaxValue = 100       # Error: Mixed case (first uppercase, but not all)
-# _MyConst = 50        # Error: Mixed case
+# _: byte = 0           # Error: Identifier cannot be only underscores
 ```
 
 **Important:**
 
-- Constants are declared at **top-level only** (not inside functions)
+- Constants are declared with the `const` keyword
+- Constants can be declared at **top-level or inside functions**
 - Constants are **immutable** - they cannot be reassigned
 - Constants can have any type (byte, word, sbyte, sword, fixed, float, bool, string)
 
@@ -967,9 +969,9 @@ def main():
 ### Color Cycler
 
 ```python
-# Constants use UPPERCASE names
-BORDER: word = $D020
-BACKGROUND: word = $D021
+# Constants use 'const' keyword
+const BORDER: word = $D020
+const BACKGROUND: word = $D021
 
 def main():
     cls()
@@ -1093,7 +1095,7 @@ def main():
 ```python
 # Example using fixed-point for smooth sprite movement
 
-SCREEN_WIDTH: word = 320
+const SCREEN_WIDTH: word = 320
 
 def main():
     cls()
@@ -1235,7 +1237,6 @@ def find_rank(scores: word[], new_score: word) -> byte:
 | `Invalid escape sequence`    | Unknown escape like `\x`                                             |
 | `Number overflow`            | Number too large for type                                            |
 | `Tabs not allowed`           | Use 4 spaces for indentation                                         |
-| `Invalid identifier naming`  | Mixed case like `MyConst` (must be all uppercase or start lowercase) |
 | `Identifier only underscore` | Identifier cannot be just `_` or `__`                                |
 
 ### Parser Errors
@@ -1264,18 +1265,11 @@ def find_rank(scores: word[], new_score: word) -> byte:
 
 ### Known Issues
 
-1. **elif has a code generation bug** - Use nested if-else instead:
+1. ~~**elif has a code generation bug**~~ - **FIXED in v0.8.0**: The elif statement now works correctly. The bug was in label management during code generation.
 
-   ```python
-   # Instead of elif, use:
-   if condition1:
-       # ...
-   else:
-       if condition2:
-           # ...
-   ```
+2. ~~**Deep nesting limit**~~ - **FIXED in v0.7.0**: The compiler now automatically uses "branch trampolining" to handle deep nesting. When a branch target exceeds the 6510's 127-byte limit, the compiler inverts the condition and uses a JMP instruction instead.
 
-2. **Deep nesting limit** - The 6510 CPU has a ~127 byte branch range. Very deep nesting (more than 4-5 levels) may fail to compile.
+**Note:** All major known issues have been resolved. Please report any new issues at the project repository.
 
 ### Platform Constraints
 
@@ -1335,6 +1329,24 @@ The generated PRG and D64 files should work with any C64 emulator that supports 
 
 ## Version History
 
+- **0.8.0** - elif bug fix
+  - **BUG FIX:** elif statements now work correctly
+  - Fixed label management in `generate_if()` for elif chains
+  - The bug caused "Undefined label 'elif_N'" errors when using multiple elif branches
+  - Root cause: `next_label` was created but never defined for subsequent branches
+  - Solution: Track `current_label` that gets updated after each elif branch
+
+- **0.7.0** - Explicit `const` keyword and branch trampolining
+  - **BREAKING CHANGE:** Constants are now declared with `const` keyword
+  - Old syntax `MAX_VALUE: byte = 255` no longer creates a constant
+  - New syntax `const MAX_VALUE: byte = 255` is required
+  - Constants can now be declared inside functions (local constants)
+  - Removed naming convention rules (UPPERCASE no longer means constant)
+  - Mixed case identifiers like `MyValue` are now valid for variables
+  - Removed error code E026 (InvalidIdentifierNaming)
+  - **Branch trampolining**: Deep nesting no longer causes compile errors
+  - Compiler automatically converts far branches to JMP instructions
+
 - **0.6.0** - Explicit type annotations required
   - **BREAKING CHANGE:** Type inference for declarations has been removed
   - All variable declarations now require explicit type annotations
@@ -1362,13 +1374,13 @@ The generated PRG and D64 files should work with any C64 emulator that supports 
   - Signed array type inference from negative values
   - Array-specific error messages
 
-- **0.3.0** - Naming convention for constants
-  - Removed `const` keyword
-  - Constants are now identified by UPPERCASE naming convention
+- **0.3.0** - Naming convention for constants *(superseded by 0.7.0)*
+  - Removed `const` keyword (reintroduced in 0.7.0)
+  - Constants were identified by UPPERCASE naming convention
   - First letter uppercase + all letters uppercase = constant
   - First letter lowercase = variable
   - Added compile-time validation for naming rules
-  - New error codes: E026 (InvalidIdentifierNaming), E027 (IdentifierOnlyUnderscore)
+  - New error codes: E026 (InvalidIdentifierNaming, removed in 0.7.0), E027 (IdentifierOnlyUnderscore)
 
 - **0.2.0** - Decimal number types
   - Added `fixed` type (12.4 fixed-point, -2048.0 to +2047.9375)

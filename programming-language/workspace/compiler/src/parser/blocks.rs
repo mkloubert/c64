@@ -29,7 +29,7 @@ use super::types::TypeParser;
 use super::Parser;
 use crate::ast::{Block, FunctionDef, Parameter, StatementKind, TopLevelItem};
 use crate::error::{CompileError, ErrorCode};
-use crate::lexer::{is_constant_name, Token};
+use crate::lexer::Token;
 
 /// Extension trait for block and function parsing.
 pub trait BlockParser {
@@ -56,35 +56,23 @@ impl<'a> BlockParser for Parser<'a> {
                 let func = self.parse_function_def()?;
                 Ok(TopLevelItem::Function(func))
             }
-            Some(Token::Identifier(name)) => {
-                let name = name.clone();
-                // Check if it's a constant (UPPERCASE name) or variable (lowercase name)
-                if is_constant_name(&name) {
-                    // Constant: NAME = value OR NAME: type = value
-                    if matches!(self.peek_ahead(1), Some(Token::Equal))
-                        || matches!(self.peek_ahead(1), Some(Token::Colon))
-                    {
-                        let decl = self.parse_const_decl()?;
-                        Ok(TopLevelItem::Constant(decl))
-                    } else {
-                        Err(self.error(
-                            ErrorCode::UnexpectedToken,
-                            "Expected '=' or ':' after constant name",
-                        ))
-                    }
+            Some(Token::Const) => {
+                // Constant: const name: type = value
+                let decl = self.parse_const_decl()?;
+                Ok(TopLevelItem::Constant(decl))
+            }
+            Some(Token::Identifier(_)) => {
+                // Variable: name: type = value
+                if matches!(self.peek_ahead(1), Some(Token::Colon))
+                    || matches!(self.peek_ahead(1), Some(Token::Equal))
+                {
+                    let decl = self.parse_var_decl()?;
+                    Ok(TopLevelItem::Variable(decl))
                 } else {
-                    // Variable: name: type = value OR name = value
-                    if matches!(self.peek_ahead(1), Some(Token::Colon))
-                        || matches!(self.peek_ahead(1), Some(Token::Equal))
-                    {
-                        let decl = self.parse_var_decl()?;
-                        Ok(TopLevelItem::Variable(decl))
-                    } else {
-                        Err(self.error(
-                            ErrorCode::UnexpectedToken,
-                            "Expected function definition, constant, or variable declaration at top level",
-                        ))
-                    }
+                    Err(self.error(
+                        ErrorCode::UnexpectedToken,
+                        "Expected function definition, constant, or variable declaration at top level",
+                    ))
                 }
             }
             Some(t) if t.is_type() => Err(self.error(

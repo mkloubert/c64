@@ -43,7 +43,7 @@ export interface Range {
 
 /**
  * Error codes from the Cobra64 compiler.
- * Lexical errors: E001-E027
+ * Lexical errors: E001-E026
  * Syntax errors: E100-E146
  * Semantic errors: E200-E246
  */
@@ -54,8 +54,7 @@ export enum ErrorCode {
     InvalidEscapeSequence = 'E003',
     NumberOverflow = 'E004',
     TabsNotAllowed = 'E005',
-    InvalidIdentifierNaming = 'E026',
-    IdentifierOnlyUnderscore = 'E027',
+    IdentifierOnlyUnderscore = 'E026',
 
     // Syntax errors
     UnexpectedToken = 'E100',
@@ -138,6 +137,7 @@ export type Cobra64Type = typeof COBRA64_TYPES[number];
  * Cobra64 keywords.
  */
 export const COBRA64_KEYWORDS = [
+    'const',
     'def',
     'if',
     'elif',

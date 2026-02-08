@@ -370,9 +370,9 @@ impl std::fmt::Display for VarDecl {
 impl std::fmt::Display for ConstDecl {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(ref const_type) = self.const_type {
-            write!(f, "{}: {} = {}", self.name, const_type, self.value)
+            write!(f, "const {}: {} = {}", self.name, const_type, self.value)
         } else {
-            write!(f, "{} = {}", self.name, self.value)
+            write!(f, "const {} = {}", self.name, self.value)
         }
     }
 }
@@ -544,7 +544,7 @@ mod tests {
         let span = Span::new(0, 15);
         let value = Expr::new(ExprKind::IntegerLiteral(100), Span::new(12, 15));
         let decl = ConstDecl::new("MAX".to_string(), value, span);
-        assert_eq!(format!("{}", decl), "MAX = 100");
+        assert_eq!(format!("{}", decl), "const MAX = 100");
     }
 
     #[test]
@@ -552,7 +552,7 @@ mod tests {
         let span = Span::new(0, 20);
         let value = Expr::new(ExprKind::IntegerLiteral(255), Span::new(16, 19));
         let decl = ConstDecl::new_typed("MAX".to_string(), Type::Word, value, span);
-        assert_eq!(format!("{}", decl), "MAX: word = 255");
+        assert_eq!(format!("{}", decl), "const MAX: word = 255");
     }
 
     #[test]

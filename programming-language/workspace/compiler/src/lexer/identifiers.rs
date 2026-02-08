@@ -20,10 +20,8 @@
 //! This module handles scanning of:
 //! - Identifiers (variable and function names)
 //! - Keywords (reserved words)
-//! - Naming convention validation
 
 use super::helpers::LexerHelpers;
-use super::tokens;
 use super::Lexer;
 use super::Token;
 use crate::error::{CompileError, ErrorCode, Span};
@@ -52,26 +50,13 @@ impl<'source> IdentifierScanner<'source> for Lexer<'source> {
         // First check if it's a keyword
         let token = Token::from_keyword_or_identifier(text);
 
-        // If it's an identifier (not a keyword), validate the naming convention
+        // If it's an identifier (not a keyword), check for underscore-only names
         if let Token::Identifier(ref name) = token {
-            // Check for underscore-only identifiers
             if name.chars().all(|c| c == '_') {
                 return Err(CompileError::new(
                     ErrorCode::IdentifierOnlyUnderscore,
                     "Identifier cannot consist only of underscores",
                     span,
-                ));
-            }
-
-            // Validate naming convention
-            if let Err(msg) = tokens::validate_identifier_naming(name) {
-                return Err(CompileError::new(
-                    ErrorCode::InvalidIdentifierNaming,
-                    msg,
-                    span,
-                )
-                .with_hint(
-                    "Constants must be ALL_UPPERCASE, variables must start with a lowercase letter",
                 ));
             }
         }

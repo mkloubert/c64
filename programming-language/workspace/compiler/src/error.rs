@@ -96,7 +96,6 @@ pub enum ErrorCode {
     InvalidHexDigit,
     EmptyNumberLiteral,
     InvalidDecimalLiteral,
-    InvalidIdentifierNaming,
     IdentifierOnlyUnderscore,
 
     // Syntax errors (E100-E146)
@@ -193,8 +192,7 @@ impl ErrorCode {
             ErrorCode::InvalidHexDigit => "E023",
             ErrorCode::EmptyNumberLiteral => "E024",
             ErrorCode::InvalidDecimalLiteral => "E025",
-            ErrorCode::InvalidIdentifierNaming => "E026",
-            ErrorCode::IdentifierOnlyUnderscore => "E027",
+            ErrorCode::IdentifierOnlyUnderscore => "E026",
 
             // Syntax errors
             ErrorCode::UnexpectedToken => "E100",

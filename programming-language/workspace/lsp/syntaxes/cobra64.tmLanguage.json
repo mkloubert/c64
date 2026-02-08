@@ -151,6 +151,10 @@
           "match": "\\b(def)\\b"
         },
         {
+          "name": "keyword.other.const.cobra64",
+          "match": "\\b(const)\\b"
+        },
+        {
           "name": "keyword.operator.logical.cobra64",
           "match": "\\b(and|or|not)\\b"
         },

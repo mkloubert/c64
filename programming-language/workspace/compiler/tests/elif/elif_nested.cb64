@@ -1,0 +1,30 @@
+# Test: Nested if statements with elif
+# Expected: Compiles and executes correctly
+# Tests: elif inside other control structures
+
+def main():
+    x: byte = 5
+    y: byte = 10
+
+    if x > 0:
+        if y > 20:
+            println("Y LARGE")
+        elif y > 5:
+            println("Y MEDIUM")
+        else:
+            println("Y SMALL")
+    elif x == 0:
+        println("X ZERO")
+    else:
+        println("X NEGATIVE")
+
+    # elif inside else block
+    if x > 100:
+        println("BIG X")
+    else:
+        if y > 15:
+            println("BIG Y")
+        elif y > 8:
+            println("MED Y")
+        else:
+            println("SMALL Y")

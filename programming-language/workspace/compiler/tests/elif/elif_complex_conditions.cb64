@@ -1,0 +1,34 @@
+# Test: elif with complex conditions
+# Expected: Compiles and executes correctly
+# Tests: elif with and/or/not operators
+
+def main():
+    a: byte = 10
+    b: byte = 20
+    flag: bool = true
+
+    # Test with 'and' conditions
+    if a > 50 and b > 50:
+        println("BOTH BIG")
+    elif a > 5 and b > 15:
+        println("BOTH MEDIUM")
+    else:
+        println("NOT BOTH")
+
+    # Test with 'or' conditions
+    if a > 100 or b > 100:
+        println("ONE HUGE")
+    elif a > 50 or b > 50:
+        println("ONE BIG")
+    elif a > 5 or b > 5:
+        println("ONE OK")
+    else:
+        println("BOTH TINY")
+
+    # Test with 'not' and boolean
+    if not flag:
+        println("FLAG OFF")
+    elif flag and a > 5:
+        println("FLAG ON AND A OK")
+    else:
+        println("OTHER")

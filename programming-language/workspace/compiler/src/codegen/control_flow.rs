@@ -78,8 +78,11 @@ impl ControlFlowEmitter for CodeGenerator {
         }
 
         // Generate elif branches
+        // Track the current label - starts with else_label, then becomes next_label for each branch
+        let mut current_label = else_label.clone();
         for (i, (cond, block)) in if_stmt.elif_branches.iter().enumerate() {
-            self.define_label(&else_label);
+            self.define_label(&current_label);
+
             let next_label = if i < if_stmt.elif_branches.len() - 1 || if_stmt.else_block.is_some()
             {
                 self.make_label("elif")
@@ -94,13 +97,15 @@ impl ControlFlowEmitter for CodeGenerator {
 
             self.generate_block(block)?;
             self.emit_jmp(&end_label);
+
+            // The next elif branch will define this label
+            current_label = next_label;
         }
 
         // Generate else block
         if let Some(else_block) = &if_stmt.else_block {
-            if if_stmt.elif_branches.is_empty() {
-                self.define_label(&else_label);
-            }
+            // If no elif branches, define else_label; otherwise define the last next_label
+            self.define_label(&current_label);
             self.generate_block(else_block)?;
         }
 

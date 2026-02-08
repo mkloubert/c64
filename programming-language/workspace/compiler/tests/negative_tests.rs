@@ -249,8 +249,8 @@ fn test_semantic_duplicate_function() {
 /// Test constant reassignment errors.
 #[test]
 fn test_semantic_constant_reassignment() {
-    // Constants require explicit type annotation
-    let source = "X: byte = 10\n\ndef main():\n    X = 20\n";
+    // Constants use 'const' keyword and cannot be reassigned
+    let source = "const X: byte = 10\n\ndef main():\n    X = 20\n";
     let err = compile_and_get_error(source);
     assert!(err.is_some(), "Expected error for constant reassignment");
     assert_eq!(err.unwrap(), ErrorCode::CannotAssignToConstant);
@@ -374,7 +374,7 @@ fn test_first_error_reported() {
 #[test]
 fn test_const_explicit_type_mismatch_decimal_to_byte() {
     // Cannot assign decimal to byte
-    let source = "PI: byte = 3.14\ndef main():\n    pass";
+    let source = "const PI: byte = 3.14\ndef main():\n    pass";
     let result = cobra64::compile(source);
     assert!(
         result.is_err(),
@@ -386,7 +386,7 @@ fn test_const_explicit_type_mismatch_decimal_to_byte() {
 #[test]
 fn test_const_explicit_type_mismatch_string_to_word() {
     // Cannot assign string to word
-    let source = "MSG: word = \"hello\"\ndef main():\n    pass";
+    let source = "const MSG: word = \"hello\"\ndef main():\n    pass";
     let result = cobra64::compile(source);
     assert!(
         result.is_err(),
@@ -398,7 +398,7 @@ fn test_const_explicit_type_mismatch_string_to_word() {
 #[test]
 fn test_const_explicit_type_mismatch_bool_to_fixed() {
     // Cannot assign bool to fixed
-    let source = "FLAG: fixed = true\ndef main():\n    pass";
+    let source = "const FLAG: fixed = true\ndef main():\n    pass";
     let result = cobra64::compile(source);
     assert!(result.is_err(), "Expected error for bool assigned to fixed");
 }
@@ -420,7 +420,7 @@ fn test_var_inference_requires_initializer() {
 #[test]
 fn test_const_explicit_type_out_of_range() {
     // 256 is out of range for byte
-    let source = "MAX: byte = 256\ndef main():\n    pass";
+    let source = "const MAX: byte = 256\ndef main():\n    pass";
     let result = cobra64::compile(source);
     assert!(
         result.is_err(),
@@ -432,7 +432,7 @@ fn test_const_explicit_type_out_of_range() {
 #[test]
 fn test_const_explicit_type_negative_to_unsigned() {
     // -1 is out of range for byte
-    let source = "NEG: byte = -1\ndef main():\n    pass";
+    let source = "const NEG: byte = -1\ndef main():\n    pass";
     let result = cobra64::compile(source);
     assert!(
         result.is_err(),
@@ -444,7 +444,7 @@ fn test_const_explicit_type_negative_to_unsigned() {
 #[test]
 fn test_const_explicit_type_string_expression() {
     // String expression cannot be assigned to word
-    let source = "VAL: word = \"hello\" + \"world\"\ndef main():\n    pass";
+    let source = "const VAL: word = \"hello\" + \"world\"\ndef main():\n    pass";
     let result = cobra64::compile(source);
     assert!(result.is_err(), "Expected error for string expr to word");
 }

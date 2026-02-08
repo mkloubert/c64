@@ -51,8 +51,8 @@ Program {
                                                     "x",
                                                 ),
                                                 span: Span {
-                                                    start: 137,
-                                                    end: 138,
+                                                    start: 98,
+                                                    end: 99,
                                                 },
                                             },
                                             op: Greater,
@@ -61,14 +61,14 @@ Program {
                                                     3,
                                                 ),
                                                 span: Span {
-                                                    start: 141,
-                                                    end: 142,
+                                                    start: 102,
+                                                    end: 103,
                                                 },
                                             },
                                         },
                                         span: Span {
-                                            start: 137,
-                                            end: 142,
+                                            start: 98,
+                                            end: 103,
                                         },
                                     },
                                     then_block: Block {
@@ -84,165 +84,143 @@ Program {
                                                                         "BIG",
                                                                     ),
                                                                     span: Span {
-                                                                        start: 160,
-                                                                        end: 165,
+                                                                        start: 121,
+                                                                        end: 126,
                                                                     },
                                                                 },
                                                             ],
                                                         },
                                                         span: Span {
-                                                            start: 152,
-                                                            end: 166,
+                                                            start: 113,
+                                                            end: 127,
                                                         },
                                                     },
                                                 ),
                                                 span: Span {
-                                                    start: 152,
-                                                    end: 166,
+                                                    start: 113,
+                                                    end: 127,
                                                 },
                                             },
                                         ],
                                         span: Span {
-                                            start: 144,
-                                            end: 171,
+                                            start: 105,
+                                            end: 132,
                                         },
                                     },
-                                    elif_branches: [],
+                                    elif_branches: [
+                                        (
+                                            Expr {
+                                                kind: BinaryOp {
+                                                    left: Expr {
+                                                        kind: Identifier(
+                                                            "x",
+                                                        ),
+                                                        span: Span {
+                                                            start: 137,
+                                                            end: 138,
+                                                        },
+                                                    },
+                                                    op: Greater,
+                                                    right: Expr {
+                                                        kind: IntegerLiteral(
+                                                            1,
+                                                        ),
+                                                        span: Span {
+                                                            start: 141,
+                                                            end: 142,
+                                                        },
+                                                    },
+                                                },
+                                                span: Span {
+                                                    start: 137,
+                                                    end: 142,
+                                                },
+                                            },
+                                            Block {
+                                                statements: [
+                                                    Statement {
+                                                        kind: Expression(
+                                                            Expr {
+                                                                kind: FunctionCall {
+                                                                    name: "println",
+                                                                    args: [
+                                                                        Expr {
+                                                                            kind: StringLiteral(
+                                                                                "MEDIUM",
+                                                                            ),
+                                                                            span: Span {
+                                                                                start: 160,
+                                                                                end: 168,
+                                                                            },
+                                                                        },
+                                                                    ],
+                                                                },
+                                                                span: Span {
+                                                                    start: 152,
+                                                                    end: 169,
+                                                                },
+                                                            },
+                                                        ),
+                                                        span: Span {
+                                                            start: 152,
+                                                            end: 169,
+                                                        },
+                                                    },
+                                                ],
+                                                span: Span {
+                                                    start: 144,
+                                                    end: 174,
+                                                },
+                                            },
+                                        ),
+                                    ],
                                     else_block: Some(
                                         Block {
                                             statements: [
                                                 Statement {
-                                                    kind: If(
-                                                        IfStatement {
-                                                            condition: Expr {
-                                                                kind: BinaryOp {
-                                                                    left: Expr {
-                                                                        kind: Identifier(
-                                                                            "x",
+                                                    kind: Expression(
+                                                        Expr {
+                                                            kind: FunctionCall {
+                                                                name: "println",
+                                                                args: [
+                                                                    Expr {
+                                                                        kind: StringLiteral(
+                                                                            "SMALL",
                                                                         ),
                                                                         span: Span {
-                                                                            start: 188,
-                                                                            end: 189,
-                                                                        },
-                                                                    },
-                                                                    op: Greater,
-                                                                    right: Expr {
-                                                                        kind: IntegerLiteral(
-                                                                            1,
-                                                                        ),
-                                                                        span: Span {
-                                                                            start: 192,
-                                                                            end: 193,
-                                                                        },
-                                                                    },
-                                                                },
-                                                                span: Span {
-                                                                    start: 188,
-                                                                    end: 193,
-                                                                },
-                                                            },
-                                                            then_block: Block {
-                                                                statements: [
-                                                                    Statement {
-                                                                        kind: Expression(
-                                                                            Expr {
-                                                                                kind: FunctionCall {
-                                                                                    name: "println",
-                                                                                    args: [
-                                                                                        Expr {
-                                                                                            kind: StringLiteral(
-                                                                                                "MEDIUM",
-                                                                                            ),
-                                                                                            span: Span {
-                                                                                                start: 215,
-                                                                                                end: 223,
-                                                                                            },
-                                                                                        },
-                                                                                    ],
-                                                                                },
-                                                                                span: Span {
-                                                                                    start: 207,
-                                                                                    end: 224,
-                                                                                },
-                                                                            },
-                                                                        ),
-                                                                        span: Span {
-                                                                            start: 207,
-                                                                            end: 224,
+                                                                            start: 196,
+                                                                            end: 203,
                                                                         },
                                                                     },
                                                                 ],
-                                                                span: Span {
-                                                                    start: 195,
-                                                                    end: 233,
-                                                                },
                                                             },
-                                                            elif_branches: [],
-                                                            else_block: Some(
-                                                                Block {
-                                                                    statements: [
-                                                                        Statement {
-                                                                            kind: Expression(
-                                                                                Expr {
-                                                                                    kind: FunctionCall {
-                                                                                        name: "println",
-                                                                                        args: [
-                                                                                            Expr {
-                                                                                                kind: StringLiteral(
-                                                                                                    "SMALL",
-                                                                                                ),
-                                                                                                span: Span {
-                                                                                                    start: 259,
-                                                                                                    end: 266,
-                                                                                                },
-                                                                                            },
-                                                                                        ],
-                                                                                    },
-                                                                                    span: Span {
-                                                                                        start: 251,
-                                                                                        end: 267,
-                                                                                    },
-                                                                                },
-                                                                            ),
-                                                                            span: Span {
-                                                                                start: 251,
-                                                                                end: 267,
-                                                                            },
-                                                                        },
-                                                                    ],
-                                                                    span: Span {
-                                                                        start: 239,
-                                                                        end: 273,
-                                                                    },
-                                                                },
-                                                            ),
                                                             span: Span {
-                                                                start: 185,
-                                                                end: 273,
+                                                                start: 188,
+                                                                end: 204,
                                                             },
                                                         },
                                                     ),
                                                     span: Span {
-                                                        start: 185,
-                                                        end: 273,
+                                                        start: 188,
+                                                        end: 204,
                                                     },
                                                 },
                                             ],
                                             span: Span {
-                                                start: 177,
-                                                end: 273,
+                                                start: 180,
+                                                end: 210,
                                             },
                                         },
                                     ),
                                     span: Span {
-                                        start: 134,
-                                        end: 273,
+                                        start: 95,
+                                        end: 210,
                                     },
                                 },
                             ),
                             span: Span {
-                                start: 134,
-                                end: 273,
+                                start: 95,
+                                end: 210,
                             },
                         },
                         Statement {
@@ -258,21 +236,21 @@ Program {
                                                 0,
                                             ),
                                             span: Span {
-                                                start: 283,
-                                                end: 284,
+                                                start: 220,
+                                                end: 221,
                                             },
                                         },
                                     ),
                                     array_size: None,
                                     span: Span {
-                                        start: 273,
-                                        end: 284,
+                                        start: 210,
+                                        end: 221,
                                     },
                                 },
                             ),
                             span: Span {
-                                start: 273,
-                                end: 284,
+                                start: 210,
+                                end: 221,
                             },
                         },
                         Statement {
@@ -285,8 +263,8 @@ Program {
                                                     "i",
                                                 ),
                                                 span: Span {
-                                                    start: 295,
-                                                    end: 296,
+                                                    start: 232,
+                                                    end: 233,
                                                 },
                                             },
                                             op: Less,
@@ -295,14 +273,14 @@ Program {
                                                     3,
                                                 ),
                                                 span: Span {
-                                                    start: 299,
-                                                    end: 300,
+                                                    start: 236,
+                                                    end: 237,
                                                 },
                                             },
                                         },
                                         span: Span {
-                                            start: 295,
-                                            end: 300,
+                                            start: 232,
+                                            end: 237,
                                         },
                                     },
                                     body: Block {
@@ -318,21 +296,21 @@ Program {
                                                                         "i",
                                                                     ),
                                                                     span: Span {
-                                                                        start: 318,
-                                                                        end: 319,
+                                                                        start: 255,
+                                                                        end: 256,
                                                                     },
                                                                 },
                                                             ],
                                                         },
                                                         span: Span {
-                                                            start: 310,
-                                                            end: 320,
+                                                            start: 247,
+                                                            end: 257,
                                                         },
                                                     },
                                                 ),
                                                 span: Span {
-                                                    start: 310,
-                                                    end: 320,
+                                                    start: 247,
+                                                    end: 257,
                                                 },
                                             },
                                             Statement {
@@ -349,8 +327,8 @@ Program {
                                                                         "i",
                                                                     ),
                                                                     span: Span {
-                                                                        start: 333,
-                                                                        end: 334,
+                                                                        start: 270,
+                                                                        end: 271,
                                                                     },
                                                                 },
                                                                 op: Add,
@@ -359,53 +337,53 @@ Program {
                                                                         1,
                                                                     ),
                                                                     span: Span {
-                                                                        start: 337,
-                                                                        end: 338,
+                                                                        start: 274,
+                                                                        end: 275,
                                                                     },
                                                                 },
                                                             },
                                                             span: Span {
-                                                                start: 333,
-                                                                end: 338,
+                                                                start: 270,
+                                                                end: 275,
                                                             },
                                                         },
                                                         span: Span {
-                                                            start: 329,
-                                                            end: 338,
+                                                            start: 266,
+                                                            end: 275,
                                                         },
                                                     },
                                                 ),
                                                 span: Span {
-                                                    start: 329,
-                                                    end: 338,
+                                                    start: 266,
+                                                    end: 275,
                                                 },
                                             },
                                         ],
                                         span: Span {
-                                            start: 302,
-                                            end: 339,
+                                            start: 239,
+                                            end: 276,
                                         },
                                     },
                                     span: Span {
-                                        start: 289,
-                                        end: 339,
+                                        start: 226,
+                                        end: 276,
                                     },
                                 },
                             ),
                             span: Span {
-                                start: 289,
-                                end: 339,
+                                start: 226,
+                                end: 276,
                             },
                         },
                     ],
                     span: Span {
                         start: 38,
-                        end: 339,
+                        end: 276,
                     },
                 },
                 span: Span {
                     start: 26,
-                    end: 339,
+                    end: 276,
                 },
             },
         ),

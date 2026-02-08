@@ -32,26 +32,26 @@ bool_true: bool = true
 bool_false: bool = false
 
 # ============================================
-# Constants with Explicit Types
+# Constants with Explicit Types (using const keyword)
 # ============================================
 
 # Byte constants
-MAX: byte = 255
-MIN: byte = 0
+const MAX: byte = 255
+const MIN: byte = 0
 
 # Word constants
-LARGE: word = 1000
-MAX_WORD: word = 65535
+const LARGE: word = 1000
+const MAX_WORD: word = 65535
 
 # Signed constants
-NEGATIVE: sbyte = -100
-BIG_NEG: sword = -1000
+const NEGATIVE: sbyte = -100
+const BIG_NEG: sword = -1000
 
 # Floating point constants
-PI: fixed = 3.14159
-HALF: fixed = 0.5
-E: float = 2.71828
-DECIMAL: float = 2.5
+const PI: fixed = 3.14159
+const HALF: fixed = 0.5
+const E: float = 2.71828
+const DECIMAL: float = 2.5
 
 # ============================================
 # Mixed declarations

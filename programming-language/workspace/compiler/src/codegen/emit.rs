@@ -89,12 +89,15 @@ impl EmitHelpers for CodeGenerator {
     }
 
     fn emit_branch(&mut self, opcode: u8, label: &str) {
+        let opcode_offset = self.code.len();
         self.emit_byte(opcode);
         let offset = self.code.len();
         self.emit_byte(0x00); // Placeholder
         self.pending_branches.push(PendingBranch {
+            opcode_offset,
             code_offset: offset,
             target_label: label.to_string(),
+            trampolined: false,
         });
     }
 

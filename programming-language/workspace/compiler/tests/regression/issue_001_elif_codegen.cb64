@@ -1,28 +1,19 @@
 # Regression Test: Issue #001 - elif code generation bug
 #
-# Bug: elif branches generate "Undefined label 'elif_N'" error
-# Status: KNOWN BUG (not fixed)
-# Workaround: Use nested if-else instead of elif
+# Bug: elif branches generated "Undefined label 'elif_N'" error
+# Status: FIXED (v0.8.0)
+# Root cause: Label management in generate_if() was broken
+# Fix: Track current_label properly for each elif branch
 #
-# This test documents the bug. When fixed, this should compile.
-# Currently marked as expected to fail.
+# This test verifies the fix works correctly.
 
 def main():
     x: byte = 5
 
-    # This elif chain causes codegen error:
-    # if x > 7:
-    #     println("LARGE")
-    # elif x > 3:
-    #     println("MEDIUM")
-    # else:
-    #     println("SMALL")
-
-    # Workaround using nested if:
+    # This elif chain now works correctly:
     if x > 7:
         println("LARGE")
+    elif x > 3:
+        println("MEDIUM")
     else:
-        if x > 3:
-            println("MEDIUM")
-        else:
-            println("SMALL")
+        println("SMALL")

@@ -107,10 +107,11 @@ fn test_issue_004_safe_nesting() {
 // Known Bug Documentation Tests
 // ============================================================================
 
-/// Verify that elif still fails (documents known bug).
-/// When this test starts failing, the bug has been fixed!
+/// Verify that elif works correctly (bug fixed in v0.8.0).
+/// The bug was in label management in generate_if() - the next_label
+/// was created but never defined for subsequent elif branches.
 #[test]
-fn test_known_bug_elif_fails() {
+fn test_elif_fixed() {
     let source = r#"
 def main():
     x: byte = 5
@@ -123,8 +124,9 @@ def main():
 "#;
     let result = cobra64::compile(source);
     assert!(
-        result.is_err(),
-        "elif bug appears to be fixed! Update regression test."
+        result.is_ok(),
+        "elif should compile correctly: {:?}",
+        result.err()
     );
 }
 
@@ -145,32 +147,26 @@ fn test_bug_007_comment_first_line_fixed() {
     );
 }
 
-/// Verify that deep nesting still fails (hardware limitation).
+/// Verify that deep nesting works with automatic branch trampolining.
+/// The compiler now automatically converts far branches to JMP instructions.
 #[test]
-fn test_known_limitation_deep_nesting_fails() {
+fn test_deep_nesting_works_with_trampolining() {
     let mut source = String::from("def main():\n    x: byte = 10\n");
     let mut indent = String::from("    ");
 
-    // 15 levels of nesting should exceed branch limit
+    // 15 levels of nesting - now works thanks to trampolining
     for i in 0..15 {
         source.push_str(&format!("{}if x > {}:\n", indent, i));
         indent.push_str("    ");
     }
-    source.push_str(&format!("{}println(\"TOO DEEP\")\n", indent));
+    source.push_str(&format!("{}println(\"DEEP\")\n", indent));
 
     let result = cobra64::compile(&source);
     assert!(
-        result.is_err(),
-        "Deep nesting should fail due to branch limit"
+        result.is_ok(),
+        "Deep nesting should compile with trampolining: {:?}",
+        result.err()
     );
-
-    if let Err(e) = result {
-        assert!(
-            e.message.contains("Branch target too far"),
-            "Should report branch limit error, got: {}",
-            e.message
-        );
-    }
 }
 
 // ============================================================================

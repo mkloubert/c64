@@ -2,14 +2,13 @@
 def main():
     x: byte = 5
 
-    # Note: elif has a known code generation bug - using nested if for now
+    # Elif chains (fixed in v0.8.0)
     if x > 3:
         println("BIG")
+    elif x > 1:
+        println("MEDIUM")
     else:
-        if x > 1:
-            println("MEDIUM")
-        else:
-            println("SMALL")
+        println("SMALL")
 
     i: byte = 0
     while i < 3:

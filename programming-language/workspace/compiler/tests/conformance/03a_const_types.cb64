@@ -1,0 +1,45 @@
+# Conformance Test: Constants with All Types
+# Tests: const keyword with byte, word, sbyte, sword, fixed, float, bool, string
+# Expected: Compiles without errors
+
+# Unsigned integer constants
+const BYTE_MAX: byte = 255
+const BYTE_MIN: byte = 0
+const WORD_MAX: word = 65535
+const WORD_ZERO: word = 0
+
+# Signed integer constants
+const SBYTE_MAX: sbyte = 127
+const SBYTE_MIN: sbyte = -128
+const SWORD_MAX: sword = 32767
+const SWORD_MIN: sword = -32768
+
+# Fixed-point constants
+const PI: fixed = 3.14
+const HALF: fixed = 0.5
+const NEG_HALF: fixed = -0.5
+
+# Float constants
+const E: float = 2.718
+const FLOAT_ZERO: float = 0.0
+
+# Boolean constants
+const FLAG_ON: bool = true
+const FLAG_OFF: bool = false
+
+# String constants
+const GREETING: string = "HELLO"
+const EMPTY_STR: string = ""
+
+def main():
+    # Use all constant types
+    b: byte = BYTE_MAX
+    w: word = WORD_MAX
+    sb: sbyte = SBYTE_MIN
+    sw: sword = SWORD_MIN
+    f: fixed = PI
+    fl: float = E
+    flag: bool = FLAG_ON
+    msg: string = GREETING
+
+    println("ALL TYPES OK")

@@ -300,7 +300,13 @@ mod tests {
 
     #[test]
     fn test_valid_constant_declaration() {
-        let result = analyze_source("MAX: byte = 100\ndef main():\n    pass");
+        let result = analyze_source("const MAX: byte = 100\ndef main():\n    pass");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_valid_constant_in_function() {
+        let result = analyze_source("def main():\n    const LOCAL: word = 500");
         assert!(result.is_ok());
     }
 
@@ -448,7 +454,13 @@ mod tests {
 
     #[test]
     fn test_error_assign_to_constant() {
-        let result = analyze_source("X: byte = 5\ndef main():\n    X = 10");
+        let result = analyze_source("const X: byte = 5\ndef main():\n    X = 10");
+        assert!(has_error_code(&result, ErrorCode::CannotAssignToConstant));
+    }
+
+    #[test]
+    fn test_error_assign_to_local_constant() {
+        let result = analyze_source("def main():\n    const Y: word = 100\n    Y = 200");
         assert!(has_error_code(&result, ErrorCode::CannotAssignToConstant));
     }
 

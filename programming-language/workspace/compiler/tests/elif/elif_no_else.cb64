@@ -1,0 +1,15 @@
+# Test: elif without final else
+# Expected: Compiles and executes correctly
+# Tests: if-elif chain without else block
+
+def main():
+    value: byte = 42
+
+    if value > 100:
+        println("OVER 100")
+    elif value > 50:
+        println("OVER 50")
+    elif value > 25:
+        println("OVER 25")
+
+    println("DONE")

@@ -1,0 +1,17 @@
+# Test: Multiple elif branches
+# Expected: Compiles and executes correctly
+# Tests: if with multiple elif branches and final else
+
+def main():
+    score: byte = 75
+
+    if score >= 90:
+        println("GRADE A")
+    elif score >= 80:
+        println("GRADE B")
+    elif score >= 70:
+        println("GRADE C")
+    elif score >= 60:
+        println("GRADE D")
+    else:
+        println("GRADE F")

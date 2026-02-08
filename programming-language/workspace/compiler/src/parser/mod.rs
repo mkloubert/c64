@@ -511,13 +511,26 @@ mod tests {
 
     #[test]
     fn test_parse_const_decl() {
-        // Constant declarations are only allowed at top-level
-        let program = parse_source("MAX: byte = 100\ndef main():\n    pass").unwrap();
+        // Constant declarations use 'const' keyword
+        let program = parse_source("const MAX: byte = 100\ndef main():\n    pass").unwrap();
         if let TopLevelItem::Constant(decl) = &program.items[0] {
             assert_eq!(decl.name, "MAX");
             assert_eq!(decl.const_type, Some(Type::Byte));
         } else {
             panic!("Expected const decl at top-level");
+        }
+    }
+
+    #[test]
+    fn test_parse_const_decl_in_function() {
+        // Constant declarations are allowed inside functions
+        let program = parse_source("def main():\n    const LOCAL_MAX: word = 1000").unwrap();
+        let main = program.main_function().unwrap();
+        if let StatementKind::ConstDecl(decl) = &main.body.statements[0].kind {
+            assert_eq!(decl.name, "LOCAL_MAX");
+            assert_eq!(decl.const_type, Some(Type::Word));
+        } else {
+            panic!("Expected const decl in function body");
         }
     }
 
@@ -691,7 +704,7 @@ mod tests {
 
     #[test]
     fn test_parse_top_level_const() {
-        let program = parse_source("MAX: byte = 255\ndef main():\n    pass").unwrap();
+        let program = parse_source("const MAX: byte = 255\ndef main():\n    pass").unwrap();
         assert_eq!(program.items.len(), 2);
         assert!(matches!(program.items[0], TopLevelItem::Constant(_)));
     }
@@ -958,7 +971,8 @@ mod tests {
 
     #[test]
     fn test_parse_const_negative_value() {
-        let program = parse_source("MIN_SBYTE: sbyte = -128\ndef main():\n    pass").unwrap();
+        let program =
+            parse_source("const MIN_SBYTE: sbyte = -128\ndef main():\n    pass").unwrap();
         if let TopLevelItem::Constant(decl) = &program.items[0] {
             assert_eq!(decl.name, "MIN_SBYTE");
             assert_eq!(decl.const_type, Some(Type::Sbyte));
@@ -1458,8 +1472,8 @@ mod tests {
 
     #[test]
     fn test_parse_const_decl_explicit_type() {
-        // Constant with explicit type: NAME: type = value
-        let program = parse_source("MAX: word = 255\ndef main():\n    pass").unwrap();
+        // Constant with const keyword: const name: type = value
+        let program = parse_source("const MAX: word = 255\ndef main():\n    pass").unwrap();
         assert_eq!(program.items.len(), 2);
         if let TopLevelItem::Constant(decl) = &program.items[0] {
             assert_eq!(decl.name, "MAX");
@@ -1472,7 +1486,7 @@ mod tests {
     #[test]
     fn test_parse_const_decl_explicit_type_fixed() {
         // Constant with explicit fixed type
-        let program = parse_source("PI: fixed = 3.14\ndef main():\n    pass").unwrap();
+        let program = parse_source("const PI: fixed = 3.14\ndef main():\n    pass").unwrap();
         if let TopLevelItem::Constant(decl) = &program.items[0] {
             assert_eq!(decl.name, "PI");
             assert_eq!(decl.const_type, Some(Type::Fixed));
@@ -1484,7 +1498,7 @@ mod tests {
     #[test]
     fn test_parse_const_decl_requires_explicit_type() {
         // Constant without explicit type should fail
-        let result = parse_source("MIN = 0\ndef main():\n    pass");
+        let result = parse_source("const MIN = 0\ndef main():\n    pass");
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert_eq!(err.code, ErrorCode::MissingTypeAnnotation);
@@ -1492,19 +1506,19 @@ mod tests {
 
     #[test]
     fn test_parse_mixed_explicit_type_declarations() {
-        // All declarations with explicit types
+        // All declarations with explicit types (constants use 'const' keyword)
         let source = r#"
-MAX: word = 255
+const MAX: word = 255
 count: byte = 0
-PI: fixed = 3.14
-E: float = 2.718
+const PI: fixed = 3.14
+const E: float = 2.718
 def main():
     pass
 "#;
         let program = parse_source(source).unwrap();
         assert_eq!(program.items.len(), 5);
 
-        // MAX: word = 255 (constant with explicit type)
+        // const MAX: word = 255
         if let TopLevelItem::Constant(decl) = &program.items[0] {
             assert_eq!(decl.name, "MAX");
             assert_eq!(decl.const_type, Some(Type::Word));
@@ -1512,7 +1526,7 @@ def main():
             panic!("Expected constant MAX");
         }
 
-        // count: byte = 0 (variable with explicit type)
+        // count: byte = 0 (variable)
         if let TopLevelItem::Variable(decl) = &program.items[1] {
             assert_eq!(decl.name, "count");
             assert_eq!(decl.var_type, Some(Type::Byte));
@@ -1520,7 +1534,7 @@ def main():
             panic!("Expected variable count");
         }
 
-        // PI: fixed = 3.14 (constant with explicit type)
+        // const PI: fixed = 3.14
         if let TopLevelItem::Constant(decl) = &program.items[2] {
             assert_eq!(decl.name, "PI");
             assert_eq!(decl.const_type, Some(Type::Fixed));
@@ -1528,7 +1542,7 @@ def main():
             panic!("Expected constant PI");
         }
 
-        // E: float = 2.718 (constant with explicit type)
+        // const E: float = 2.718
         if let TopLevelItem::Constant(decl) = &program.items[3] {
             assert_eq!(decl.name, "E");
             assert_eq!(decl.const_type, Some(Type::Float));

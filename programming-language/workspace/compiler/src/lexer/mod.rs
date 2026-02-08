@@ -43,9 +43,7 @@ mod operators;
 mod strings;
 mod tokens;
 
-pub use tokens::{
-    is_constant_name, is_variable_name, validate_identifier_naming, IdentifierKind, Token,
-};
+pub use tokens::Token;
 
 use crate::error::{CompileError, Span};
 use helpers::LexerHelpers;
@@ -1126,8 +1124,8 @@ def main():
     // ========================================
 
     #[test]
-    fn test_constant_names_valid() {
-        // Valid constant names (first letter uppercase, all letters uppercase)
+    fn test_uppercase_identifiers_valid() {
+        // Uppercase identifiers are valid
         let tokens = tokenize("MY_CONST").unwrap();
         assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "MY_CONST"));
 
@@ -1151,8 +1149,8 @@ def main():
     }
 
     #[test]
-    fn test_variable_names_valid() {
-        // Valid variable names (first letter lowercase)
+    fn test_lowercase_identifiers_valid() {
+        // Lowercase and mixed case identifiers are valid
         let tokens = tokenize("myVar").unwrap();
         assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "myVar"));
 
@@ -1179,27 +1177,19 @@ def main():
     }
 
     #[test]
-    fn test_mixed_case_constant_invalid() {
-        // Invalid: first letter uppercase but not all letters uppercase
-        let result = tokenize("MyConst");
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert_eq!(err.code, ErrorCode::InvalidIdentifierNaming);
+    fn test_mixed_case_identifiers_valid() {
+        // Mixed case identifiers are now valid (no naming convention enforced)
+        let tokens = tokenize("MyConst").unwrap();
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "MyConst"));
 
-        let result = tokenize("_My_Const");
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert_eq!(err.code, ErrorCode::InvalidIdentifierNaming);
+        let tokens = tokenize("_My_Const").unwrap();
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "_My_Const"));
 
-        let result = tokenize("_3My_Const");
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert_eq!(err.code, ErrorCode::InvalidIdentifierNaming);
+        let tokens = tokenize("_3My_Const").unwrap();
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "_3My_Const"));
 
-        let result = tokenize("MY_Const");
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert_eq!(err.code, ErrorCode::InvalidIdentifierNaming);
+        let tokens = tokenize("MY_Const").unwrap();
+        assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "MY_Const"));
     }
 
     #[test]
@@ -1223,11 +1213,10 @@ def main():
 
     #[test]
     fn test_identifier_with_leading_underscore_and_digit() {
-        // _4D is a constant (first letter D is uppercase, all letters uppercase)
+        // Identifiers can start with underscore followed by digits and letters
         let tokens = tokenize("_4D").unwrap();
         assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "_4D"));
 
-        // _4d is a variable (first letter d is lowercase)
         let tokens = tokenize("_4d").unwrap();
         assert!(matches!(&tokens[0].0, Token::Identifier(s) if s == "_4d"));
     }

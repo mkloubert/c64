@@ -80,6 +80,12 @@ impl<'a> StatementParser for Parser<'a> {
                 let span = start_span;
                 Ok(Statement::new(StatementKind::Pass, span))
             }
+            Some(Token::Const) => {
+                // Constant declaration inside function
+                let decl = self.parse_const_decl()?;
+                let span = decl.span.clone();
+                Ok(Statement::new(StatementKind::ConstDecl(decl), span))
+            }
             Some(Token::Identifier(_)) => {
                 // Could be variable declaration, assignment, or expression
                 self.parse_identifier_statement()
@@ -95,10 +101,6 @@ impl<'a> StatementParser for Parser<'a> {
 
     fn parse_identifier_statement(&mut self) -> Result<Statement, CompileError> {
         let start_span = self.peek_span().unwrap();
-
-        // Note: Constant declarations (NAME = value) are only allowed at top-level,
-        // not inside function bodies. Inside functions, NAME = value is always
-        // an assignment (which will be rejected by the analyzer if NAME is a constant).
 
         // Check if it's a variable declaration (name: type)
         if matches!(self.peek_ahead(1), Some(Token::Colon)) {
@@ -234,6 +236,9 @@ impl<'a> StatementParser for Parser<'a> {
 
     fn parse_const_decl(&mut self) -> Result<ConstDecl, CompileError> {
         let start_span = self.peek_span().unwrap();
+
+        // Consume 'const' keyword
+        self.expect(&Token::Const, "Expected 'const' keyword")?;
 
         let name = match self.advance() {
             Some((Token::Identifier(name), _)) => name,

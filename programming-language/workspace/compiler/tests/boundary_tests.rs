@@ -306,8 +306,9 @@ fn test_nested_if_4_levels() {
 }
 
 #[test]
-fn test_nested_if_branch_limit_error() {
-    // Verify that deeply nested code properly reports branch limit error
+fn test_nested_if_deep_with_trampolining() {
+    // Deep nesting now works thanks to automatic branch trampolining.
+    // The compiler automatically converts far branches to JMP instructions.
     let mut source = String::from("def main():\n    x: byte = 10\n");
     let mut indent = String::from("    ");
 
@@ -315,16 +316,14 @@ fn test_nested_if_branch_limit_error() {
         source.push_str(&format!("{}if x > {}:\n", indent, i));
         indent.push_str("    ");
     }
-    source.push_str(&format!("{}println(\"TOO DEEP\")\n", indent));
+    source.push_str(&format!("{}println(\"DEEP\")\n", indent));
 
     let result = cobra64::compile(&source);
-    assert!(result.is_err(), "Very deep nesting should hit branch limit");
-    if let Err(e) = result {
-        assert!(
-            e.message.contains("Branch target too far"),
-            "Should report branch limit error"
-        );
-    }
+    assert!(
+        result.is_ok(),
+        "Deep nesting should compile with trampolining: {:?}",
+        result.err()
+    );
 }
 
 #[test]
@@ -422,20 +421,19 @@ fn test_long_identifier() {
 }
 
 #[test]
-fn test_uppercase_constant() {
-    // Constants require explicit type annotation
-    let source = "MAX_VALUE: byte = 255\n\ndef main():\n    x: byte = MAX_VALUE\n";
+fn test_const_keyword() {
+    // Constants use 'const' keyword
+    let source = "const MAX_VALUE: byte = 255\n\ndef main():\n    x: byte = MAX_VALUE\n";
     let result = cobra64::compile(source);
-    assert!(result.is_ok(), "uppercase constants should be valid");
+    assert!(result.is_ok(), "const keyword constants should be valid");
 }
 
 #[test]
 fn test_mixed_case_identifier() {
-    // Note: Mixed case like 'MyVariable' is now INVALID
-    // Variables must start with lowercase, constants must be ALL_UPPERCASE
-    let source = "def main():\n    myVariable: byte = 1\n    anotherVar: byte = 2\n";
+    // Mixed case identifiers are now valid (no naming convention enforced)
+    let source = "def main():\n    myVariable: byte = 1\n    AnotherVar: byte = 2\n    MixedCase: byte = 3\n";
     let result = cobra64::compile(source);
-    assert!(result.is_ok(), "variables with camelCase should be valid");
+    assert!(result.is_ok(), "mixed case identifiers should be valid");
 }
 
 #[test]
