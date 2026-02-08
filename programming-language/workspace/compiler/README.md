@@ -1604,7 +1604,7 @@ The generated PRG and D64 files should work with any C64 emulator that supports 
 
 ## Version History
 
-- **0.11.0** - Type Casting System Improvements
+- **0.11.2** - Type Casting System Improvements
   - **Fixed `sbyte → fixed` conversion bug**: Negative sbyte values now correctly convert to fixed-point
   - **Removed dangerous implicit casts**: `byte ↔ sbyte` and `word/sword → fixed` now require explicit casts
   - **Added bool conversions**: `bool()` cast function and implicit `bool → integer`
