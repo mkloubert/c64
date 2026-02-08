@@ -1201,6 +1201,220 @@ def main():
     println(rand_byte(1, 100))
 ```
 
+### Sprite Functions
+
+The C64 VIC-II chip provides 8 hardware sprites. Cobra64 offers comprehensive sprite control through built-in functions.
+
+#### Sprite Basics
+
+Each sprite is 24×21 pixels (63 bytes of data + 1 padding = 64 bytes). Sprites can be positioned anywhere on the 320×200 screen, with X coordinates ranging from 0-511 (9-bit).
+
+#### `sprite_enable(num: byte, enable: bool)`
+
+Enables or disables a single sprite.
+
+```python
+def main():
+    sprite_enable(0, true)   # Enable sprite 0
+    sprite_enable(0, false)  # Disable sprite 0
+```
+
+#### `sprites_enable(mask: byte)`
+
+Enables sprites using a bitmask (bit 0 = sprite 0, etc.).
+
+```python
+def main():
+    sprites_enable(3)   # Enable sprites 0 and 1 (binary 00000011)
+    sprites_enable(0)   # Disable all sprites
+```
+
+#### `sprite_pos(num: byte, x: word, y: byte)`
+
+Sets both X and Y position for a sprite.
+
+```python
+def main():
+    sprite_pos(0, 160, 100)  # Center of screen
+    sprite_pos(0, 320, 200)  # X can be 0-511
+```
+
+#### `sprite_x(num: byte, x: word)` / `sprite_y(num: byte, y: byte)`
+
+Sets X or Y position individually.
+
+```python
+def main():
+    sprite_x(0, 256)  # Set X position (9-bit: 0-511)
+    sprite_y(0, 100)  # Set Y position (8-bit: 0-255)
+```
+
+#### `sprite_get_x(num: byte) -> word` / `sprite_get_y(num: byte) -> byte`
+
+Returns the current position of a sprite.
+
+```python
+def main():
+    x: word = sprite_get_x(0)
+    y: byte = sprite_get_y(0)
+```
+
+#### `sprite_data(num: byte, pointer: byte)`
+
+Sets the sprite data pointer. The pointer value = memory_address / 64.
+
+```python
+def main():
+    # Sprite data at $3000 = pointer 192 ($3000 / 64 = 192)
+    sprite_data(0, 192)
+```
+
+#### `sprite_color(num: byte, color: byte)`
+
+Sets the sprite's color (0-15).
+
+```python
+def main():
+    sprite_color(0, 1)   # White
+    sprite_color(1, 2)   # Red
+```
+
+#### `sprite_multicolor1(color: byte)` / `sprite_multicolor2(color: byte)`
+
+Sets the shared multicolor palette colors.
+
+```python
+def main():
+    sprite_multicolor1(5)  # Green - shared color 1
+    sprite_multicolor2(6)  # Blue - shared color 2
+```
+
+#### `sprite_multicolor(num: byte, enable: bool)`
+
+Enables multicolor mode for a sprite (12×21 pixels, 4 colors).
+
+```python
+def main():
+    sprite_multicolor(0, true)   # Enable multicolor
+    sprite_multicolor(0, false)  # Standard high-res mode
+```
+
+#### `sprite_expand_x(num: byte, expand: bool)` / `sprite_expand_y(num: byte, expand: bool)`
+
+Doubles the sprite size in X or Y direction.
+
+```python
+def main():
+    sprite_expand_x(0, true)  # Double width (48 pixels)
+    sprite_expand_y(0, true)  # Double height (42 pixels)
+```
+
+#### `sprite_priority(num: byte, behind_bg: bool)`
+
+Sets whether sprite appears behind background graphics.
+
+```python
+def main():
+    sprite_priority(0, true)   # Sprite behind background
+    sprite_priority(0, false)  # Sprite in front (default)
+```
+
+#### `sprite_collision_sprite() -> byte`
+
+Reads the sprite-sprite collision register. Returns a bitmask of collided sprites. Reading clears the register.
+
+```python
+def main():
+    coll: byte = sprite_collision_sprite()
+    if coll & 3 == 3:  # Sprites 0 and 1 collided
+        println("COLLISION!")
+```
+
+#### `sprite_collision_bg() -> byte`
+
+Reads the sprite-background collision register.
+
+```python
+def main():
+    coll: byte = sprite_collision_bg()
+    if coll & 1 != 0:  # Sprite 0 hit background
+        println("HIT WALL!")
+```
+
+#### `sprite_collides(mask: byte) -> bool`
+
+Checks if any sprite in the mask has a collision.
+
+```python
+def main():
+    if sprite_collides(1):  # Check sprite 0
+        println("SPRITE 0 COLLISION")
+```
+
+#### Complete Sprite Example
+
+```python
+const SPRITE_PTR: byte = 192  # Data at $3000
+
+def main():
+    cls()
+
+    # Setup sprite data pointer
+    sprite_data(0, SPRITE_PTR)
+
+    # Set color and position
+    sprite_color(0, 1)
+    sprite_pos(0, 160, 100)
+
+    # Enable sprite
+    sprite_enable(0, true)
+
+    # Animation loop
+    x: word = 160
+    while get_key() == 0:
+        x = x + 1
+        if x > 320:
+            x = 24
+        sprite_x(0, x)
+
+    sprite_enable(0, false)
+```
+
+#### Sprite Function Reference
+
+| Function                            | Description                 |
+| ----------------------------------- | --------------------------- |
+| `sprite_enable(num, enable)`        | Enable/disable sprite       |
+| `sprites_enable(mask)`              | Enable by bitmask           |
+| `sprite_x(num, x)`                  | Set X position (0-511)      |
+| `sprite_y(num, y)`                  | Set Y position (0-255)      |
+| `sprite_pos(num, x, y)`             | Set both positions          |
+| `sprite_get_x(num) -> word`         | Get X position              |
+| `sprite_get_y(num) -> byte`         | Get Y position              |
+| `sprite_data(num, ptr)`             | Set data pointer            |
+| `sprite_get_data(num) -> byte`      | Get data pointer            |
+| `sprite_color(num, color)`          | Set sprite color            |
+| `sprite_get_color(num) -> byte`     | Get sprite color            |
+| `sprite_multicolor1(color)`         | Set shared color 1          |
+| `sprite_multicolor2(color)`         | Set shared color 2          |
+| `sprite_get_multicolor1() -> byte`  | Get shared color 1          |
+| `sprite_get_multicolor2() -> byte`  | Get shared color 2          |
+| `sprite_multicolor(num, enable)`    | Enable multicolor mode      |
+| `sprites_multicolor(mask)`          | Multicolor by mask          |
+| `sprite_is_multicolor(num) -> bool` | Check multicolor            |
+| `sprite_expand_x(num, expand)`      | Enable 2x width             |
+| `sprite_expand_y(num, expand)`      | Enable 2x height            |
+| `sprites_expand_x(mask)`            | X expand by mask            |
+| `sprites_expand_y(mask)`            | Y expand by mask            |
+| `sprite_is_expanded_x(num) -> bool` | Check X expansion           |
+| `sprite_is_expanded_y(num) -> bool` | Check Y expansion           |
+| `sprite_priority(num, behind)`      | Set priority                |
+| `sprites_priority(mask)`            | Priority by mask            |
+| `sprite_get_priority(num) -> bool`  | Get priority                |
+| `sprite_collision_sprite() -> byte` | Sprite-sprite collision     |
+| `sprite_collision_bg() -> byte`     | Sprite-background collision |
+| `sprite_collides(mask) -> bool`     | Check collision             |
+
 ---
 
 ## Example Programs
@@ -1603,6 +1817,14 @@ The generated PRG and D64 files should work with any C64 emulator that supports 
 ---
 
 ## Version History
+
+- **0.12.0** - LSP Documentation Examples
+  - Added code examples (1-3 per item) for all built-in functions in VS Code extension
+  - Added code examples for all built-in constants (COLOR*\*, VIC_SPRITE*\*)
+  - Examples include beginner-friendly comments explaining C64-specific concepts
+  - Examples shown in hover documentation and auto-completion
+  - Built-in constants now appear in auto-completion suggestions
+  - Improved documentation for VIC-II registers, sprite handling, and memory addresses
 
 - **0.11.2** - Type Casting System Improvements
   - **Fixed `sbyte → fixed` conversion bug**: Negative sbyte values now correctly convert to fixed-point

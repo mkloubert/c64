@@ -48,6 +48,9 @@ pub trait EmitHelpers {
     /// Emit an instruction with absolute operand.
     fn emit_abs(&mut self, opcode: u8, address: u16);
 
+    /// Emit an instruction with absolute,X indexed operand.
+    fn emit_abx(&mut self, opcode: u8, address: u16);
+
     /// Emit a branch instruction with a label target.
     fn emit_branch(&mut self, opcode: u8, label: &str);
 
@@ -84,6 +87,11 @@ impl EmitHelpers for CodeGenerator {
     }
 
     fn emit_abs(&mut self, opcode: u8, address: u16) {
+        self.emit_byte(opcode);
+        self.emit_word(address);
+    }
+
+    fn emit_abx(&mut self, opcode: u8, address: u16) {
         self.emit_byte(opcode);
         self.emit_word(address);
     }

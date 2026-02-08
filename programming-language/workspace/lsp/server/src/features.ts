@@ -38,6 +38,7 @@ import {
 import { AnalyzerResult } from './analyzer';
 import {
     COBRA64_BUILTINS,
+    COBRA64_CONSTANTS,
     COBRA64_TYPES,
     COBRA64_KEYWORDS,
     positionToOffset,
@@ -284,11 +285,30 @@ export function getHover(
     if (builtin) {
         const params = builtin.parameters.map(p => `- \`${p.name}: ${p.type}\` - ${p.description}`).join('\n');
         const returnInfo = builtin.returnType ? `\n\n**Returns:** \`${builtin.returnType}\`` : '';
+        const examplesSection = builtin.examples.length > 0
+            ? '\n\n**Examples:**\n```python\n' + builtin.examples.join('\n\n') + '\n```'
+            : '';
 
         return {
             contents: {
                 kind: MarkupKind.Markdown,
-                value: `**${builtin.name}** (built-in function)\n\n\`\`\`python\n${builtin.signature}\n\`\`\`\n\n${builtin.description}${params ? '\n\n**Parameters:**\n' + params : ''}${returnInfo}`,
+                value: `**${builtin.name}** (built-in function)\n\n\`\`\`python\n${builtin.signature}\n\`\`\`\n\n${builtin.description}${params ? '\n\n**Parameters:**\n' + params : ''}${returnInfo}${examplesSection}`,
+            },
+            range,
+        };
+    }
+
+    // Check if it's a built-in constant
+    const constant = COBRA64_CONSTANTS.find(c => c.name === word);
+    if (constant) {
+        const examplesSection = constant.examples.length > 0
+            ? '\n\n**Examples:**\n```python\n' + constant.examples.join('\n') + '\n```'
+            : '';
+
+        return {
+            contents: {
+                kind: MarkupKind.Markdown,
+                value: `**${constant.name}** (built-in constant)\n\n\`\`\`python\nconst ${constant.name}: ${constant.type} = ${constant.value}\n\`\`\`\n\n${constant.description}${examplesSection}`,
             },
             range,
         };

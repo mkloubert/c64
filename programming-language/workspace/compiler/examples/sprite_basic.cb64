@@ -1,0 +1,137 @@
+# Basic Sprite Demo for Cobra64
+# Demonstrates sprite enable, position, and movement
+
+# Sprite data pointer (points to $3000 / 64 = 192)
+const SPRITE_PTR: byte = 192
+
+def main():
+    cls()
+    println("SPRITE DEMO")
+    println("PRESS ANY KEY TO EXIT")
+
+    # Setup sprite data at $3000 (pointer = 192)
+    # Create a simple ball sprite (24x21 pixels)
+    setup_sprite_data()
+
+    # Set sprite 0 pointer
+    poke(2040, SPRITE_PTR)
+
+    # Set sprite 0 color to white
+    poke($D027, 1)
+
+    # Enable sprite 0
+    sprite_enable(0, true)
+
+    # Initial position
+    x: word = 100
+    y: byte = 100
+    dx: sbyte = 1
+    dy: sbyte = 1
+
+    # Animation loop
+    while get_key() == 0:
+        # Set sprite position
+        sprite_pos(0, x, y)
+
+        # Move sprite
+        x = x + word(dx)
+        y = y + byte(dy)
+
+        # Bounce off screen edges
+        if x > 320:
+            dx = -1
+        if x < 24:
+            dx = 1
+        if y > 229:
+            dy = -1
+        if y < 50:
+            dy = 1
+
+        # Small delay
+        delay: byte = 0
+        while delay < 100:
+            delay = delay + 1
+
+    # Disable sprite
+    sprite_enable(0, false)
+
+    println("DONE!")
+
+def setup_sprite_data():
+    # Simple ball sprite data at $3000
+    # Row 0-2: empty
+    poke($3000, 0)
+    poke($3001, 0)
+    poke($3002, 0)
+    poke($3003, 0)
+    poke($3004, 0)
+    poke($3005, 0)
+    poke($3006, 0)
+    poke($3007, 0)
+    poke($3008, 0)
+
+    # Rows 3-5: top of ball
+    poke($3009, 0)
+    poke($300A, $3C)
+    poke($300B, 0)
+    poke($300C, 0)
+    poke($300D, $7E)
+    poke($300E, 0)
+    poke($300F, 0)
+    poke($3010, $FF)
+    poke($3011, 0)
+
+    # Rows 6-8: middle of ball
+    poke($3012, 1)
+    poke($3013, $FF)
+    poke($3014, $80)
+    poke($3015, 1)
+    poke($3016, $FF)
+    poke($3017, $80)
+    poke($3018, 1)
+    poke($3019, $FF)
+    poke($301A, $80)
+
+    # Rows 9-11: middle of ball continued
+    poke($301B, 1)
+    poke($301C, $FF)
+    poke($301D, $80)
+    poke($301E, 1)
+    poke($301F, $FF)
+    poke($3020, $80)
+    poke($3021, 1)
+    poke($3022, $FF)
+    poke($3023, $80)
+
+    # Rows 12-14: middle of ball continued
+    poke($3024, 1)
+    poke($3025, $FF)
+    poke($3026, $80)
+    poke($3027, 1)
+    poke($3028, $FF)
+    poke($3029, $80)
+    poke($302A, 0)
+    poke($302B, $FF)
+    poke($302C, 0)
+
+    # Rows 15-17: bottom of ball
+    poke($302D, 0)
+    poke($302E, $7E)
+    poke($302F, 0)
+    poke($3030, 0)
+    poke($3031, $3C)
+    poke($3032, 0)
+    poke($3033, 0)
+    poke($3034, 0)
+    poke($3035, 0)
+
+    # Rows 18-20: empty
+    poke($3036, 0)
+    poke($3037, 0)
+    poke($3038, 0)
+    poke($3039, 0)
+    poke($303A, 0)
+    poke($303B, 0)
+    poke($303C, 0)
+    poke($303D, 0)
+    poke($303E, 0)

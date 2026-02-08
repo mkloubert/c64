@@ -1,0 +1,151 @@
+# Sprite Collision Detection Demo for Cobra64
+# Demonstrates sprite priority and collision detection
+
+const SPRITE_PTR: byte = 192  # $3000
+
+def main():
+    cls()
+    println("COLLISION DEMO")
+    println("ARROWS=MOVE P=PRIORITY")
+    println("Q=QUIT")
+
+    # Setup sprite data
+    setup_sprite()
+
+    # Setup two sprites
+    sprite_data(0, SPRITE_PTR)
+    sprite_data(1, SPRITE_PTR)
+
+    # Set colors
+    sprite_color(0, 1)  # White
+    sprite_color(1, 2)  # Red
+
+    # Initial positions
+    sprite_pos(0, 160, 120)  # Player (center)
+    sprite_pos(1, 200, 120)  # Target
+
+    # Enable sprites
+    sprites_enable(3)
+
+    # Player position
+    px: word = 160
+    py: byte = 120
+
+    # Game loop
+    while true:
+        k: byte = get_key()
+
+        # Movement
+        if k == 17:  # Cursor down
+            if py < 229:
+                py = py + 2
+        if k == 145:  # Cursor up
+            if py > 50:
+                py = py - 2
+        if k == 29:  # Cursor right
+            if px < 320:
+                px = px + 2
+        if k == 157:  # Cursor left
+            if px > 24:
+                px = px - 2
+
+        # Update player position
+        sprite_pos(0, px, py)
+
+        # Toggle priority with 'P'
+        if k == 80:
+            pri: bool = sprite_get_priority(0)
+            if pri:
+                sprite_priority(0, false)
+                println("SPRITE IN FRONT")
+            else:
+                sprite_priority(0, true)
+                println("SPRITE BEHIND")
+
+        # Check for collision
+        coll: byte = sprite_collision_sprite()
+        if coll != 0:
+            # Check if sprite 0 and 1 collided
+            if coll & 3 == 3:
+                cursor(0, 5)
+                println("COLLISION!   ")
+
+        # Quit on 'Q'
+        if k == 81:
+            break
+
+    # Cleanup
+    sprites_enable(0)
+    println("DONE!")
+
+def setup_sprite():
+    # Simple filled circle sprite
+    poke($3000, 0)
+    poke($3001, $3C)
+    poke($3002, 0)
+
+    poke($3003, 0)
+    poke($3004, $7E)
+    poke($3005, 0)
+
+    poke($3006, 0)
+    poke($3007, $FF)
+    poke($3008, 0)
+
+    poke($3009, 1)
+    poke($300A, $FF)
+    poke($300B, $80)
+
+    poke($300C, 1)
+    poke($300D, $FF)
+    poke($300E, $80)
+
+    poke($300F, 3)
+    poke($3010, $FF)
+    poke($3011, $C0)
+
+    poke($3012, 3)
+    poke($3013, $FF)
+    poke($3014, $C0)
+
+    poke($3015, 3)
+    poke($3016, $FF)
+    poke($3017, $C0)
+
+    poke($3018, 3)
+    poke($3019, $FF)
+    poke($301A, $C0)
+
+    poke($301B, 3)
+    poke($301C, $FF)
+    poke($301D, $C0)
+
+    poke($301E, 3)
+    poke($301F, $FF)
+    poke($3020, $C0)
+
+    poke($3021, 1)
+    poke($3022, $FF)
+    poke($3023, $80)
+
+    poke($3024, 1)
+    poke($3025, $FF)
+    poke($3026, $80)
+
+    poke($3027, 0)
+    poke($3028, $FF)
+    poke($3029, 0)
+
+    poke($302A, 0)
+    poke($302B, $7E)
+    poke($302C, 0)
+
+    poke($302D, 0)
+    poke($302E, $3C)
+    poke($302F, 0)
+
+    # Fill remaining bytes with 0
+    i: byte = 48
+    while i < 63:
+        poke($3000 + word(i), 0)
+        i = i + 1

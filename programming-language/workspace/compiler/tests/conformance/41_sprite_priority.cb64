@@ -1,0 +1,49 @@
+# Test sprite priority and collision functions
+# Expected output:
+# PRIORITY TEST
+# PRI=FALSE
+# PRI=TRUE
+# COLL REG OK
+# DONE
+
+def main():
+    println("PRIORITY TEST")
+
+    # Test sprite_priority and sprite_get_priority
+    sprite_priority(0, false)
+    p1: bool = sprite_get_priority(0)
+    print("PRI=")
+    println(p1)
+
+    sprite_priority(0, true)
+    p2: bool = sprite_get_priority(0)
+    print("PRI=")
+    println(p2)
+
+    # Test sprites_priority bitmask
+    sprites_priority(0)  # Clear all
+    sprites_priority(5)  # Set sprites 0 and 2
+
+    p0: bool = sprite_get_priority(0)
+    p1b: bool = sprite_get_priority(1)
+    p2b: bool = sprite_get_priority(2)
+
+    # Sprite 0 should be true, sprite 1 should be false
+    if p0 == true and p1b == false:
+        println("COLL REG OK")
+    else:
+        println("COLL REG FAIL")
+
+    # Note: We can't easily test actual collision detection
+    # in a conformance test without setting up visible sprites
+    # and having them overlap. The functions are tested by
+    # verifying they compile and the registers are readable.
+
+    # Read collision registers (they will be 0 without actual collisions)
+    cs: byte = sprite_collision_sprite()
+    cb: byte = sprite_collision_bg()
+
+    # sprite_collides should return false when no collision
+    col: bool = sprite_collides(255)
+
+    println("DONE")

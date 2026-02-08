@@ -29,7 +29,7 @@ use super::binary_ops::BinaryOpsEmitter;
 use super::conversions::TypeConversions;
 use super::emit::EmitHelpers;
 use super::functions::FunctionCallEmitter;
-use super::mos6510::{opcodes, zeropage};
+use super::mos6510::{colors, opcodes, sprite, zeropage};
 use super::strings::StringManager;
 use super::type_inference::TypeInference;
 use super::types::{decimal_string_to_binary16, decimal_string_to_fixed};
@@ -38,6 +38,69 @@ use super::variables::VariableManager;
 use super::CodeGenerator;
 use crate::ast::{Expr, ExprKind, Type};
 use crate::error::{CompileError, ErrorCode};
+
+/// Get the value of a built-in constant, if it exists.
+/// Returns Some((value, is_word)) for known constants.
+fn get_builtin_constant(name: &str) -> Option<(u16, bool)> {
+    match name {
+        // C64 color constants (byte values)
+        "COLOR_BLACK" => Some((colors::BLACK as u16, false)),
+        "COLOR_WHITE" => Some((colors::WHITE as u16, false)),
+        "COLOR_RED" => Some((colors::RED as u16, false)),
+        "COLOR_CYAN" => Some((colors::CYAN as u16, false)),
+        "COLOR_PURPLE" => Some((colors::PURPLE as u16, false)),
+        "COLOR_GREEN" => Some((colors::GREEN as u16, false)),
+        "COLOR_BLUE" => Some((colors::BLUE as u16, false)),
+        "COLOR_YELLOW" => Some((colors::YELLOW as u16, false)),
+        "COLOR_ORANGE" => Some((colors::ORANGE as u16, false)),
+        "COLOR_BROWN" => Some((colors::BROWN as u16, false)),
+        "COLOR_LIGHT_RED" => Some((colors::LIGHT_RED as u16, false)),
+        "COLOR_DARK_GRAY" => Some((colors::DARK_GRAY as u16, false)),
+        "COLOR_GRAY" => Some((colors::GRAY as u16, false)),
+        "COLOR_LIGHT_GREEN" => Some((colors::LIGHT_GREEN as u16, false)),
+        "COLOR_LIGHT_BLUE" => Some((colors::LIGHT_BLUE as u16, false)),
+        "COLOR_LIGHT_GRAY" => Some((colors::LIGHT_GRAY as u16, false)),
+        // VIC-II sprite registers (word values - memory addresses)
+        "VIC_SPRITE_ENABLE" => Some((sprite::ENABLE, true)),
+        "VIC_SPRITE_X_MSB" => Some((sprite::X_MSB, true)),
+        "VIC_SPRITE_EXPAND_Y" => Some((sprite::EXPAND_Y, true)),
+        "VIC_SPRITE_PRIORITY" => Some((sprite::PRIORITY, true)),
+        "VIC_SPRITE_MULTICOLOR" => Some((sprite::MULTICOLOR, true)),
+        "VIC_SPRITE_EXPAND_X" => Some((sprite::EXPAND_X, true)),
+        "VIC_SPRITE_COLLISION_SPRITE" => Some((sprite::COLLISION_SPRITE, true)),
+        "VIC_SPRITE_COLLISION_BG" => Some((sprite::COLLISION_BG, true)),
+        "VIC_SPRITE_MULTICOLOR1" => Some((sprite::MULTICOLOR1, true)),
+        "VIC_SPRITE_MULTICOLOR2" => Some((sprite::MULTICOLOR2, true)),
+        "VIC_SPRITE_POINTER_BASE" => Some((sprite::POINTER_BASE, true)),
+        // Individual sprite position registers
+        "VIC_SPRITE0_X" => Some((sprite::SPRITE0_X, true)),
+        "VIC_SPRITE0_Y" => Some((sprite::SPRITE0_Y, true)),
+        "VIC_SPRITE1_X" => Some((sprite::SPRITE1_X, true)),
+        "VIC_SPRITE1_Y" => Some((sprite::SPRITE1_Y, true)),
+        "VIC_SPRITE2_X" => Some((sprite::SPRITE2_X, true)),
+        "VIC_SPRITE2_Y" => Some((sprite::SPRITE2_Y, true)),
+        "VIC_SPRITE3_X" => Some((sprite::SPRITE3_X, true)),
+        "VIC_SPRITE3_Y" => Some((sprite::SPRITE3_Y, true)),
+        "VIC_SPRITE4_X" => Some((sprite::SPRITE4_X, true)),
+        "VIC_SPRITE4_Y" => Some((sprite::SPRITE4_Y, true)),
+        "VIC_SPRITE5_X" => Some((sprite::SPRITE5_X, true)),
+        "VIC_SPRITE5_Y" => Some((sprite::SPRITE5_Y, true)),
+        "VIC_SPRITE6_X" => Some((sprite::SPRITE6_X, true)),
+        "VIC_SPRITE6_Y" => Some((sprite::SPRITE6_Y, true)),
+        "VIC_SPRITE7_X" => Some((sprite::SPRITE7_X, true)),
+        "VIC_SPRITE7_Y" => Some((sprite::SPRITE7_Y, true)),
+        // Individual sprite color registers
+        "VIC_SPRITE0_COLOR" => Some((sprite::SPRITE0_COLOR, true)),
+        "VIC_SPRITE1_COLOR" => Some((sprite::SPRITE1_COLOR, true)),
+        "VIC_SPRITE2_COLOR" => Some((sprite::SPRITE2_COLOR, true)),
+        "VIC_SPRITE3_COLOR" => Some((sprite::SPRITE3_COLOR, true)),
+        "VIC_SPRITE4_COLOR" => Some((sprite::SPRITE4_COLOR, true)),
+        "VIC_SPRITE5_COLOR" => Some((sprite::SPRITE5_COLOR, true)),
+        "VIC_SPRITE6_COLOR" => Some((sprite::SPRITE6_COLOR, true)),
+        "VIC_SPRITE7_COLOR" => Some((sprite::SPRITE7_COLOR, true)),
+        _ => None,
+    }
+}
 
 /// Extension trait for expression code generation.
 pub trait ExpressionEmitter {
@@ -97,14 +160,22 @@ impl ExpressionEmitter for CodeGenerator {
                 self.emit_string_ref(string_index);
             }
             ExprKind::Identifier(name) => {
-                let var = self.get_variable(name).ok_or_else(|| {
-                    CompileError::new(
-                        ErrorCode::UndefinedVariable,
-                        format!("Undefined variable '{}'", name),
-                        expr.span.clone(),
-                    )
-                })?;
-                self.emit_load_from_address(var.address, &var.var_type);
+                // Check for built-in constants first
+                if let Some((value, is_word)) = get_builtin_constant(name) {
+                    self.emit_imm(opcodes::LDA_IMM, (value & 0xFF) as u8);
+                    if is_word {
+                        self.emit_imm(opcodes::LDX_IMM, ((value >> 8) & 0xFF) as u8);
+                    }
+                } else {
+                    let var = self.get_variable(name).ok_or_else(|| {
+                        CompileError::new(
+                            ErrorCode::UndefinedVariable,
+                            format!("Undefined variable '{}'", name),
+                            expr.span.clone(),
+                        )
+                    })?;
+                    self.emit_load_from_address(var.address, &var.var_type);
+                }
             }
             ExprKind::BinaryOp { left, op, right } => {
                 self.generate_binary_op(left, *op, right)?;

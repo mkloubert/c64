@@ -25,7 +25,7 @@
 use super::emit::EmitHelpers;
 use super::expressions::ExpressionEmitter;
 use super::labels::LabelManager;
-use super::mos6510::{kernal, opcodes, petscii, zeropage};
+use super::mos6510::{kernal, opcodes, petscii, sprite, zeropage};
 use super::type_inference::TypeInference;
 use super::CodeGenerator;
 use crate::ast::{Expr, Type};
@@ -257,6 +257,544 @@ impl FunctionCallEmitter for CodeGenerator {
                     // Load character at index: LDA (TMP1),Y
                     self.emit_byte(opcodes::LDA_IZY);
                     self.emit_byte(zeropage::TMP1);
+                }
+            }
+            "sprite_enable" => {
+                // sprite_enable(num: byte, enable: bool)
+                // Sets or clears the bit for sprite 'num' in $D015
+                if args.len() >= 2 {
+                    // Evaluate sprite number and save it
+                    self.generate_expression(&args[0])?;
+                    self.emit_byte(opcodes::PHA); // Save sprite number
+
+                    // Evaluate enable flag
+                    self.generate_expression(&args[1])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP2); // TMP2 = enable flag
+
+                    // Restore sprite number and convert to bitmask
+                    self.emit_byte(opcodes::PLA);
+                    self.emit_byte(opcodes::TAX); // X = sprite number
+
+                    // Create bitmask: 1 << sprite_num
+                    self.emit_imm(opcodes::LDA_IMM, 1);
+                    let shift_label = self.make_label("se_shift");
+                    let done_shift_label = self.make_label("se_done_shift");
+                    self.emit_byte(opcodes::CPX_IMM);
+                    self.emit_byte(0);
+                    self.emit_branch(opcodes::BEQ, &done_shift_label);
+                    self.define_label(&shift_label);
+                    self.emit_byte(opcodes::ASL_ACC);
+                    self.emit_byte(opcodes::DEX);
+                    self.emit_branch(opcodes::BNE, &shift_label);
+                    self.define_label(&done_shift_label);
+                    // A = bitmask
+
+                    // Check if enable or disable
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1); // TMP1 = bitmask
+                    self.emit_byte(opcodes::LDA_ZP);
+                    self.emit_byte(zeropage::TMP2);
+                    let disable_label = self.make_label("se_disable");
+                    let done_label = self.make_label("se_done");
+                    self.emit_branch(opcodes::BEQ, &disable_label);
+
+                    // Enable: OR the bitmask with current value
+                    self.emit_abs(opcodes::LDA_ABS, sprite::ENABLE);
+                    self.emit_byte(opcodes::ORA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_abs(opcodes::STA_ABS, sprite::ENABLE);
+                    self.emit_jmp(&done_label);
+
+                    // Disable: AND with inverted bitmask
+                    self.define_label(&disable_label);
+                    self.emit_byte(opcodes::LDA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_byte(opcodes::EOR_IMM);
+                    self.emit_byte(0xFF); // Invert bitmask
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_abs(opcodes::LDA_ABS, sprite::ENABLE);
+                    self.emit_byte(opcodes::AND_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_abs(opcodes::STA_ABS, sprite::ENABLE);
+
+                    self.define_label(&done_label);
+                }
+            }
+            "sprites_enable" => {
+                // sprites_enable(mask: byte) - directly write to $D015
+                if !args.is_empty() {
+                    self.generate_expression(&args[0])?;
+                    self.emit_abs(opcodes::STA_ABS, sprite::ENABLE);
+                }
+            }
+            "sprite_x" => {
+                // sprite_x(num: byte, x: word)
+                // Sets X position for sprite 'num' (0-511, 9-bit value)
+                if args.len() >= 2 {
+                    // Evaluate sprite number and save it
+                    self.generate_expression(&args[0])?;
+                    self.emit_byte(opcodes::PHA); // Save sprite number
+
+                    // Evaluate X position (word: A=low, X=high)
+                    self.generate_expression(&args[1])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1); // TMP1 = X low byte
+                    self.emit_byte(opcodes::STX_ZP);
+                    self.emit_byte(zeropage::TMP2); // TMP2 = X high byte (MSB)
+
+                    // Restore sprite number
+                    self.emit_byte(opcodes::PLA);
+                    self.emit_byte(opcodes::ASL_ACC); // sprite_num * 2 for X register offset
+                    self.emit_byte(opcodes::TAX);
+
+                    // Store low byte at $D000 + sprite_num * 2
+                    self.emit_byte(opcodes::LDA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_abx(opcodes::STA_ABX, sprite::SPRITE0_X);
+
+                    // Now handle MSB in $D010
+                    // Create bitmask: 1 << sprite_num
+                    self.emit_byte(opcodes::TXA);
+                    self.emit_byte(opcodes::LSR_ACC); // Back to sprite_num
+                    self.emit_byte(opcodes::TAX);
+                    self.emit_imm(opcodes::LDA_IMM, 1);
+                    let shift_label = self.make_label("sx_shift");
+                    let done_shift_label = self.make_label("sx_done_shift");
+                    self.emit_byte(opcodes::CPX_IMM);
+                    self.emit_byte(0);
+                    self.emit_branch(opcodes::BEQ, &done_shift_label);
+                    self.define_label(&shift_label);
+                    self.emit_byte(opcodes::ASL_ACC);
+                    self.emit_byte(opcodes::DEX);
+                    self.emit_branch(opcodes::BNE, &shift_label);
+                    self.define_label(&done_shift_label);
+                    // A = bitmask
+
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1); // TMP1 = bitmask
+
+                    // Check if MSB should be set (bit 0 of TMP2)
+                    self.emit_byte(opcodes::LDA_ZP);
+                    self.emit_byte(zeropage::TMP2);
+                    self.emit_imm(opcodes::AND_IMM, 0x01);
+                    let clear_msb_label = self.make_label("sx_clear_msb");
+                    let done_msb_label = self.make_label("sx_done_msb");
+                    self.emit_branch(opcodes::BEQ, &clear_msb_label);
+
+                    // Set MSB: OR bitmask
+                    self.emit_abs(opcodes::LDA_ABS, sprite::X_MSB);
+                    self.emit_byte(opcodes::ORA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_abs(opcodes::STA_ABS, sprite::X_MSB);
+                    self.emit_jmp(&done_msb_label);
+
+                    // Clear MSB: AND with inverted bitmask
+                    self.define_label(&clear_msb_label);
+                    self.emit_byte(opcodes::LDA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_byte(opcodes::EOR_IMM);
+                    self.emit_byte(0xFF);
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_abs(opcodes::LDA_ABS, sprite::X_MSB);
+                    self.emit_byte(opcodes::AND_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_abs(opcodes::STA_ABS, sprite::X_MSB);
+
+                    self.define_label(&done_msb_label);
+                }
+            }
+            "sprite_y" => {
+                // sprite_y(num: byte, y: byte)
+                // Sets Y position for sprite 'num' (0-255)
+                if args.len() >= 2 {
+                    // Evaluate sprite number and save it
+                    self.generate_expression(&args[0])?;
+                    self.emit_byte(opcodes::PHA); // Save sprite number
+
+                    // Evaluate Y position
+                    self.generate_expression(&args[1])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1); // TMP1 = Y value
+
+                    // Restore sprite number
+                    self.emit_byte(opcodes::PLA);
+                    self.emit_byte(opcodes::ASL_ACC); // sprite_num * 2 for register offset
+                    self.emit_byte(opcodes::TAX);
+
+                    // Store Y at $D001 + sprite_num * 2
+                    self.emit_byte(opcodes::LDA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_abx(opcodes::STA_ABX, sprite::SPRITE0_Y);
+                }
+            }
+            "sprite_pos" => {
+                // sprite_pos(num: byte, x: word, y: byte)
+                // Convenience function to set both X and Y
+                if args.len() >= 3 {
+                    // Evaluate sprite number and save it
+                    self.generate_expression(&args[0])?;
+                    self.emit_byte(opcodes::PHA); // Save sprite number
+
+                    // Evaluate Y position and save it
+                    self.generate_expression(&args[2])?;
+                    self.emit_byte(opcodes::PHA); // Save Y
+
+                    // Evaluate X position (word: A=low, X=high)
+                    self.generate_expression(&args[1])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1); // TMP1 = X low
+                    self.emit_byte(opcodes::STX_ZP);
+                    self.emit_byte(zeropage::TMP2); // TMP2 = X high (MSB flag)
+
+                    // Restore Y position
+                    self.emit_byte(opcodes::PLA);
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP3); // TMP3 = Y
+
+                    // Restore sprite number
+                    self.emit_byte(opcodes::PLA);
+                    self.emit_byte(opcodes::ASL_ACC); // sprite_num * 2
+                    self.emit_byte(opcodes::TAX);
+
+                    // Store X low byte at $D000 + sprite_num * 2
+                    self.emit_byte(opcodes::LDA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_abx(opcodes::STA_ABX, sprite::SPRITE0_X);
+
+                    // Store Y at $D001 + sprite_num * 2
+                    self.emit_byte(opcodes::LDA_ZP);
+                    self.emit_byte(zeropage::TMP3);
+                    self.emit_abx(opcodes::STA_ABX, sprite::SPRITE0_Y);
+
+                    // Handle MSB in $D010
+                    self.emit_byte(opcodes::TXA);
+                    self.emit_byte(opcodes::LSR_ACC); // Back to sprite_num
+                    self.emit_byte(opcodes::TAX);
+                    self.emit_imm(opcodes::LDA_IMM, 1);
+                    let shift_label = self.make_label("sp_shift");
+                    let done_shift_label = self.make_label("sp_done_shift");
+                    self.emit_byte(opcodes::CPX_IMM);
+                    self.emit_byte(0);
+                    self.emit_branch(opcodes::BEQ, &done_shift_label);
+                    self.define_label(&shift_label);
+                    self.emit_byte(opcodes::ASL_ACC);
+                    self.emit_byte(opcodes::DEX);
+                    self.emit_branch(opcodes::BNE, &shift_label);
+                    self.define_label(&done_shift_label);
+
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1); // TMP1 = bitmask
+
+                    // Check if MSB should be set
+                    self.emit_byte(opcodes::LDA_ZP);
+                    self.emit_byte(zeropage::TMP2);
+                    self.emit_imm(opcodes::AND_IMM, 0x01);
+                    let clear_msb_label = self.make_label("sp_clear_msb");
+                    let done_msb_label = self.make_label("sp_done_msb");
+                    self.emit_branch(opcodes::BEQ, &clear_msb_label);
+
+                    // Set MSB
+                    self.emit_abs(opcodes::LDA_ABS, sprite::X_MSB);
+                    self.emit_byte(opcodes::ORA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_abs(opcodes::STA_ABS, sprite::X_MSB);
+                    self.emit_jmp(&done_msb_label);
+
+                    // Clear MSB
+                    self.define_label(&clear_msb_label);
+                    self.emit_byte(opcodes::LDA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_byte(opcodes::EOR_IMM);
+                    self.emit_byte(0xFF);
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_abs(opcodes::LDA_ABS, sprite::X_MSB);
+                    self.emit_byte(opcodes::AND_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_abs(opcodes::STA_ABS, sprite::X_MSB);
+
+                    self.define_label(&done_msb_label);
+                }
+            }
+            "sprite_get_x" => {
+                // sprite_get_x(num: byte) -> word
+                // Returns X position (0-511) for sprite 'num'
+                if !args.is_empty() {
+                    // Evaluate sprite number
+                    self.generate_expression(&args[0])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP3); // TMP3 = sprite_num (for MSB lookup)
+                    self.emit_byte(opcodes::ASL_ACC); // sprite_num * 2
+                    self.emit_byte(opcodes::TAX);
+
+                    // Load low byte from $D000 + sprite_num * 2
+                    self.emit_abx(opcodes::LDA_ABX, sprite::SPRITE0_X);
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1); // TMP1 = X low byte
+
+                    // Get MSB from $D010
+                    self.emit_byte(opcodes::LDA_ZP);
+                    self.emit_byte(zeropage::TMP3); // sprite_num
+                    self.emit_byte(opcodes::TAX);
+                    self.emit_imm(opcodes::LDA_IMM, 1);
+                    let shift_label = self.make_label("sgx_shift");
+                    let done_shift_label = self.make_label("sgx_done_shift");
+                    self.emit_byte(opcodes::CPX_IMM);
+                    self.emit_byte(0);
+                    self.emit_branch(opcodes::BEQ, &done_shift_label);
+                    self.define_label(&shift_label);
+                    self.emit_byte(opcodes::ASL_ACC);
+                    self.emit_byte(opcodes::DEX);
+                    self.emit_branch(opcodes::BNE, &shift_label);
+                    self.define_label(&done_shift_label);
+                    // A = bitmask
+
+                    // AND with MSB register
+                    self.emit_abs(opcodes::AND_ABS, sprite::X_MSB);
+                    let msb_clear_label = self.make_label("sgx_msb_clear");
+                    self.emit_branch(opcodes::BEQ, &msb_clear_label);
+
+                    // MSB is set: X = 1
+                    self.emit_imm(opcodes::LDX_IMM, 1);
+                    let done_label = self.make_label("sgx_done");
+                    self.emit_jmp(&done_label);
+
+                    // MSB is clear: X = 0
+                    self.define_label(&msb_clear_label);
+                    self.emit_imm(opcodes::LDX_IMM, 0);
+
+                    self.define_label(&done_label);
+                    // Load low byte into A
+                    self.emit_byte(opcodes::LDA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    // Result: A = low byte, X = high byte
+                }
+            }
+            "sprite_get_y" => {
+                // sprite_get_y(num: byte) -> byte
+                // Returns Y position (0-255) for sprite 'num'
+                if !args.is_empty() {
+                    // Evaluate sprite number
+                    self.generate_expression(&args[0])?;
+                    self.emit_byte(opcodes::ASL_ACC); // sprite_num * 2
+                    self.emit_byte(opcodes::TAX);
+
+                    // Load Y from $D001 + sprite_num * 2
+                    self.emit_abx(opcodes::LDA_ABX, sprite::SPRITE0_Y);
+                }
+            }
+            "sprite_data" => {
+                // sprite_data(num: byte, pointer: byte)
+                // Sets sprite data pointer at $07F8 + sprite_num
+                if args.len() >= 2 {
+                    // Evaluate sprite number and save it
+                    self.generate_expression(&args[0])?;
+                    self.emit_byte(opcodes::PHA); // Save sprite number
+
+                    // Evaluate pointer value
+                    self.generate_expression(&args[1])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1); // TMP1 = pointer value
+
+                    // Restore sprite number
+                    self.emit_byte(opcodes::PLA);
+                    self.emit_byte(opcodes::TAX);
+
+                    // Store pointer at $07F8 + sprite_num
+                    self.emit_byte(opcodes::LDA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_abx(opcodes::STA_ABX, sprite::POINTER_BASE);
+                }
+            }
+            "sprite_get_data" => {
+                // sprite_get_data(num: byte) -> byte
+                // Returns sprite data pointer from $07F8 + sprite_num
+                if !args.is_empty() {
+                    // Evaluate sprite number
+                    self.generate_expression(&args[0])?;
+                    self.emit_byte(opcodes::TAX);
+
+                    // Load pointer from $07F8 + sprite_num
+                    self.emit_abx(opcodes::LDA_ABX, sprite::POINTER_BASE);
+                }
+            }
+            "sprite_color" => {
+                // sprite_color(num: byte, color: byte)
+                // Sets sprite color at $D027 + sprite_num
+                if args.len() >= 2 {
+                    // Evaluate sprite number and save it
+                    self.generate_expression(&args[0])?;
+                    self.emit_byte(opcodes::PHA); // Save sprite number
+
+                    // Evaluate color value
+                    self.generate_expression(&args[1])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1); // TMP1 = color
+
+                    // Restore sprite number
+                    self.emit_byte(opcodes::PLA);
+                    self.emit_byte(opcodes::TAX);
+
+                    // Store color at $D027 + sprite_num
+                    self.emit_byte(opcodes::LDA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_abx(opcodes::STA_ABX, sprite::SPRITE0_COLOR);
+                }
+            }
+            "sprite_get_color" => {
+                // sprite_get_color(num: byte) -> byte
+                // Returns sprite color from $D027 + sprite_num
+                if !args.is_empty() {
+                    // Evaluate sprite number
+                    self.generate_expression(&args[0])?;
+                    self.emit_byte(opcodes::TAX);
+
+                    // Load color from $D027 + sprite_num
+                    self.emit_abx(opcodes::LDA_ABX, sprite::SPRITE0_COLOR);
+                }
+            }
+            "sprite_multicolor1" => {
+                // sprite_multicolor1(color: byte)
+                // Sets shared multicolor 1 at $D025
+                if !args.is_empty() {
+                    self.generate_expression(&args[0])?;
+                    self.emit_abs(opcodes::STA_ABS, sprite::MULTICOLOR1);
+                }
+            }
+            "sprite_multicolor2" => {
+                // sprite_multicolor2(color: byte)
+                // Sets shared multicolor 2 at $D026
+                if !args.is_empty() {
+                    self.generate_expression(&args[0])?;
+                    self.emit_abs(opcodes::STA_ABS, sprite::MULTICOLOR2);
+                }
+            }
+            "sprite_get_multicolor1" => {
+                // sprite_get_multicolor1() -> byte
+                // Returns shared multicolor 1 from $D025
+                self.emit_abs(opcodes::LDA_ABS, sprite::MULTICOLOR1);
+            }
+            "sprite_get_multicolor2" => {
+                // sprite_get_multicolor2() -> byte
+                // Returns shared multicolor 2 from $D026
+                self.emit_abs(opcodes::LDA_ABS, sprite::MULTICOLOR2);
+            }
+            "sprite_multicolor" => {
+                // sprite_multicolor(num: byte, enable: bool)
+                // Sets or clears the multicolor bit for sprite 'num' in $D01C
+                if args.len() >= 2 {
+                    self.generate_sprite_bit_set(&args[0], &args[1], sprite::MULTICOLOR)?;
+                }
+            }
+            "sprites_multicolor" => {
+                // sprites_multicolor(mask: byte) - directly write to $D01C
+                if !args.is_empty() {
+                    self.generate_expression(&args[0])?;
+                    self.emit_abs(opcodes::STA_ABS, sprite::MULTICOLOR);
+                }
+            }
+            "sprite_is_multicolor" => {
+                // sprite_is_multicolor(num: byte) -> bool
+                if !args.is_empty() {
+                    self.generate_sprite_bit_get(&args[0], sprite::MULTICOLOR)?;
+                }
+            }
+            "sprite_expand_x" => {
+                // sprite_expand_x(num: byte, expand: bool)
+                // Sets or clears the X expansion bit for sprite 'num' in $D01D
+                if args.len() >= 2 {
+                    self.generate_sprite_bit_set(&args[0], &args[1], sprite::EXPAND_X)?;
+                }
+            }
+            "sprite_expand_y" => {
+                // sprite_expand_y(num: byte, expand: bool)
+                // Sets or clears the Y expansion bit for sprite 'num' in $D017
+                if args.len() >= 2 {
+                    self.generate_sprite_bit_set(&args[0], &args[1], sprite::EXPAND_Y)?;
+                }
+            }
+            "sprites_expand_x" => {
+                // sprites_expand_x(mask: byte) - directly write to $D01D
+                if !args.is_empty() {
+                    self.generate_expression(&args[0])?;
+                    self.emit_abs(opcodes::STA_ABS, sprite::EXPAND_X);
+                }
+            }
+            "sprites_expand_y" => {
+                // sprites_expand_y(mask: byte) - directly write to $D017
+                if !args.is_empty() {
+                    self.generate_expression(&args[0])?;
+                    self.emit_abs(opcodes::STA_ABS, sprite::EXPAND_Y);
+                }
+            }
+            "sprite_is_expanded_x" => {
+                // sprite_is_expanded_x(num: byte) -> bool
+                if !args.is_empty() {
+                    self.generate_sprite_bit_get(&args[0], sprite::EXPAND_X)?;
+                }
+            }
+            "sprite_is_expanded_y" => {
+                // sprite_is_expanded_y(num: byte) -> bool
+                if !args.is_empty() {
+                    self.generate_sprite_bit_get(&args[0], sprite::EXPAND_Y)?;
+                }
+            }
+            "sprite_priority" => {
+                // sprite_priority(num: byte, behind_bg: bool)
+                // Sets or clears the priority bit for sprite 'num' in $D01B
+                // behind_bg=true means sprite appears behind background
+                if args.len() >= 2 {
+                    self.generate_sprite_bit_set(&args[0], &args[1], sprite::PRIORITY)?;
+                }
+            }
+            "sprites_priority" => {
+                // sprites_priority(mask: byte) - directly write to $D01B
+                if !args.is_empty() {
+                    self.generate_expression(&args[0])?;
+                    self.emit_abs(opcodes::STA_ABS, sprite::PRIORITY);
+                }
+            }
+            "sprite_get_priority" => {
+                // sprite_get_priority(num: byte) -> bool
+                // Returns true if sprite is behind background
+                if !args.is_empty() {
+                    self.generate_sprite_bit_get(&args[0], sprite::PRIORITY)?;
+                }
+            }
+            "sprite_collision_sprite" => {
+                // sprite_collision_sprite() -> byte
+                // Read sprite-sprite collision register $D01E
+                // Reading clears the register
+                self.emit_abs(opcodes::LDA_ABS, sprite::COLLISION_SPRITE);
+            }
+            "sprite_collision_bg" => {
+                // sprite_collision_bg() -> byte
+                // Read sprite-background collision register $D01F
+                // Reading clears the register
+                self.emit_abs(opcodes::LDA_ABS, sprite::COLLISION_BG);
+            }
+            "sprite_collides" => {
+                // sprite_collides(mask: byte) -> bool
+                // Check if any sprite in mask has collision (sprite-sprite)
+                if !args.is_empty() {
+                    // Evaluate mask
+                    self.generate_expression(&args[0])?;
+
+                    // AND with collision register
+                    self.emit_abs(opcodes::AND_ABS, sprite::COLLISION_SPRITE);
+
+                    // Convert to boolean: 0 stays 0, non-zero becomes 1
+                    let zero_label = self.make_label("sc_zero");
+                    let done_label = self.make_label("sc_done");
+                    self.emit_branch(opcodes::BEQ, &zero_label);
+                    self.emit_imm(opcodes::LDA_IMM, 1); // true
+                    self.emit_jmp(&done_label);
+                    self.define_label(&zero_label);
+                    self.emit_imm(opcodes::LDA_IMM, 0); // false
+                    self.define_label(&done_label);
                 }
             }
             _ => {
@@ -639,6 +1177,122 @@ impl CodeGenerator {
         self.emit_byte(opcodes::LDA_ZP);
         self.emit_byte(zeropage::TMP4);
 
+        self.define_label(&done_label);
+
+        Ok(())
+    }
+}
+
+/// Helper methods for sprite bit manipulation.
+impl CodeGenerator {
+    /// Generate code to set/clear a bit in a sprite control register.
+    ///
+    /// Used for multicolor, expand_x, expand_y, priority, etc.
+    /// Sets or clears the bit for sprite 'num' based on 'enable'.
+    fn generate_sprite_bit_set(
+        &mut self,
+        num_expr: &Expr,
+        enable_expr: &Expr,
+        register: u16,
+    ) -> Result<(), CompileError> {
+        // Evaluate sprite number and save it
+        self.generate_expression(num_expr)?;
+        self.emit_byte(opcodes::PHA); // Save sprite number
+
+        // Evaluate enable flag
+        self.generate_expression(enable_expr)?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2); // TMP2 = enable flag
+
+        // Restore sprite number and convert to bitmask
+        self.emit_byte(opcodes::PLA);
+        self.emit_byte(opcodes::TAX); // X = sprite number
+
+        // Create bitmask: 1 << sprite_num
+        self.emit_imm(opcodes::LDA_IMM, 1);
+        let shift_label = self.make_label("sbs_shift");
+        let done_shift_label = self.make_label("sbs_done_shift");
+        self.emit_byte(opcodes::CPX_IMM);
+        self.emit_byte(0);
+        self.emit_branch(opcodes::BEQ, &done_shift_label);
+        self.define_label(&shift_label);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::DEX);
+        self.emit_branch(opcodes::BNE, &shift_label);
+        self.define_label(&done_shift_label);
+        // A = bitmask
+
+        // Check if enable or disable
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1); // TMP1 = bitmask
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        let disable_label = self.make_label("sbs_disable");
+        let done_label = self.make_label("sbs_done");
+        self.emit_branch(opcodes::BEQ, &disable_label);
+
+        // Enable: OR the bitmask with current value
+        self.emit_abs(opcodes::LDA_ABS, register);
+        self.emit_byte(opcodes::ORA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_abs(opcodes::STA_ABS, register);
+        self.emit_jmp(&done_label);
+
+        // Disable: AND with inverted bitmask
+        self.define_label(&disable_label);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::EOR_IMM);
+        self.emit_byte(0xFF); // Invert bitmask
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_abs(opcodes::LDA_ABS, register);
+        self.emit_byte(opcodes::AND_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_abs(opcodes::STA_ABS, register);
+
+        self.define_label(&done_label);
+
+        Ok(())
+    }
+
+    /// Generate code to get a bit from a sprite control register.
+    ///
+    /// Returns 1 (true) if the bit is set, 0 (false) otherwise.
+    fn generate_sprite_bit_get(
+        &mut self,
+        num_expr: &Expr,
+        register: u16,
+    ) -> Result<(), CompileError> {
+        // Evaluate sprite number
+        self.generate_expression(num_expr)?;
+        self.emit_byte(opcodes::TAX); // X = sprite number
+
+        // Create bitmask: 1 << sprite_num
+        self.emit_imm(opcodes::LDA_IMM, 1);
+        let shift_label = self.make_label("sbg_shift");
+        let done_shift_label = self.make_label("sbg_done_shift");
+        self.emit_byte(opcodes::CPX_IMM);
+        self.emit_byte(0);
+        self.emit_branch(opcodes::BEQ, &done_shift_label);
+        self.define_label(&shift_label);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::DEX);
+        self.emit_branch(opcodes::BNE, &shift_label);
+        self.define_label(&done_shift_label);
+        // A = bitmask
+
+        // AND with register to check if bit is set
+        self.emit_abs(opcodes::AND_ABS, register);
+
+        // Convert to boolean: 0 stays 0, non-zero becomes 1
+        let zero_label = self.make_label("sbg_zero");
+        let done_label = self.make_label("sbg_done");
+        self.emit_branch(opcodes::BEQ, &zero_label);
+        self.emit_imm(opcodes::LDA_IMM, 1); // true
+        self.emit_jmp(&done_label);
+        self.define_label(&zero_label);
+        self.emit_imm(opcodes::LDA_IMM, 0); // false
         self.define_label(&done_label);
 
         Ok(())

@@ -1,0 +1,36 @@
+# Test sprite data and color functions
+# Expected output:
+# SPRITE COLOR TEST
+# PTR=192
+# COLOR=7
+# MC1=5
+# MC2=6
+# DONE
+
+def main():
+    println("SPRITE COLOR TEST")
+
+    # Test sprite_data and sprite_get_data
+    sprite_data(0, 192)
+    ptr: byte = sprite_get_data(0)
+    print("PTR=")
+    println(ptr)
+
+    # Test sprite_color and sprite_get_color
+    sprite_color(0, 7)  # Yellow
+    color: byte = sprite_get_color(0)
+    print("COLOR=")
+    println(color)
+
+    # Test multicolor functions
+    sprite_multicolor1(5)  # Green
+    sprite_multicolor2(6)  # Blue
+
+    mc1: byte = sprite_get_multicolor1()
+    mc2: byte = sprite_get_multicolor2()
+    print("MC1=")
+    println(mc1)
+    print("MC2=")
+    println(mc2)
+
+    println("DONE")

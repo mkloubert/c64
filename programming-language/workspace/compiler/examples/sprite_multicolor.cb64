@@ -1,0 +1,83 @@
+# Sprite Multicolor and Expansion Demo for Cobra64
+# Demonstrates multicolor mode and 2x expansion
+
+const SPRITE_PTR: byte = 192  # $3000
+
+def main():
+    cls()
+    println("MULTICOLOR & EXPAND")
+    println("KEYS: M=MULTI X=EXPX")
+    println("      Y=EXPY Q=QUIT")
+
+    # Setup multicolor sprite data
+    setup_multicolor_sprite()
+
+    # Set sprite data pointer
+    sprite_data(0, SPRITE_PTR)
+
+    # Set colors for multicolor mode
+    sprite_color(0, 1)        # White (sprite color)
+    sprite_multicolor1(2)     # Red (shared color 1)
+    sprite_multicolor2(5)     # Green (shared color 2)
+
+    # Position and enable sprite
+    sprite_pos(0, 160, 120)
+    sprite_enable(0, true)
+
+    # Start with multicolor enabled
+    sprite_multicolor(0, true)
+
+    # Main loop
+    while true:
+        k: byte = read()
+
+        if k == 77:  # 'M' - toggle multicolor
+            mc: bool = sprite_is_multicolor(0)
+            if mc:
+                sprite_multicolor(0, false)
+                println("MULTICOLOR OFF")
+            else:
+                sprite_multicolor(0, true)
+                println("MULTICOLOR ON")
+
+        if k == 88:  # 'X' - toggle X expansion
+            ex: bool = sprite_is_expanded_x(0)
+            if ex:
+                sprite_expand_x(0, false)
+                println("EXPAND X OFF")
+            else:
+                sprite_expand_x(0, true)
+                println("EXPAND X ON")
+
+        if k == 89:  # 'Y' - toggle Y expansion
+            ey: bool = sprite_is_expanded_y(0)
+            if ey:
+                sprite_expand_y(0, false)
+                println("EXPAND Y OFF")
+            else:
+                sprite_expand_y(0, true)
+                println("EXPAND Y ON")
+
+        if k == 81:  # 'Q' - quit
+            break
+
+    # Cleanup
+    sprite_enable(0, false)
+    println("DONE!")
+
+def setup_multicolor_sprite():
+    # Multicolor sprite: 12x21 pixels (2 bits per pixel)
+    # Pattern: vertical stripes with all 4 colors
+    # 00 = transparent, 01 = multicolor1, 10 = sprite color, 11 = multicolor2
+
+    # Each row: 3 bytes = 12 pixels in multicolor mode
+    # Pattern: 01 10 11 01 10 11 01 10 11 01 10 11
+    # Binary:  01101101 01101101 01101101 = $6D $6D $6D
+
+    i: byte = 0
+    while i < 21:
+        addr: word = $3000 + word(i) * 3
+        poke(addr, $6D)
+        poke(addr + 1, $B6)
+        poke(addr + 2, $DB)
+        i = i + 1

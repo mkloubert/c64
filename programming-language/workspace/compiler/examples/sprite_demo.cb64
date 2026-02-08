@@ -1,0 +1,301 @@
+# Comprehensive Sprite Demo for Cobra64
+# Demonstrates all sprite features: animation, multicolor, expansion,
+# keyboard control, priority, and collision detection
+
+const SPRITE_PTR: byte = 192  # $3000 / 64 = pointer 192
+
+def main():
+    cls()
+    println("SPRITE DEMO")
+    println("ARROWS=MOVE E=EXPAND")
+    println("M=MULTICOLOR P=PRIORITY")
+    println("C=CYCLE COLOR Q=QUIT")
+
+    # Initialize sprites
+    setup_sprites()
+
+    # Set sprite data pointers
+    sprite_data(0, SPRITE_PTR)      # Player sprite
+    sprite_data(1, SPRITE_PTR + 1)  # Target sprite
+    sprite_data(2, SPRITE_PTR + 1)  # Bouncing sprite
+
+    # Set colors
+    sprite_color(0, COLOR_WHITE)
+    sprite_color(1, COLOR_RED)
+    sprite_color(2, COLOR_GREEN)
+
+    # Set multicolor shared colors
+    sprite_multicolor1(COLOR_YELLOW)
+    sprite_multicolor2(COLOR_BLUE)
+
+    # Initial positions
+    sprite_pos(0, 160, 150)   # Player center
+    sprite_pos(1, 200, 100)   # Target right
+    sprite_pos(2, 100, 180)   # Bouncing left
+
+    # Enable 3 sprites
+    sprites_enable(7)  # bits 0, 1, 2
+
+    # Player state
+    px: word = 160
+    py: byte = 150
+
+    # Bouncing sprite state
+    bx: word = 100
+    by: byte = 180
+    dx: sbyte = 2
+    dy: sbyte = 1
+
+    # Animation counter
+    frame: byte = 0
+    color_idx: byte = 1
+
+    # Main loop
+    while true:
+        k: byte = get_key()
+
+        # Player movement
+        if k == 17:  # Down
+            if py < 229:
+                py = py + 3
+        if k == 145:  # Up
+            if py > 50:
+                py = py - 3
+        if k == 29:  # Right
+            if px < 320:
+                px = px + 3
+        if k == 157:  # Left
+            if px > 24:
+                px = px - 3
+
+        # Update player
+        sprite_pos(0, px, py)
+
+        # Toggle expansion with 'E'
+        if k == 69:
+            ex: bool = sprite_is_expanded_x(0)
+            if ex:
+                sprite_expand_x(0, false)
+                sprite_expand_y(0, false)
+            else:
+                sprite_expand_x(0, true)
+                sprite_expand_y(0, true)
+
+        # Toggle multicolor with 'M'
+        if k == 77:
+            mc: bool = sprite_is_multicolor(0)
+            if mc:
+                sprite_multicolor(0, false)
+            else:
+                sprite_multicolor(0, true)
+
+        # Toggle priority with 'P'
+        if k == 80:
+            pri: bool = sprite_get_priority(0)
+            if pri:
+                sprite_priority(0, false)
+            else:
+                sprite_priority(0, true)
+
+        # Cycle color with 'C'
+        if k == 67:
+            color_idx = color_idx + 1
+            if color_idx > 15:
+                color_idx = 1
+            sprite_color(0, color_idx)
+
+        # Animate bouncing sprite
+        frame = frame + 1
+        if frame > 3:
+            frame = 0
+
+            # Update bouncing sprite position
+            if dx > 0:
+                if bx < 320:
+                    bx = bx + word(dx)
+                else:
+                    dx = -2
+            else:
+                if bx > 24:
+                    bx = bx - word(-dx)
+                else:
+                    dx = 2
+
+            if dy > 0:
+                if by < 220:
+                    by = by + byte(dy)
+                else:
+                    dy = -1
+            else:
+                if by > 60:
+                    by = by - byte(-dy)
+                else:
+                    dy = 1
+
+            sprite_pos(2, bx, by)
+
+        # Check collisions
+        coll: byte = sprite_collision_sprite()
+        if coll != 0:
+            # Flash collision indicator
+            cursor(0, 6)
+            if coll & 3 == 3:
+                print("HIT TARGET!  ")
+            if coll & 5 == 5:
+                print("HIT BOUNCER! ")
+
+        # Quit on 'Q'
+        if k == 81:
+            break
+
+    # Cleanup
+    sprites_enable(0)
+    cls()
+    println("DEMO ENDED")
+
+def setup_sprites():
+    # Sprite 0: Player - filled circle shape
+    poke($3000, 0)
+    poke($3001, $3C)
+    poke($3002, 0)
+
+    poke($3003, 0)
+    poke($3004, $7E)
+    poke($3005, 0)
+
+    poke($3006, 0)
+    poke($3007, $FF)
+    poke($3008, 0)
+
+    poke($3009, 1)
+    poke($300A, $FF)
+    poke($300B, $80)
+
+    poke($300C, 1)
+    poke($300D, $FF)
+    poke($300E, $80)
+
+    poke($300F, 3)
+    poke($3010, $FF)
+    poke($3011, $C0)
+
+    poke($3012, 3)
+    poke($3013, $FF)
+    poke($3014, $C0)
+
+    poke($3015, 3)
+    poke($3016, $FF)
+    poke($3017, $C0)
+
+    poke($3018, 3)
+    poke($3019, $FF)
+    poke($301A, $C0)
+
+    poke($301B, 3)
+    poke($301C, $FF)
+    poke($301D, $C0)
+
+    poke($301E, 3)
+    poke($301F, $FF)
+    poke($3020, $C0)
+
+    poke($3021, 1)
+    poke($3022, $FF)
+    poke($3023, $80)
+
+    poke($3024, 1)
+    poke($3025, $FF)
+    poke($3026, $80)
+
+    poke($3027, 0)
+    poke($3028, $FF)
+    poke($3029, 0)
+
+    poke($302A, 0)
+    poke($302B, $7E)
+    poke($302C, 0)
+
+    poke($302D, 0)
+    poke($302E, $3C)
+    poke($302F, 0)
+
+    # Padding
+    i: byte = 48
+    while i < 64:
+        poke($3000 + word(i), 0)
+        i = i + 1
+
+    # Sprite 1: Target - diamond shape
+    poke($3040, 0)
+    poke($3041, $18)
+    poke($3042, 0)
+
+    poke($3043, 0)
+    poke($3044, $3C)
+    poke($3045, 0)
+
+    poke($3046, 0)
+    poke($3047, $7E)
+    poke($3048, 0)
+
+    poke($3049, 0)
+    poke($304A, $FF)
+    poke($304B, 0)
+
+    poke($304C, 1)
+    poke($304D, $FF)
+    poke($304E, $80)
+
+    poke($304F, 3)
+    poke($3050, $FF)
+    poke($3051, $C0)
+
+    poke($3052, 7)
+    poke($3053, $FF)
+    poke($3054, $E0)
+
+    poke($3055, $0F)
+    poke($3056, $FF)
+    poke($3057, $F0)
+
+    poke($3058, $1F)
+    poke($3059, $FF)
+    poke($305A, $F8)
+
+    poke($305B, $0F)
+    poke($305C, $FF)
+    poke($305D, $F0)
+
+    poke($305E, 7)
+    poke($305F, $FF)
+    poke($3060, $E0)
+
+    poke($3061, 3)
+    poke($3062, $FF)
+    poke($3063, $C0)
+
+    poke($3064, 1)
+    poke($3065, $FF)
+    poke($3066, $80)
+
+    poke($3067, 0)
+    poke($3068, $FF)
+    poke($3069, 0)
+
+    poke($306A, 0)
+    poke($306B, $7E)
+    poke($306C, 0)
+
+    poke($306D, 0)
+    poke($306E, $3C)
+    poke($306F, 0)
+
+    poke($3070, 0)
+    poke($3071, $18)
+    poke($3072, 0)
+
+    # Padding
+    j: byte = 51
+    while j < 64:
+        poke($3040 + word(j), 0)
+        j = j + 1

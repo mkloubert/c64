@@ -1,0 +1,90 @@
+# Sprite Colors Demo for Cobra64
+# Demonstrates sprite data pointers and color functions
+
+# Sprite data pointers (memory_address / 64)
+const SPRITE_PTR_0: byte = 192  # $3000
+const SPRITE_PTR_1: byte = 193  # $3040
+
+def main():
+    cls()
+    println("SPRITE COLORS DEMO")
+    println("PRESS KEY TO CYCLE")
+
+    # Setup sprite data for two sprites
+    setup_sprite_data()
+
+    # Set sprite data pointers
+    sprite_data(0, SPRITE_PTR_0)
+    sprite_data(1, SPRITE_PTR_1)
+
+    # Set initial colors
+    sprite_color(0, 1)  # White
+    sprite_color(1, 2)  # Red
+
+    # Set multicolor palette
+    sprite_multicolor1(5)  # Green
+    sprite_multicolor2(6)  # Blue
+
+    # Position sprites
+    sprite_pos(0, 100, 100)
+    sprite_pos(1, 150, 100)
+
+    # Enable both sprites
+    sprites_enable(3)  # Binary 00000011
+
+    # Color cycling
+    color: byte = 1
+    while true:
+        k: byte = read()
+
+        # Cycle sprite 0 color
+        color = color + 1
+        if color > 15:
+            color = 1
+
+        sprite_color(0, color)
+
+        # Read back and display
+        c: byte = sprite_get_color(0)
+        print("SPRITE 0 COLOR: ")
+        println(c)
+
+        # Also read data pointer
+        ptr: byte = sprite_get_data(0)
+        print("DATA POINTER: ")
+        println(ptr)
+
+        # Read multicolors
+        mc1: byte = sprite_get_multicolor1()
+        mc2: byte = sprite_get_multicolor2()
+        print("MULTICOLORS: ")
+        print(mc1)
+        print(" ")
+        println(mc2)
+
+        # Exit on 'Q' key
+        if k == 81:
+            break
+
+    # Disable sprites
+    sprites_enable(0)
+    println("DONE!")
+
+def setup_sprite_data():
+    # Simple square sprite at $3000
+    i: byte = 0
+    while i < 63:
+        if i < 21:
+            poke($3000 + word(i), $FF)
+        else:
+            poke($3000 + word(i), 0)
+        i = i + 1
+
+    # Simple circle sprite at $3040
+    j: byte = 0
+    while j < 63:
+        if j >= 9 and j < 54:
+            poke($3040 + word(j), $7E)
+        else:
+            poke($3040 + word(j), 0)
+        j = j + 1

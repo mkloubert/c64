@@ -1,0 +1,67 @@
+# Test sprite multicolor and expansion functions
+# Expected output:
+# SPRITE MODES TEST
+# MC=FALSE
+# MC=TRUE
+# EX=FALSE
+# EX=TRUE
+# EY=FALSE
+# EY=TRUE
+# MASK OK
+# DONE
+
+def main():
+    println("SPRITE MODES TEST")
+
+    # Test sprite_multicolor and sprite_is_multicolor
+    sprite_multicolor(0, false)
+    mc1: bool = sprite_is_multicolor(0)
+    print("MC=")
+    println(mc1)
+
+    sprite_multicolor(0, true)
+    mc2: bool = sprite_is_multicolor(0)
+    print("MC=")
+    println(mc2)
+
+    # Test sprite_expand_x and sprite_is_expanded_x
+    sprite_expand_x(0, false)
+    ex1: bool = sprite_is_expanded_x(0)
+    print("EX=")
+    println(ex1)
+
+    sprite_expand_x(0, true)
+    ex2: bool = sprite_is_expanded_x(0)
+    print("EX=")
+    println(ex2)
+
+    # Test sprite_expand_y and sprite_is_expanded_y
+    sprite_expand_y(0, false)
+    ey1: bool = sprite_is_expanded_y(0)
+    print("EY=")
+    println(ey1)
+
+    sprite_expand_y(0, true)
+    ey2: bool = sprite_is_expanded_y(0)
+    print("EY=")
+    println(ey2)
+
+    # Test bitmask functions
+    sprites_multicolor(0)     # Clear all
+    sprites_expand_x(0)       # Clear all
+    sprites_expand_y(0)       # Clear all
+
+    # Set sprite 1 and 2 with mask
+    sprites_multicolor(6)     # Binary 00000110
+    sprites_expand_x(6)
+    sprites_expand_y(6)
+
+    # Verify sprite 0 is not set, sprite 1 is set
+    m0: bool = sprite_is_multicolor(0)
+    m1: bool = sprite_is_multicolor(1)
+    if m0 == false and m1 == true:
+        println("MASK OK")
+    else:
+        println("MASK FAIL")
+
+    println("DONE")

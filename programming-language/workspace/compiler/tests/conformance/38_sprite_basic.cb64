@@ -1,0 +1,36 @@
+# Test sprite basic functions: enable, position, get
+# Expected output:
+# SPRITE TEST
+# ENABLED
+# POS SET
+# X=256
+# Y=100
+# DISABLED
+# DONE
+
+def main():
+    println("SPRITE TEST")
+
+    # Test sprites_enable with bitmask
+    sprites_enable(1)  # Enable sprite 0
+    println("ENABLED")
+
+    # Test sprite_pos (9-bit X position)
+    sprite_pos(0, 256, 100)
+    println("POS SET")
+
+    # Test sprite_get_x (should return 256)
+    x: word = sprite_get_x(0)
+    print("X=")
+    println(x)
+
+    # Test sprite_get_y (should return 100)
+    y: byte = sprite_get_y(0)
+    print("Y=")
+    println(y)
+
+    # Test sprite_enable to disable
+    sprite_enable(0, false)
+    println("DISABLED")
+
+    println("DONE")

@@ -32,6 +32,7 @@ import { TextDocument } from 'vscode-languageserver-textdocument';
 import { DocumentAnalysis } from './features';
 import {
     COBRA64_BUILTINS,
+    COBRA64_CONSTANTS,
     COBRA64_TYPES,
     COBRA64_KEYWORDS,
     positionToOffset,
@@ -153,6 +154,7 @@ export function getCompletions(
     items.push(...getKeywordCompletions(context.wordPrefix));
     items.push(...getTypeCompletions());
     items.push(...getBuiltinFunctionCompletions());
+    items.push(...getBuiltinConstantCompletions());
     items.push(...getUserFunctionCompletions(analysis, context.wordPrefix));
     items.push(...getVariableCompletions(analysis, context.wordPrefix));
 
@@ -250,6 +252,11 @@ function getBuiltinFunctionCompletions(): CompletionItem[] {
         const paramList = builtin.parameters.map(p => `${p.name}: ${p.type}`).join(', ');
         const signature = `${builtin.name}(${paramList})${builtin.returnType ? ' -> ' + builtin.returnType : ''}`;
 
+        // Include first example in documentation
+        const exampleSection = builtin.examples.length > 0
+            ? `\n\n**Example:**\n\`\`\`python\n${builtin.examples[0]}\n\`\`\``
+            : '';
+
         return {
             label: builtin.name,
             kind: CompletionItemKind.Function,
@@ -258,9 +265,32 @@ function getBuiltinFunctionCompletions(): CompletionItem[] {
             detail: signature,
             documentation: {
                 kind: MarkupKind.Markdown,
-                value: `**${builtin.name}** (built-in)\n\n${builtin.description}`,
+                value: `**${builtin.name}** (built-in)\n\n${builtin.description}${exampleSection}`,
             },
             sortText: `2${index.toString().padStart(2, '0')}`, // Built-ins third
+        };
+    });
+}
+
+/**
+ * Get built-in constant completions.
+ */
+function getBuiltinConstantCompletions(): CompletionItem[] {
+    return COBRA64_CONSTANTS.map((constant, index) => {
+        // Include first example in documentation
+        const exampleSection = constant.examples.length > 0
+            ? `\n\n**Example:**\n\`\`\`python\n${constant.examples[0]}\n\`\`\``
+            : '';
+
+        return {
+            label: constant.name,
+            kind: CompletionItemKind.Constant,
+            detail: `${constant.type} = ${constant.value}`,
+            documentation: {
+                kind: MarkupKind.Markdown,
+                value: `**${constant.name}** (built-in constant)\n\n${constant.description}${exampleSection}`,
+            },
+            sortText: `25${index.toString().padStart(2, '0')}`, // Constants after functions
         };
     });
 }
@@ -327,15 +357,34 @@ function getVariableCompletions(
 export function resolveCompletionItem(item: CompletionItem): CompletionItem {
     // Add more documentation if needed
     const builtin = COBRA64_BUILTINS.find(b => b.name === item.label);
-    if (builtin && !item.documentation) {
+    if (builtin) {
         const params = builtin.parameters.map(p =>
             `- \`${p.name}: ${p.type}\` - ${p.description}`
         ).join('\n');
 
+        const examplesSection = builtin.examples.length > 0
+            ? '\n\n**Examples:**\n```python\n' + builtin.examples.join('\n\n') + '\n```'
+            : '';
+
         item.documentation = {
             kind: MarkupKind.Markdown,
-            value: `**${builtin.name}**\n\n${builtin.description}${params ? '\n\n**Parameters:**\n' + params : ''}${builtin.returnType ? '\n\n**Returns:** `' + builtin.returnType + '`' : ''}`,
+            value: `**${builtin.name}**\n\n${builtin.description}${params ? '\n\n**Parameters:**\n' + params : ''}${builtin.returnType ? '\n\n**Returns:** `' + builtin.returnType + '`' : ''}${examplesSection}`,
         };
+        return item;
+    }
+
+    // Check for built-in constants
+    const constant = COBRA64_CONSTANTS.find(c => c.name === item.label);
+    if (constant) {
+        const examplesSection = constant.examples.length > 0
+            ? '\n\n**Examples:**\n```python\n' + constant.examples.join('\n') + '\n```'
+            : '';
+
+        item.documentation = {
+            kind: MarkupKind.Markdown,
+            value: `**${constant.name}** (built-in constant)\n\n${constant.description}\n\nValue: \`${constant.value}\` (${constant.type})${examplesSection}`,
+        };
+        return item;
     }
 
     return item;

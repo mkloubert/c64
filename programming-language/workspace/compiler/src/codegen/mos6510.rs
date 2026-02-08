@@ -362,6 +362,120 @@ pub mod vic {
     pub const RASTER: u16 = 0xD012;
 }
 
+/// VIC-II sprite registers.
+#[allow(dead_code)]
+pub mod sprite {
+    // Sprite position registers (X and Y pairs for sprites 0-7)
+    /// Sprite 0 X position (low 8 bits).
+    pub const SPRITE0_X: u16 = 0xD000;
+    /// Sprite 0 Y position.
+    pub const SPRITE0_Y: u16 = 0xD001;
+    /// Sprite 1 X position (low 8 bits).
+    pub const SPRITE1_X: u16 = 0xD002;
+    /// Sprite 1 Y position.
+    pub const SPRITE1_Y: u16 = 0xD003;
+    /// Sprite 2 X position (low 8 bits).
+    pub const SPRITE2_X: u16 = 0xD004;
+    /// Sprite 2 Y position.
+    pub const SPRITE2_Y: u16 = 0xD005;
+    /// Sprite 3 X position (low 8 bits).
+    pub const SPRITE3_X: u16 = 0xD006;
+    /// Sprite 3 Y position.
+    pub const SPRITE3_Y: u16 = 0xD007;
+    /// Sprite 4 X position (low 8 bits).
+    pub const SPRITE4_X: u16 = 0xD008;
+    /// Sprite 4 Y position.
+    pub const SPRITE4_Y: u16 = 0xD009;
+    /// Sprite 5 X position (low 8 bits).
+    pub const SPRITE5_X: u16 = 0xD00A;
+    /// Sprite 5 Y position.
+    pub const SPRITE5_Y: u16 = 0xD00B;
+    /// Sprite 6 X position (low 8 bits).
+    pub const SPRITE6_X: u16 = 0xD00C;
+    /// Sprite 6 Y position.
+    pub const SPRITE6_Y: u16 = 0xD00D;
+    /// Sprite 7 X position (low 8 bits).
+    pub const SPRITE7_X: u16 = 0xD00E;
+    /// Sprite 7 Y position.
+    pub const SPRITE7_Y: u16 = 0xD00F;
+
+    /// Sprite X position MSB (bit 8 of X for each sprite, bits 0-7 = sprites 0-7).
+    pub const X_MSB: u16 = 0xD010;
+
+    /// Sprite enable register (bits 0-7 enable sprites 0-7).
+    pub const ENABLE: u16 = 0xD015;
+
+    /// Sprite Y expansion (bits 0-7 = double height for sprites 0-7).
+    pub const EXPAND_Y: u16 = 0xD017;
+
+    /// Sprite priority (bits 0-7: 1 = sprite behind background).
+    pub const PRIORITY: u16 = 0xD01B;
+
+    /// Sprite multicolor mode (bits 0-7: 1 = multicolor for sprite).
+    pub const MULTICOLOR: u16 = 0xD01C;
+
+    /// Sprite X expansion (bits 0-7 = double width for sprites 0-7).
+    pub const EXPAND_X: u16 = 0xD01D;
+
+    /// Sprite-sprite collision register (read clears, bits show collided sprites).
+    pub const COLLISION_SPRITE: u16 = 0xD01E;
+
+    /// Sprite-background collision register (read clears, bits show collided sprites).
+    pub const COLLISION_BG: u16 = 0xD01F;
+
+    /// Sprite multicolor shared color 1.
+    pub const MULTICOLOR1: u16 = 0xD025;
+
+    /// Sprite multicolor shared color 2.
+    pub const MULTICOLOR2: u16 = 0xD026;
+
+    // Individual sprite color registers
+    /// Sprite 0 color.
+    pub const SPRITE0_COLOR: u16 = 0xD027;
+    /// Sprite 1 color.
+    pub const SPRITE1_COLOR: u16 = 0xD028;
+    /// Sprite 2 color.
+    pub const SPRITE2_COLOR: u16 = 0xD029;
+    /// Sprite 3 color.
+    pub const SPRITE3_COLOR: u16 = 0xD02A;
+    /// Sprite 4 color.
+    pub const SPRITE4_COLOR: u16 = 0xD02B;
+    /// Sprite 5 color.
+    pub const SPRITE5_COLOR: u16 = 0xD02C;
+    /// Sprite 6 color.
+    pub const SPRITE6_COLOR: u16 = 0xD02D;
+    /// Sprite 7 color.
+    pub const SPRITE7_COLOR: u16 = 0xD02E;
+
+    /// Base address for sprite pointers (default screen at $0400).
+    /// Sprite pointers are at screen + $3F8 to screen + $3FF.
+    pub const POINTER_BASE: u16 = 0x07F8;
+
+    /// Sprite data size (64 bytes per sprite shape).
+    pub const DATA_SIZE: u8 = 64;
+}
+
+/// C64 color constants (VIC-II palette).
+#[allow(dead_code)]
+pub mod colors {
+    pub const BLACK: u8 = 0;
+    pub const WHITE: u8 = 1;
+    pub const RED: u8 = 2;
+    pub const CYAN: u8 = 3;
+    pub const PURPLE: u8 = 4;
+    pub const GREEN: u8 = 5;
+    pub const BLUE: u8 = 6;
+    pub const YELLOW: u8 = 7;
+    pub const ORANGE: u8 = 8;
+    pub const BROWN: u8 = 9;
+    pub const LIGHT_RED: u8 = 10;
+    pub const DARK_GRAY: u8 = 11;
+    pub const GRAY: u8 = 12;
+    pub const LIGHT_GREEN: u8 = 13;
+    pub const LIGHT_BLUE: u8 = 14;
+    pub const LIGHT_GRAY: u8 = 15;
+}
+
 /// CIA (Complex Interface Adapter) registers.
 #[allow(dead_code)]
 pub mod cia {
