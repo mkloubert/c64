@@ -1,0 +1,50 @@
+# Test Extended Background Color Mode (ECM) functions
+# Expected output:
+# ECM TEST
+# SET BG0 OK
+# GET BG0=1
+# SET BG1 OK
+# GET BG1=2
+# SET BG2 OK
+# GET BG2=3
+# SET BG3 OK
+# GET BG3=4
+# DONE
+
+def main():
+    println("ECM TEST")
+
+    # Test ecm_background - set background 0 to white (1)
+    ecm_background(0, 1)
+    println("SET BG0 OK")
+
+    # Test get_ecm_background - read back the value
+    c: byte = get_ecm_background(0)
+    print("GET BG0=")
+    println(c)
+
+    # Test background 1 - set to red (2)
+    ecm_background(1, 2)
+    println("SET BG1 OK")
+
+    c = get_ecm_background(1)
+    print("GET BG1=")
+    println(c)
+
+    # Test background 2 - set to cyan (3)
+    ecm_background(2, 3)
+    println("SET BG2 OK")
+
+    c = get_ecm_background(2)
+    print("GET BG2=")
+    println(c)
+
+    # Test background 3 - set to purple (4)
+    ecm_background(3, 4)
+    println("SET BG3 OK")
+
+    c = get_ecm_background(3)
+    print("GET BG3=")
+    println(c)
+
+    println("DONE")

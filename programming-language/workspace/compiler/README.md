@@ -1850,6 +1850,301 @@ def main():
 
 ---
 
+### Graphics Mode Support
+
+Cobra64 provides comprehensive VIC-II graphics mode support including bitmap graphics, color control, hardware scrolling, and raster functions.
+
+#### VIC-II Register Constants
+
+| Constant         | Value   | Description                    |
+| ---------------- | ------- | ------------------------------ |
+| `VIC_CONTROL1`   | $D011   | Control register 1             |
+| `VIC_CONTROL2`   | $D016   | Control register 2             |
+| `VIC_MEMORY`     | $D018   | Memory control register        |
+| `VIC_RASTER`     | $D012   | Raster line register           |
+| `VIC_BORDER`     | $D020   | Border color register          |
+| `VIC_BACKGROUND` | $D021   | Background color register      |
+| `VIC_BACKGROUND1`| $D022   | Extra background 1             |
+| `VIC_BACKGROUND2`| $D023   | Extra background 2             |
+| `VIC_BACKGROUND3`| $D024   | Extra background 3             |
+| `COLOR_RAM`      | $D800   | Color RAM start address        |
+
+#### Graphics Mode Constants
+
+| Constant       | Value | Description                        |
+| -------------- | ----- | ---------------------------------- |
+| `GFX_TEXT`     | 0     | Standard character mode (40x25)    |
+| `GFX_TEXT_MC`  | 1     | Multicolor character mode          |
+| `GFX_BITMAP`   | 2     | Standard bitmap mode (320x200)     |
+| `GFX_BITMAP_MC`| 3     | Multicolor bitmap mode (160x200)   |
+| `GFX_TEXT_ECM` | 4     | Extended background color mode     |
+
+#### VIC Bank Constants
+
+| Constant    | Value | Address Range     |
+| ----------- | ----- | ----------------- |
+| `VIC_BANK0` | 0     | $0000-$3FFF       |
+| `VIC_BANK1` | 1     | $4000-$7FFF       |
+| `VIC_BANK2` | 2     | $8000-$BFFF       |
+| `VIC_BANK3` | 3     | $C000-$FFFF       |
+
+#### Raster Constants
+
+| Constant          | Value | Description                   |
+| ----------------- | ----- | ----------------------------- |
+| `RASTER_TOP`      | 50    | First visible raster line     |
+| `RASTER_BOTTOM`   | 250   | Last visible raster line      |
+| `RASTER_MAX_PAL`  | 311   | Maximum raster line (PAL)     |
+| `RASTER_MAX_NTSC` | 261   | Maximum raster line (NTSC)    |
+
+#### Display Control Functions
+
+```python
+# Set border and background colors
+border_color(5)       # Set border to green
+background_color(0)   # Set background to black
+
+# Read current colors
+c: byte = get_border_color()
+c: byte = get_background_color()
+```
+
+| Function                  | Description                     |
+| ------------------------- | ------------------------------- |
+| `border_color(color)`     | Set border color (0-15)         |
+| `background_color(color)` | Set background color (0-15)     |
+| `get_border_color()`      | Get current border color        |
+| `get_background_color()`  | Get current background color    |
+
+#### Mode Switching Functions
+
+```python
+# Switch to hires bitmap mode
+gfx_mode(GFX_BITMAP)
+# Or use shortcut
+gfx_hires()
+
+# Switch back to text mode
+gfx_text()
+
+# Set screen dimensions
+screen_columns(38)    # 38-column mode (with border)
+screen_rows(24)       # 24-row mode (with border)
+```
+
+| Function                  | Description                        |
+| ------------------------- | ---------------------------------- |
+| `gfx_mode(mode)`          | Switch graphics mode (0-4)         |
+| `get_gfx_mode()`          | Get current graphics mode          |
+| `gfx_text()`              | Switch to standard text mode       |
+| `gfx_hires()`             | Switch to hires bitmap (320x200)   |
+| `gfx_multicolor()`        | Switch to multicolor bitmap        |
+| `screen_columns(cols)`    | Set 38 or 40 column mode           |
+| `screen_rows(rows)`       | Set 24 or 25 row mode              |
+
+#### Memory Configuration Functions
+
+```python
+# Set VIC bank 1 ($4000-$7FFF)
+vic_bank(VIC_BANK1)
+
+# Set screen RAM address (relative to bank)
+screen_address($0400)
+
+# Set bitmap address (relative to bank)
+bitmap_address($2000)
+
+# Set custom character set address
+charset_address($0800)
+```
+
+| Function                  | Description                        |
+| ------------------------- | ---------------------------------- |
+| `vic_bank(bank)`          | Set VIC memory bank (0-3)          |
+| `get_vic_bank()`          | Get current VIC bank               |
+| `screen_address(addr)`    | Set screen RAM address             |
+| `bitmap_address(addr)`    | Set bitmap address                 |
+| `charset_address(addr)`   | Set character set address          |
+
+#### Bitmap Pixel Operations
+
+```python
+# Initialize bitmap mode
+gfx_hires()
+bitmap_clear()
+
+# Draw pixels in hires mode (320x200)
+plot(160, 100)        # Set pixel at center
+unplot(160, 100)      # Clear pixel
+
+# Test if pixel is set
+if point(160, 100):
+    println("PIXEL SET")
+
+# Multicolor mode (160x200, 4 colors per cell)
+gfx_multicolor()
+plot_mc(80, 100, 2)   # Set pixel with color 2
+c: byte = point_mc(80, 100)  # Get pixel color (0-3)
+```
+
+| Function                      | Description                        |
+| ----------------------------- | ---------------------------------- |
+| `plot(x, y)`                  | Set pixel in hires mode            |
+| `unplot(x, y)`                | Clear pixel in hires mode          |
+| `point(x, y) -> bool`         | Test if pixel is set               |
+| `plot_mc(x, y, color)`        | Set multicolor pixel (0-3)         |
+| `point_mc(x, y) -> byte`      | Get multicolor pixel value         |
+| `bitmap_clear()`              | Clear entire bitmap                |
+| `bitmap_fill(pattern)`        | Fill bitmap with pattern           |
+
+#### Drawing Primitives
+
+```python
+# Draw lines
+line(0, 0, 319, 199)      # Diagonal line
+hline(0, 100, 320)        # Fast horizontal line
+vline(160, 0, 200)        # Fast vertical line
+
+# Draw rectangles
+rect(10, 10, 100, 80)     # Rectangle outline
+rect_fill(120, 10, 100, 80)  # Filled rectangle
+```
+
+| Function                           | Description                     |
+| ---------------------------------- | ------------------------------- |
+| `line(x1, y1, x2, y2)`             | Draw line (Bresenham)           |
+| `hline(x, y, length)`              | Fast horizontal line            |
+| `vline(x, y, length)`              | Fast vertical line              |
+| `rect(x, y, width, height)`        | Draw rectangle outline          |
+| `rect_fill(x, y, width, height)`   | Draw filled rectangle           |
+
+#### Cell Color Control
+
+In bitmap modes, each 8x8 pixel cell has foreground and background colors:
+
+```python
+# Set colors for cell at column 20, row 12
+cell_color(20, 12, 1, 0)    # White foreground, black background
+
+# Get cell colors (fg in high nibble, bg in low)
+colors: byte = get_cell_color(20, 12)
+
+# Work with color RAM directly
+color_ram(20, 12, 5)        # Set color RAM value
+c: byte = get_color_ram(20, 12)
+
+# Fill all cells with same colors
+fill_colors(1, 0)           # All cells: white on black
+fill_color_ram(1)           # Fill color RAM with 1
+```
+
+| Function                        | Description                        |
+| ------------------------------- | ---------------------------------- |
+| `cell_color(cx, cy, fg, bg)`    | Set cell foreground/background     |
+| `get_cell_color(cx, cy)`        | Get cell colors (fg<<4 | bg)       |
+| `color_ram(cx, cy, color)`      | Set color RAM at cell position     |
+| `get_color_ram(cx, cy)`         | Get color RAM value                |
+| `fill_colors(fg, bg)`           | Fill all cells with colors         |
+| `fill_color_ram(color)`         | Fill color RAM with value          |
+
+#### Hardware Scrolling
+
+```python
+# Set scroll offsets (0-7 pixels)
+scroll_x(4)    # Horizontal scroll
+scroll_y(2)    # Vertical scroll
+
+# Get current scroll values
+sx: byte = get_scroll_x()
+sy: byte = get_scroll_y()
+
+# Smooth scrolling example
+while true:
+    i: byte = 0
+    while i < 8:
+        scroll_x(i)
+        wait_raster(250)
+        i = i + 1
+```
+
+| Function          | Description                        |
+| ----------------- | ---------------------------------- |
+| `scroll_x(offset)`| Set horizontal scroll (0-7)        |
+| `scroll_y(offset)`| Set vertical scroll (0-7)          |
+| `get_scroll_x()`  | Get current horizontal scroll      |
+| `get_scroll_y()`  | Get current vertical scroll        |
+
+#### Raster Functions
+
+```python
+# Get current raster line (0-311 PAL)
+r: word = raster()
+
+# Wait for specific raster line (for timing)
+wait_raster(250)   # Wait for line 250
+
+# Raster bar effect
+while true:
+    wait_raster(100)
+    border_color(2)
+    wait_raster(150)
+    border_color(0)
+```
+
+| Function              | Description                       |
+| --------------------- | --------------------------------- |
+| `raster() -> word`    | Get current raster line (0-311)   |
+| `wait_raster(line)`   | Wait until raster reaches line    |
+
+#### Extended Background Color Mode (ECM)
+
+ECM mode allows 4 different background colors selected per character:
+
+```python
+# Set ECM backgrounds
+ecm_background(0, 0)    # Background 0 = black
+ecm_background(1, 2)    # Background 1 = red
+ecm_background(2, 5)    # Background 2 = green
+ecm_background(3, 6)    # Background 3 = blue
+
+# Get ECM background colors
+c: byte = get_ecm_background(1)  # Get background 1
+
+# Switch to ECM mode
+gfx_mode(GFX_TEXT_ECM)
+```
+
+Note: In ECM mode, only characters 0-63 are available. Bits 6-7 of the character code select which background color (0-3) to use.
+
+| Function                         | Description                      |
+| -------------------------------- | -------------------------------- |
+| `ecm_background(index, color)`   | Set ECM background (0-3)         |
+| `get_ecm_background(index)`      | Get ECM background color         |
+
+#### Graphics Mode Bits Reference
+
+| Mode | ECM | BMM | MCM | Name                    | Resolution  |
+| ---- | --- | --- | --- | ----------------------- | ----------- |
+| 0    | 0   | 0   | 0   | Standard Text           | 40x25 chars |
+| 1    | 0   | 0   | 1   | Multicolor Text         | 40x25 chars |
+| 2    | 0   | 1   | 0   | Standard Bitmap (Hires) | 320x200 px  |
+| 3    | 0   | 1   | 1   | Multicolor Bitmap       | 160x200 px  |
+| 4    | 1   | 0   | 0   | Extended Color Text     | 40x25 chars |
+
+- **ECM** = Bit 6 of $D011 (Extended Color Mode)
+- **BMM** = Bit 5 of $D011 (Bitmap Mode)
+- **MCM** = Bit 4 of $D016 (Multicolor Mode)
+
+#### Default Memory Layout
+
+| Address Range | Size   | Content                    |
+| ------------- | ------ | -------------------------- |
+| $0400-$07FF   | 1 KB   | Screen RAM (text/colors)   |
+| $2000-$3FFF   | 8 KB   | Bitmap data                |
+| $D800-$DBFF   | 1 KB   | Color RAM                  |
+
+---
+
 ## Example Programs
 
 ### Counter

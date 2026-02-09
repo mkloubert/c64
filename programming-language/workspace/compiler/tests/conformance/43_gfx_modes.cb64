@@ -1,0 +1,63 @@
+# Test VIC-II graphics mode switching functions
+# Expected output:
+# GFX MODES TEST
+# MODE=0
+# TEXT OK
+# MODE=2
+# HIRES OK
+# MODE=3
+# MC OK
+# BACK TO TEXT
+# MODE=0
+# COLS OK
+# ROWS OK
+# DONE
+
+def main():
+    println("GFX MODES TEST")
+
+    # Test get_gfx_mode - should start in text mode
+    m: byte = get_gfx_mode()
+    print("MODE=")
+    println(m)
+
+    # Verify text mode
+    if m == GFX_TEXT:
+        println("TEXT OK")
+
+    # Test gfx_hires - switch to hires bitmap mode
+    gfx_hires()
+    m = get_gfx_mode()
+    print("MODE=")
+    println(m)
+
+    if m == GFX_BITMAP:
+        println("HIRES OK")
+
+    # Test gfx_multicolor - switch to multicolor bitmap mode
+    gfx_multicolor()
+    m = get_gfx_mode()
+    print("MODE=")
+    println(m)
+
+    if m == GFX_BITMAP_MC:
+        println("MC OK")
+
+    # Test gfx_text - switch back to text mode
+    gfx_text()
+    println("BACK TO TEXT")
+    m = get_gfx_mode()
+    print("MODE=")
+    println(m)
+
+    # Test screen_columns
+    screen_columns(38)
+    screen_columns(40)
+    println("COLS OK")
+
+    # Test screen_rows
+    screen_rows(24)
+    screen_rows(25)
+    println("ROWS OK")
+
+    println("DONE")

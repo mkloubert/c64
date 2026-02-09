@@ -1,0 +1,50 @@
+# Test drawing primitives (lines, rectangles)
+# Expected output:
+# DRAWING PRIMITIVES TEST
+# HLINE OK
+# VLINE OK
+# LINE OK
+# RECT OK
+# RECT FILL OK
+# DONE
+
+def main():
+    println("DRAWING PRIMITIVES TEST")
+
+    # Clear the bitmap first
+    bitmap_clear()
+
+    # Test horizontal line
+    hline(10, 10, 20)
+    println("HLINE OK")
+
+    # Verify a pixel in the line is set
+    p: bool = point(15, 10)
+    if not p:
+        println("HLINE FAILED")
+
+    # Test vertical line
+    vline(50, 20, 10)
+    println("VLINE OK")
+
+    # Verify a pixel in the line is set
+    p = point(50, 25)
+    if not p:
+        println("VLINE FAILED")
+
+    # Test diagonal line
+    line(100, 50, 120, 70)
+    println("LINE OK")
+
+    # Test rectangle outline
+    rect(150, 80, 30, 20)
+    println("RECT OK")
+
+    # Test filled rectangle
+    rect_fill(200, 100, 20, 15)
+    println("RECT FILL OK")
+
+    # Clear bitmap before returning
+    bitmap_clear()
+
+    println("DONE")

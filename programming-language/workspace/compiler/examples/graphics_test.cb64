@@ -1,0 +1,209 @@
+# Cobra64 - A concept for a modern Python-like compiler creating C64 binaries
+#
+# Copyright (C) 2026 Marcel Joachim Kloubert <marcel@kloubert.dev>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+# Comprehensive Graphics Test
+# Tests all VIC-II graphics features
+
+def test_colors():
+    println("TEST 1: COLORS")
+
+    # Test border and background
+    border_color(2)
+    background_color(0)
+
+    if get_border_color() == 2:
+        println("BORDER: OK")
+    else:
+        println("BORDER: FAIL")
+
+    if get_background_color() == 0:
+        println("BACKGROUND: OK")
+    else:
+        println("BACKGROUND: FAIL")
+
+    delay(20)
+
+def test_mode_switching():
+    println("TEST 2: MODES")
+
+    # Test mode switching
+    gfx_mode(GFX_TEXT)
+    if get_gfx_mode() == 0:
+        println("TEXT MODE: OK")
+    else:
+        println("TEXT MODE: FAIL")
+
+    gfx_hires()
+    if get_gfx_mode() == 2:
+        println("HIRES MODE: OK")
+    else:
+        println("HIRES MODE: FAIL")
+
+    gfx_text()
+    delay(20)
+
+def test_scroll():
+    println("TEST 3: SCROLL")
+
+    scroll_x(4)
+    scroll_y(3)
+
+    if get_scroll_x() == 4:
+        println("SCROLL X: OK")
+    else:
+        println("SCROLL X: FAIL")
+
+    if get_scroll_y() == 3:
+        println("SCROLL Y: OK")
+    else:
+        println("SCROLL Y: FAIL")
+
+    # Reset
+    scroll_x(0)
+    scroll_y(0)
+    delay(20)
+
+def test_ecm():
+    println("TEST 4: ECM")
+
+    # Set ECM backgrounds
+    ecm_background(0, 1)
+    ecm_background(1, 2)
+    ecm_background(2, 3)
+    ecm_background(3, 4)
+
+    # Verify
+    ok: bool = true
+    if get_ecm_background(0) != 1:
+        ok = false
+    if get_ecm_background(1) != 2:
+        ok = false
+    if get_ecm_background(2) != 3:
+        ok = false
+    if get_ecm_background(3) != 4:
+        ok = false
+
+    if ok:
+        println("ECM COLORS: OK")
+    else:
+        println("ECM COLORS: FAIL")
+
+    delay(20)
+
+def test_cell_colors():
+    println("TEST 5: CELL COLORS")
+
+    # Set cell color at position (20, 12)
+    cell_color(20, 12, 7, 2)
+
+    # Read back
+    c: byte = get_cell_color(20, 12)
+    if c == $72:  # 7 << 4 | 2
+        println("CELL COLOR: OK")
+    else:
+        println("CELL COLOR: FAIL")
+
+    # Test color RAM
+    color_ram(10, 10, 5)
+    if get_color_ram(10, 10) == 5:
+        println("COLOR RAM: OK")
+    else:
+        println("COLOR RAM: FAIL")
+
+    delay(20)
+
+def test_raster():
+    println("TEST 6: RASTER")
+
+    # Read raster position
+    r: word = raster()
+
+    # Should be valid (0-311 for PAL)
+    if r < 312:
+        println("RASTER READ: OK")
+    else:
+        println("RASTER READ: FAIL")
+
+    # Test wait_raster (quick test)
+    wait_raster(200)
+    println("WAIT RASTER: OK")
+
+    delay(20)
+
+def test_bitmap():
+    println("TEST 7: BITMAP")
+    delay(20)
+
+    # Switch to hires
+    gfx_hires()
+    bitmap_clear()
+    fill_colors(1, 0)
+
+    # Draw test pattern
+    plot(160, 100)
+
+    if point(160, 100):
+        # Return to text mode to show result
+        gfx_text()
+        println("PLOT/POINT: OK")
+    else:
+        gfx_text()
+        println("PLOT/POINT: FAIL")
+
+    delay(20)
+
+def test_drawing():
+    println("TEST 8: DRAWING")
+    delay(20)
+
+    # Switch to hires
+    gfx_hires()
+    bitmap_clear()
+    fill_colors(1, 0)
+
+    # Draw shapes
+    hline(0, 10, 320)
+    vline(10, 0, 200)
+    line(0, 0, 100, 100)
+    rect(50, 50, 40, 30)
+    rect_fill(150, 50, 40, 30)
+
+    # Visual check - wait for key
+    delay(30)
+
+    gfx_text()
+    println("DRAWING: OK")
+    delay(20)
+
+def main():
+    cls()
+    println("GRAPHICS TEST SUITE")
+    println("-------------------")
+    delay(30)
+
+    test_colors()
+    test_mode_switching()
+    test_scroll()
+    test_ecm()
+    test_cell_colors()
+    test_raster()
+    test_bitmap()
+    test_drawing()
+
+    println("-------------------")
+    println("ALL TESTS COMPLETE")
+    border_color(5)

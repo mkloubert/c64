@@ -400,6 +400,240 @@ impl BuiltinRegistry for Analyzer {
         self.define_builtin_constant("SID_FILTER_CUTOFF_HI", Type::Word);
         self.define_builtin_constant("SID_FILTER_RESONANCE", Type::Word);
         self.define_builtin_constant("SID_VOLUME", Type::Word);
+
+        // =====================================================================
+        // VIC-II Graphics Constants
+        // =====================================================================
+
+        // Control registers
+        self.define_builtin_constant("VIC_CONTROL1", Type::Word);
+        self.define_builtin_constant("VIC_CONTROL2", Type::Word);
+        self.define_builtin_constant("VIC_MEMORY", Type::Word);
+        self.define_builtin_constant("VIC_RASTER", Type::Word);
+
+        // Color registers
+        self.define_builtin_constant("VIC_BORDER", Type::Word);
+        self.define_builtin_constant("VIC_BACKGROUND", Type::Word);
+        self.define_builtin_constant("VIC_BACKGROUND0", Type::Word);
+        self.define_builtin_constant("VIC_BACKGROUND1", Type::Word);
+        self.define_builtin_constant("VIC_BACKGROUND2", Type::Word);
+        self.define_builtin_constant("VIC_BACKGROUND3", Type::Word);
+
+        // Color RAM constant
+        self.define_builtin_constant("COLOR_RAM", Type::Word);
+
+        // Graphics mode constants
+        self.define_builtin_constant("GFX_TEXT", Type::Byte);
+        self.define_builtin_constant("GFX_TEXT_MC", Type::Byte);
+        self.define_builtin_constant("GFX_BITMAP", Type::Byte);
+        self.define_builtin_constant("GFX_BITMAP_MC", Type::Byte);
+        self.define_builtin_constant("GFX_TEXT_ECM", Type::Byte);
+
+        // VIC bank constants
+        self.define_builtin_constant("VIC_BANK0", Type::Byte);
+        self.define_builtin_constant("VIC_BANK1", Type::Byte);
+        self.define_builtin_constant("VIC_BANK2", Type::Byte);
+        self.define_builtin_constant("VIC_BANK3", Type::Byte);
+
+        // Raster constants
+        self.define_builtin_constant("RASTER_TOP", Type::Word);
+        self.define_builtin_constant("RASTER_BOTTOM", Type::Word);
+        self.define_builtin_constant("RASTER_MAX_PAL", Type::Word);
+        self.define_builtin_constant("RASTER_MAX_NTSC", Type::Word);
+
+        // =====================================================================
+        // VIC-II Graphics Functions
+        // =====================================================================
+
+        // Basic color control
+        // border_color(color) - set border color
+        self.define_builtin("border_color", vec![Type::Byte], None);
+
+        // background_color(color) - set background color
+        self.define_builtin("background_color", vec![Type::Byte], None);
+
+        // get_border_color() -> byte - get current border color
+        self.define_builtin("get_border_color", vec![], Some(Type::Byte));
+
+        // get_background_color() -> byte - get current background color
+        self.define_builtin("get_background_color", vec![], Some(Type::Byte));
+
+        // Graphics mode switching
+        // gfx_mode(mode) - switch to graphics mode (0-4)
+        self.define_builtin("gfx_mode", vec![Type::Byte], None);
+
+        // get_gfx_mode() -> byte - get current graphics mode
+        self.define_builtin("get_gfx_mode", vec![], Some(Type::Byte));
+
+        // Shortcut mode functions
+        // gfx_text() - switch to standard text mode
+        self.define_builtin("gfx_text", vec![], None);
+
+        // gfx_hires() - switch to hires bitmap mode (320x200)
+        self.define_builtin("gfx_hires", vec![], None);
+
+        // gfx_multicolor() - switch to multicolor bitmap mode (160x200)
+        self.define_builtin("gfx_multicolor", vec![], None);
+
+        // Screen dimension control
+        // screen_columns(cols) - set 38 or 40 column mode
+        self.define_builtin("screen_columns", vec![Type::Byte], None);
+
+        // screen_rows(rows) - set 24 or 25 row mode
+        self.define_builtin("screen_rows", vec![Type::Byte], None);
+
+        // Memory configuration
+        // vic_bank(bank) - set VIC memory bank (0-3)
+        self.define_builtin("vic_bank", vec![Type::Byte], None);
+
+        // get_vic_bank() -> byte - get current VIC bank
+        self.define_builtin("get_vic_bank", vec![], Some(Type::Byte));
+
+        // screen_address(addr) - set screen RAM address (must be within current bank)
+        self.define_builtin("screen_address", vec![Type::Word], None);
+
+        // bitmap_address(addr) - set bitmap address (0 or 8192 within bank)
+        self.define_builtin("bitmap_address", vec![Type::Word], None);
+
+        // charset_address(addr) - set character set address
+        self.define_builtin("charset_address", vec![Type::Word], None);
+
+        // =====================================================================
+        // Bitmap Graphics Functions
+        // =====================================================================
+
+        // Hires pixel operations (320x200, 1 bit per pixel)
+        // plot(x, y) - set pixel at (x, y) in hires mode
+        self.define_builtin("plot", vec![Type::Word, Type::Byte], None);
+
+        // unplot(x, y) - clear pixel at (x, y) in hires mode
+        self.define_builtin("unplot", vec![Type::Word, Type::Byte], None);
+
+        // point(x, y) -> bool - test if pixel is set at (x, y)
+        self.define_builtin("point", vec![Type::Word, Type::Byte], Some(Type::Bool));
+
+        // Multicolor pixel operations (160x200, 2 bits per pixel)
+        // plot_mc(x, y, color) - set pixel at (x, y) with color 0-3
+        self.define_builtin("plot_mc", vec![Type::Byte, Type::Byte, Type::Byte], None);
+
+        // point_mc(x, y) -> byte - get pixel color (0-3) at (x, y)
+        self.define_builtin("point_mc", vec![Type::Byte, Type::Byte], Some(Type::Byte));
+
+        // Bitmap initialization
+        // bitmap_clear() - clear entire bitmap (fill with 0)
+        self.define_builtin("bitmap_clear", vec![], None);
+
+        // bitmap_fill(pattern) - fill entire bitmap with pattern byte
+        self.define_builtin("bitmap_fill", vec![Type::Byte], None);
+
+        // =====================================================================
+        // Drawing Primitives
+        // =====================================================================
+
+        // Line drawing (Bresenham's algorithm)
+        // line(x1, y1, x2, y2) - draw line in hires mode
+        self.define_builtin(
+            "line",
+            vec![Type::Word, Type::Byte, Type::Word, Type::Byte],
+            None,
+        );
+
+        // Optimized horizontal/vertical lines
+        // hline(x, y, length) - fast horizontal line
+        self.define_builtin("hline", vec![Type::Word, Type::Byte, Type::Word], None);
+
+        // vline(x, y, length) - fast vertical line
+        self.define_builtin("vline", vec![Type::Word, Type::Byte, Type::Byte], None);
+
+        // Rectangle drawing
+        // rect(x, y, width, height) - draw rectangle outline
+        self.define_builtin(
+            "rect",
+            vec![Type::Word, Type::Byte, Type::Word, Type::Byte],
+            None,
+        );
+
+        // rect_fill(x, y, width, height) - draw filled rectangle
+        self.define_builtin(
+            "rect_fill",
+            vec![Type::Word, Type::Byte, Type::Word, Type::Byte],
+            None,
+        );
+
+        // =====================================================================
+        // Cell Color Control
+        // =====================================================================
+
+        // cell_color(cx, cy, fg, bg) - set cell foreground/background colors
+        // cx: 0-39, cy: 0-24, fg/bg: 0-15
+        // Stores fg in high nibble, bg in low nibble of screen RAM
+        self.define_builtin(
+            "cell_color",
+            vec![Type::Byte, Type::Byte, Type::Byte, Type::Byte],
+            None,
+        );
+
+        // get_cell_color(cx, cy) -> byte - get cell colors (fg in high nibble, bg in low)
+        self.define_builtin("get_cell_color", vec![Type::Byte, Type::Byte], Some(Type::Byte));
+
+        // color_ram(cx, cy, color) - set color RAM at cell position
+        self.define_builtin(
+            "color_ram",
+            vec![Type::Byte, Type::Byte, Type::Byte],
+            None,
+        );
+
+        // get_color_ram(cx, cy) -> byte - get color RAM value at cell position
+        self.define_builtin("get_color_ram", vec![Type::Byte, Type::Byte], Some(Type::Byte));
+
+        // fill_colors(fg, bg) - fill all screen RAM cells with same fg/bg colors
+        self.define_builtin("fill_colors", vec![Type::Byte, Type::Byte], None);
+
+        // fill_color_ram(color) - fill all color RAM with same value
+        self.define_builtin("fill_color_ram", vec![Type::Byte], None);
+
+        // =====================================================================
+        // Hardware Scrolling
+        // =====================================================================
+
+        // scroll_x(offset) - set horizontal scroll (0-7 pixels)
+        // Modifies bits 0-2 of $D016, preserves other bits
+        self.define_builtin("scroll_x", vec![Type::Byte], None);
+
+        // scroll_y(offset) - set vertical scroll (0-7 pixels)
+        // Modifies bits 0-2 of $D011, preserves other bits
+        self.define_builtin("scroll_y", vec![Type::Byte], None);
+
+        // get_scroll_x() -> byte - get current horizontal scroll (0-7)
+        self.define_builtin("get_scroll_x", vec![], Some(Type::Byte));
+
+        // get_scroll_y() -> byte - get current vertical scroll (0-7)
+        self.define_builtin("get_scroll_y", vec![], Some(Type::Byte));
+
+        // =====================================================================
+        // Raster Functions
+        // =====================================================================
+
+        // raster() -> word - get current raster line (0-311 PAL, 0-261 NTSC)
+        // Combines $D012 (bits 0-7) with bit 7 of $D011 (bit 8)
+        self.define_builtin("raster", vec![], Some(Type::Word));
+
+        // wait_raster(line: word) - wait until raster reaches specific line
+        // Busy-waits comparing current raster to target
+        self.define_builtin("wait_raster", vec![Type::Word], None);
+
+        // =====================================================================
+        // Extended Background Color Mode (ECM)
+        // =====================================================================
+
+        // ecm_background(index, color) - set ECM background color
+        // index 0-3 maps to $D021-$D024
+        // Note: In ECM mode, only characters 0-63 are available
+        // (bits 6-7 of character code select which background color to use)
+        self.define_builtin("ecm_background", vec![Type::Byte, Type::Byte], None);
+
+        // get_ecm_background(index) -> byte - get ECM background color
+        self.define_builtin("get_ecm_background", vec![Type::Byte], Some(Type::Byte));
     }
 
     fn define_builtin(&mut self, name: &str, params: Vec<Type>, return_type: Option<Type>) {

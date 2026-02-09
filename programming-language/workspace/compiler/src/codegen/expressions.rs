@@ -29,7 +29,7 @@ use super::binary_ops::BinaryOpsEmitter;
 use super::conversions::TypeConversions;
 use super::emit::EmitHelpers;
 use super::functions::FunctionCallEmitter;
-use super::mos6510::{colors, opcodes, sid, sprite, zeropage};
+use super::mos6510::{c64, colors, opcodes, sid, sprite, vic, zeropage};
 use super::strings::StringManager;
 use super::type_inference::TypeInference;
 use super::types::{decimal_string_to_binary16, decimal_string_to_fixed};
@@ -159,6 +159,46 @@ fn get_builtin_constant(name: &str) -> Option<(u16, bool)> {
         "SID_FILTER_CUTOFF_HI" => Some((sid::FILTER_CUTOFF_HI, true)),
         "SID_FILTER_RESONANCE" => Some((sid::FILTER_RESONANCE, true)),
         "SID_VOLUME" => Some((sid::FILTER_MODE_VOLUME, true)),
+
+        // =====================================================================
+        // VIC-II Graphics Registers
+        // =====================================================================
+
+        // Control registers
+        "VIC_CONTROL1" => Some((vic::CONTROL1, true)),
+        "VIC_CONTROL2" => Some((vic::CONTROL2, true)),
+        "VIC_MEMORY" => Some((vic::MEMORY, true)),
+        "VIC_RASTER" => Some((vic::RASTER, true)),
+
+        // Color registers
+        "VIC_BORDER" => Some((vic::BORDER, true)),
+        "VIC_BACKGROUND" => Some((vic::BACKGROUND0, true)),
+        "VIC_BACKGROUND0" => Some((vic::BACKGROUND0, true)),
+        "VIC_BACKGROUND1" => Some((vic::BACKGROUND1, true)),
+        "VIC_BACKGROUND2" => Some((vic::BACKGROUND2, true)),
+        "VIC_BACKGROUND3" => Some((vic::BACKGROUND3, true)),
+
+        // Color RAM constant
+        "COLOR_RAM" => Some((c64::COLOR_RAM, true)),
+
+        // Graphics mode constants (byte values)
+        "GFX_TEXT" => Some((vic::MODE_TEXT as u16, false)),
+        "GFX_TEXT_MC" => Some((vic::MODE_TEXT_MC as u16, false)),
+        "GFX_BITMAP" => Some((vic::MODE_BITMAP as u16, false)),
+        "GFX_BITMAP_MC" => Some((vic::MODE_BITMAP_MC as u16, false)),
+        "GFX_TEXT_ECM" => Some((vic::MODE_TEXT_ECM as u16, false)),
+
+        // VIC bank constants (byte values)
+        "VIC_BANK0" => Some((vic::BANK0 as u16, false)),
+        "VIC_BANK1" => Some((vic::BANK1 as u16, false)),
+        "VIC_BANK2" => Some((vic::BANK2 as u16, false)),
+        "VIC_BANK3" => Some((vic::BANK3 as u16, false)),
+
+        // Raster constants (word values)
+        "RASTER_TOP" => Some((vic::RASTER_TOP, true)),
+        "RASTER_BOTTOM" => Some((vic::RASTER_BOTTOM, true)),
+        "RASTER_MAX_PAL" => Some((vic::RASTER_MAX_PAL, true)),
+        "RASTER_MAX_NTSC" => Some((vic::RASTER_MAX_NTSC, true)),
 
         _ => None,
     }

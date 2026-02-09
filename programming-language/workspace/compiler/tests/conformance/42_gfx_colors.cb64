@@ -1,0 +1,50 @@
+# Test VIC-II graphics color functions and constants
+# Expected output:
+# GFX COLORS TEST
+# BORDER SET
+# BG SET
+# BORDER=2
+# BG=6
+# CONSTS OK
+# MODES OK
+# BANKS OK
+# DONE
+
+def main():
+    println("GFX COLORS TEST")
+
+    # Test border_color
+    border_color(COLOR_RED)
+    println("BORDER SET")
+
+    # Test background_color
+    background_color(COLOR_BLUE)
+    println("BG SET")
+
+    # Test get_border_color
+    b: byte = get_border_color()
+    print("BORDER=")
+    println(b)
+
+    # Test get_background_color
+    bg: byte = get_background_color()
+    print("BG=")
+    println(bg)
+
+    # Test VIC-II register constants
+    if VIC_BORDER == $D020 and VIC_BACKGROUND == $D021:
+        println("CONSTS OK")
+
+    # Test graphics mode constants
+    if GFX_TEXT == 0 and GFX_BITMAP == 2 and GFX_BITMAP_MC == 3:
+        println("MODES OK")
+
+    # Test VIC bank constants
+    if VIC_BANK0 == 0 and VIC_BANK3 == 3:
+        println("BANKS OK")
+
+    # Restore default colors
+    border_color(COLOR_LIGHT_BLUE)
+    background_color(COLOR_BLUE)
+
+    println("DONE")

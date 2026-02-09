@@ -27,7 +27,7 @@
 
 use super::emit::EmitHelpers;
 use super::labels::LabelManager;
-use super::mos6510::{kernal, opcodes, zeropage};
+use super::mos6510::{kernal, opcodes, vic, zeropage};
 use super::string_runtime::StringRuntime;
 use super::CodeGenerator;
 
@@ -80,6 +80,37 @@ pub trait RuntimeEmitter {
 
     // Sound routines
     fn emit_note_to_freq_routine(&mut self);
+
+    // Graphics routines
+    fn emit_gfx_mode_routine(&mut self);
+    fn emit_get_gfx_mode_routine(&mut self);
+
+    // Bitmap graphics routines
+    fn emit_plot_routine(&mut self);
+    fn emit_unplot_routine(&mut self);
+    fn emit_point_routine(&mut self);
+    fn emit_plot_mc_routine(&mut self);
+    fn emit_point_mc_routine(&mut self);
+    fn emit_bitmap_fill_routine(&mut self);
+    fn emit_calc_bitmap_addr_routine(&mut self);
+
+    // Drawing primitives
+    fn emit_line_routine(&mut self);
+    fn emit_hline_routine(&mut self);
+    fn emit_vline_routine(&mut self);
+    fn emit_rect_routine(&mut self);
+    fn emit_rect_fill_routine(&mut self);
+
+    // Cell color control
+    fn emit_cell_color_routine(&mut self);
+    fn emit_get_cell_color_routine(&mut self);
+    fn emit_color_ram_routine(&mut self);
+    fn emit_get_color_ram_routine(&mut self);
+    fn emit_fill_colors_routine(&mut self);
+    fn emit_fill_color_ram_routine(&mut self);
+
+    // Raster functions
+    fn emit_wait_raster_routine(&mut self);
 }
 
 impl RuntimeEmitter for CodeGenerator {
@@ -138,6 +169,37 @@ impl RuntimeEmitter for CodeGenerator {
 
         // Sound routines
         self.emit_note_to_freq_routine();
+
+        // Graphics routines
+        self.emit_gfx_mode_routine();
+        self.emit_get_gfx_mode_routine();
+
+        // Bitmap graphics routines
+        self.emit_calc_bitmap_addr_routine();
+        self.emit_plot_routine();
+        self.emit_unplot_routine();
+        self.emit_point_routine();
+        self.emit_plot_mc_routine();
+        self.emit_point_mc_routine();
+        self.emit_bitmap_fill_routine();
+
+        // Drawing primitives
+        self.emit_hline_routine();
+        self.emit_vline_routine();
+        self.emit_line_routine();
+        self.emit_rect_routine();
+        self.emit_rect_fill_routine();
+
+        // Cell color control
+        self.emit_cell_color_routine();
+        self.emit_get_cell_color_routine();
+        self.emit_color_ram_routine();
+        self.emit_get_color_ram_routine();
+        self.emit_fill_colors_routine();
+        self.emit_fill_color_ram_routine();
+
+        // Raster functions
+        self.emit_wait_raster_routine();
     }
 
     /// Emit print string routine.
@@ -2060,6 +2122,1467 @@ impl RuntimeEmitter for CodeGenerator {
         self.emit_byte(zeropage::TMP1);
         self.emit_byte(opcodes::LDX_ZP);
         self.emit_byte(zeropage::TMP1_HI);
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit graphics mode switching routine.
+    ///
+    /// Input: A = mode (0-4)
+    /// - Mode 0: ECM=0, BMM=0, MCM=0 (Standard Text)
+    /// - Mode 1: ECM=0, BMM=0, MCM=1 (Multicolor Text)
+    /// - Mode 2: ECM=0, BMM=1, MCM=0 (Hires Bitmap)
+    /// - Mode 3: ECM=0, BMM=1, MCM=1 (Multicolor Bitmap)
+    /// - Mode 4: ECM=1, BMM=0, MCM=0 (ECM Text)
+    ///
+    /// $D011 bits: Bit 5 = BMM, Bit 6 = ECM
+    /// $D016 bits: Bit 4 = MCM
+    fn emit_gfx_mode_routine(&mut self) {
+        self.define_label("__gfx_mode");
+        self.runtime_addresses
+            .insert("gfx_mode".to_string(), self.current_address);
+
+        // Save mode in TMP1
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+
+        // Clear ECM, BMM bits in $D011 (bits 5 and 6)
+        self.emit_abs(opcodes::LDA_ABS, vic::CONTROL1);
+        self.emit_imm(opcodes::AND_IMM, !(vic::ECM | vic::BMM));
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2); // Store modified $D011 value
+
+        // Clear MCM bit in $D016 (bit 4)
+        self.emit_abs(opcodes::LDA_ABS, vic::CONTROL2);
+        self.emit_imm(opcodes::AND_IMM, !vic::MCM);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP3); // Store modified $D016 value
+
+        // Check mode and set appropriate bits
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+
+        // Mode 0: do nothing (all bits already cleared)
+        self.emit_imm(opcodes::CMP_IMM, 0);
+        self.emit_branch(opcodes::BEQ, "__gfx_mode_apply");
+
+        // Mode 1: set MCM
+        self.emit_imm(opcodes::CMP_IMM, 1);
+        self.emit_branch(opcodes::BNE, "__gfx_mode_check2");
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_imm(opcodes::ORA_IMM, vic::MCM);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_jmp("__gfx_mode_apply");
+
+        // Mode 2: set BMM
+        self.define_label("__gfx_mode_check2");
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_imm(opcodes::CMP_IMM, 2);
+        self.emit_branch(opcodes::BNE, "__gfx_mode_check3");
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_imm(opcodes::ORA_IMM, vic::BMM);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_jmp("__gfx_mode_apply");
+
+        // Mode 3: set BMM and MCM
+        self.define_label("__gfx_mode_check3");
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_imm(opcodes::CMP_IMM, 3);
+        self.emit_branch(opcodes::BNE, "__gfx_mode_check4");
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_imm(opcodes::ORA_IMM, vic::BMM);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_imm(opcodes::ORA_IMM, vic::MCM);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_jmp("__gfx_mode_apply");
+
+        // Mode 4: set ECM
+        self.define_label("__gfx_mode_check4");
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_imm(opcodes::ORA_IMM, vic::ECM);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+
+        // Apply the changes
+        self.define_label("__gfx_mode_apply");
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_abs(opcodes::STA_ABS, vic::CONTROL1);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_abs(opcodes::STA_ABS, vic::CONTROL2);
+
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit get graphics mode routine.
+    ///
+    /// Output: A = current mode (0-4)
+    /// Reads ECM, BMM from $D011 and MCM from $D016 to determine mode.
+    fn emit_get_gfx_mode_routine(&mut self) {
+        self.define_label("__get_gfx_mode");
+        self.runtime_addresses
+            .insert("get_gfx_mode".to_string(), self.current_address);
+
+        // Read $D011 and extract ECM (bit 6) and BMM (bit 5)
+        self.emit_abs(opcodes::LDA_ABS, vic::CONTROL1);
+        self.emit_imm(opcodes::AND_IMM, vic::ECM | vic::BMM);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1); // TMP1 = ECM|BMM bits
+
+        // Read $D016 and extract MCM (bit 4)
+        self.emit_abs(opcodes::LDA_ABS, vic::CONTROL2);
+        self.emit_imm(opcodes::AND_IMM, vic::MCM);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2); // TMP2 = MCM bit
+
+        // Check for ECM mode first (ECM=1, BMM=0, MCM=0)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_imm(opcodes::CMP_IMM, vic::ECM);
+        self.emit_branch(opcodes::BNE, "__get_gfx_not_ecm");
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_branch(opcodes::BNE, "__get_gfx_not_ecm");
+        // Mode 4: ECM text
+        self.emit_imm(opcodes::LDA_IMM, 4);
+        self.emit_byte(opcodes::RTS);
+
+        self.define_label("__get_gfx_not_ecm");
+        // Check for BMM (bitmap modes)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_imm(opcodes::AND_IMM, vic::BMM);
+        self.emit_branch(opcodes::BEQ, "__get_gfx_text");
+
+        // Bitmap mode - check MCM
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_branch(opcodes::BNE, "__get_gfx_mode3");
+        // Mode 2: Hires bitmap
+        self.emit_imm(opcodes::LDA_IMM, 2);
+        self.emit_byte(opcodes::RTS);
+
+        self.define_label("__get_gfx_mode3");
+        // Mode 3: Multicolor bitmap
+        self.emit_imm(opcodes::LDA_IMM, 3);
+        self.emit_byte(opcodes::RTS);
+
+        // Text mode - check MCM
+        self.define_label("__get_gfx_text");
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_branch(opcodes::BNE, "__get_gfx_mode1");
+        // Mode 0: Standard text
+        self.emit_imm(opcodes::LDA_IMM, 0);
+        self.emit_byte(opcodes::RTS);
+
+        self.define_label("__get_gfx_mode1");
+        // Mode 1: Multicolor text
+        self.emit_imm(opcodes::LDA_IMM, 1);
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit bitmap address calculation routine.
+    ///
+    /// Input: TMP1/TMP1_HI = X coordinate (0-319), TMP3 = Y coordinate (0-199)
+    /// Output: TMP2/TMP2_HI = byte address in bitmap, Y = bit position (0-7)
+    ///
+    /// Bitmap layout: 8 bytes per character cell, row-by-row within cell
+    /// offset = (y / 8) * 320 + (x / 8) * 8 + (y % 8)
+    /// bit = 7 - (x % 8)
+    fn emit_calc_bitmap_addr_routine(&mut self) {
+        self.define_label("__calc_bitmap_addr");
+        self.runtime_addresses
+            .insert("calc_bitmap_addr".to_string(), self.current_address);
+
+        // Calculate (y / 8) * 320
+        // = (y / 8) * 256 + (y / 8) * 64
+        // = (y >> 3) << 8 + (y >> 3) << 6
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3); // A = Y
+        self.emit_byte(opcodes::LSR_ACC); // A = Y >> 1
+        self.emit_byte(opcodes::LSR_ACC); // A = Y >> 2
+        self.emit_byte(opcodes::LSR_ACC); // A = Y >> 3 = cell_y
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP4); // TMP4 = cell_y
+
+        // cell_y * 320 = cell_y * 256 + cell_y * 64
+        // High byte = cell_y, Low byte = 0 for *256
+        // Then add cell_y * 64 = cell_y << 6
+        self.emit_imm(opcodes::LDA_IMM, 0);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2); // TMP2 = 0 (low byte)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP4);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2_HI); // TMP2_HI = cell_y (this is cell_y * 256)
+
+        // Add cell_y * 64
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP4);
+        self.emit_byte(opcodes::ASL_ACC); // *2
+        self.emit_byte(opcodes::ASL_ACC); // *4
+        self.emit_byte(opcodes::ASL_ACC); // *8
+        self.emit_byte(opcodes::ASL_ACC); // *16
+        self.emit_byte(opcodes::ASL_ACC); // *32
+        self.emit_byte(opcodes::ASL_ACC); // *64
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_branch(opcodes::BCC, "__cba_no_carry1");
+        self.emit_byte(opcodes::INC_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+        self.define_label("__cba_no_carry1");
+
+        // Now add (x / 8) * 8 = x & $FFF8
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1); // X low
+        self.emit_imm(opcodes::AND_IMM, 0xF8); // Mask to multiple of 8
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1_HI); // X high
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+
+        // Add (y % 8)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_imm(opcodes::AND_IMM, 0x07);
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_branch(opcodes::BCC, "__cba_no_carry2");
+        self.emit_byte(opcodes::INC_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+        self.define_label("__cba_no_carry2");
+
+        // Add bitmap base address ($2000)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+        self.emit_byte(opcodes::CLC);
+        self.emit_imm(opcodes::ADC_IMM, 0x20); // Add $20 to high byte
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+
+        // Calculate bit position: Y = 7 - (x % 8)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_imm(opcodes::AND_IMM, 0x07);
+        self.emit_byte(opcodes::EOR_IMM);
+        self.emit_byte(0x07); // 7 - (x % 8)
+        self.emit_byte(opcodes::TAY);
+
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit plot routine for hires mode.
+    ///
+    /// Input: TMP1/TMP1_HI = X (0-319), TMP3 = Y (0-199)
+    fn emit_plot_routine(&mut self) {
+        self.define_label("__plot");
+        self.runtime_addresses
+            .insert("plot".to_string(), self.current_address);
+
+        // Calculate bitmap address
+        self.emit_jsr_label("__calc_bitmap_addr");
+
+        // Create bit mask from Y register (bit position)
+        self.emit_imm(opcodes::LDA_IMM, 0x80);
+        self.define_label("__plot_shift");
+        self.emit_imm(opcodes::CPY_IMM, 0);
+        self.emit_branch(opcodes::BEQ, "__plot_set");
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::DEY);
+        self.emit_jmp("__plot_shift");
+
+        self.define_label("__plot_set");
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP4); // TMP4 = bit mask
+
+        // OR the bit into the bitmap byte
+        self.emit_imm(opcodes::LDY_IMM, 0);
+        self.emit_byte(opcodes::LDA_IZY);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::ORA_ZP);
+        self.emit_byte(zeropage::TMP4);
+        self.emit_byte(opcodes::STA_IZY);
+        self.emit_byte(zeropage::TMP2);
+
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit unplot routine for hires mode.
+    ///
+    /// Input: TMP1/TMP1_HI = X (0-319), TMP3 = Y (0-199)
+    fn emit_unplot_routine(&mut self) {
+        self.define_label("__unplot");
+        self.runtime_addresses
+            .insert("unplot".to_string(), self.current_address);
+
+        // Calculate bitmap address
+        self.emit_jsr_label("__calc_bitmap_addr");
+
+        // Create inverted bit mask from Y register
+        self.emit_imm(opcodes::LDA_IMM, 0x80);
+        self.define_label("__unplot_shift");
+        self.emit_imm(opcodes::CPY_IMM, 0);
+        self.emit_branch(opcodes::BEQ, "__unplot_clear");
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::DEY);
+        self.emit_jmp("__unplot_shift");
+
+        self.define_label("__unplot_clear");
+        self.emit_byte(opcodes::EOR_IMM);
+        self.emit_byte(0xFF); // Invert mask
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP4);
+
+        // AND the inverted bit into the bitmap byte
+        self.emit_imm(opcodes::LDY_IMM, 0);
+        self.emit_byte(opcodes::LDA_IZY);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::AND_ZP);
+        self.emit_byte(zeropage::TMP4);
+        self.emit_byte(opcodes::STA_IZY);
+        self.emit_byte(zeropage::TMP2);
+
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit point routine for hires mode.
+    ///
+    /// Input: TMP1/TMP1_HI = X (0-319), TMP3 = Y (0-199)
+    /// Output: A = 0 (not set) or 1 (set)
+    fn emit_point_routine(&mut self) {
+        self.define_label("__point");
+        self.runtime_addresses
+            .insert("point".to_string(), self.current_address);
+
+        // Calculate bitmap address
+        self.emit_jsr_label("__calc_bitmap_addr");
+
+        // Create bit mask from Y register
+        self.emit_imm(opcodes::LDA_IMM, 0x80);
+        self.define_label("__point_shift");
+        self.emit_imm(opcodes::CPY_IMM, 0);
+        self.emit_branch(opcodes::BEQ, "__point_test");
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::DEY);
+        self.emit_jmp("__point_shift");
+
+        self.define_label("__point_test");
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP4);
+
+        // Test the bit
+        self.emit_imm(opcodes::LDY_IMM, 0);
+        self.emit_byte(opcodes::LDA_IZY);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::AND_ZP);
+        self.emit_byte(zeropage::TMP4);
+        self.emit_branch(opcodes::BEQ, "__point_zero");
+        self.emit_imm(opcodes::LDA_IMM, 1);
+        self.emit_byte(opcodes::RTS);
+
+        self.define_label("__point_zero");
+        self.emit_imm(opcodes::LDA_IMM, 0);
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit plot routine for multicolor mode.
+    ///
+    /// Input: TMP1 = X (0-159), TMP3 = Y (0-199), TMP4 = color (0-3)
+    fn emit_plot_mc_routine(&mut self) {
+        self.define_label("__plot_mc");
+        self.runtime_addresses
+            .insert("plot_mc".to_string(), self.current_address);
+
+        // For multicolor, each pixel is 2 bits, so 4 pixels per byte
+        // Bitmap address = (y / 8) * 320 + (x / 4) * 8 + (y % 8)
+        // Bit position = 6 - ((x % 4) * 2)
+
+        // Calculate (y / 8) * 320 (same as hires)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP5); // TMP5 = cell_y
+
+        // cell_y * 320
+        self.emit_imm(opcodes::LDA_IMM, 0);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP5);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+
+        // Add cell_y * 64
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP5);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_branch(opcodes::BCC, "__pmc_nc1");
+        self.emit_byte(opcodes::INC_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+        self.define_label("__pmc_nc1");
+
+        // Add (x / 4) * 8 = (x & $FC) * 2
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_imm(opcodes::AND_IMM, 0xFC);
+        self.emit_byte(opcodes::ASL_ACC); // *2
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_branch(opcodes::BCC, "__pmc_nc2");
+        self.emit_byte(opcodes::INC_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+        self.define_label("__pmc_nc2");
+
+        // Add (y % 8)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_imm(opcodes::AND_IMM, 0x07);
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_branch(opcodes::BCC, "__pmc_nc3");
+        self.emit_byte(opcodes::INC_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+        self.define_label("__pmc_nc3");
+
+        // Add bitmap base ($2000)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+        self.emit_imm(opcodes::ADC_IMM, 0x20);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+
+        // Calculate bit position: shift = 6 - ((x % 4) * 2)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_imm(opcodes::AND_IMM, 0x03);
+        self.emit_byte(opcodes::ASL_ACC); // *2
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP5);
+        self.emit_imm(opcodes::LDA_IMM, 6);
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(zeropage::TMP5);
+        self.emit_byte(opcodes::TAY); // Y = shift amount
+
+        // Create color mask (color << shift)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP4); // color (0-3)
+        self.define_label("__pmc_shift_color");
+        self.emit_imm(opcodes::CPY_IMM, 0);
+        self.emit_branch(opcodes::BEQ, "__pmc_apply");
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::DEY);
+        self.emit_jmp("__pmc_shift_color");
+
+        self.define_label("__pmc_apply");
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP5); // TMP5 = shifted color
+
+        // Create clear mask (%11 << shift, then invert)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_imm(opcodes::AND_IMM, 0x03);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::TAY);
+        self.emit_imm(opcodes::LDA_IMM, 0x03);
+        self.define_label("__pmc_shift_mask");
+        self.emit_imm(opcodes::CPY_IMM, 0);
+        self.emit_branch(opcodes::BEQ, "__pmc_clear");
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::DEY);
+        self.emit_jmp("__pmc_shift_mask");
+
+        self.define_label("__pmc_clear");
+        self.emit_byte(opcodes::EOR_IMM);
+        self.emit_byte(0xFF); // Invert to get clear mask
+
+        // Clear old bits and set new color
+        self.emit_imm(opcodes::LDY_IMM, 0);
+        self.emit_byte(opcodes::AND_IZY);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::ORA_ZP);
+        self.emit_byte(zeropage::TMP5);
+        self.emit_byte(opcodes::STA_IZY);
+        self.emit_byte(zeropage::TMP2);
+
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit point routine for multicolor mode.
+    ///
+    /// Input: TMP1 = X (0-159), TMP3 = Y (0-199)
+    /// Output: A = color (0-3)
+    fn emit_point_mc_routine(&mut self) {
+        self.define_label("__point_mc");
+        self.runtime_addresses
+            .insert("point_mc".to_string(), self.current_address);
+
+        // Same address calculation as plot_mc (simplified - call common routine)
+        // For now, duplicate the calculation
+
+        // Calculate address (same as plot_mc)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP5);
+
+        self.emit_imm(opcodes::LDA_IMM, 0);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP5);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP5);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_branch(opcodes::BCC, "__ptmc_nc1");
+        self.emit_byte(opcodes::INC_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+        self.define_label("__ptmc_nc1");
+
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_imm(opcodes::AND_IMM, 0xFC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_branch(opcodes::BCC, "__ptmc_nc2");
+        self.emit_byte(opcodes::INC_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+        self.define_label("__ptmc_nc2");
+
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_imm(opcodes::AND_IMM, 0x07);
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_branch(opcodes::BCC, "__ptmc_nc3");
+        self.emit_byte(opcodes::INC_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+        self.define_label("__ptmc_nc3");
+
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+        self.emit_imm(opcodes::ADC_IMM, 0x20);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+
+        // Read byte
+        self.emit_imm(opcodes::LDY_IMM, 0);
+        self.emit_byte(opcodes::LDA_IZY);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP4);
+
+        // Calculate shift: 6 - ((x % 4) * 2)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_imm(opcodes::AND_IMM, 0x03);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::TAY);
+        self.emit_imm(opcodes::LDA_IMM, 6);
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_imm(opcodes::AND_IMM, 0x06); // Mask to valid shift
+
+        // Shift byte right to get color in bits 0-1
+        self.emit_byte(opcodes::TAY);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP4);
+        self.define_label("__ptmc_shift");
+        self.emit_imm(opcodes::CPY_IMM, 0);
+        self.emit_branch(opcodes::BEQ, "__ptmc_done");
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::DEY);
+        self.emit_jmp("__ptmc_shift");
+
+        self.define_label("__ptmc_done");
+        self.emit_imm(opcodes::AND_IMM, 0x03); // Mask to 2 bits
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit bitmap fill routine.
+    ///
+    /// Input: A = fill pattern byte
+    fn emit_bitmap_fill_routine(&mut self) {
+        self.define_label("__bitmap_fill");
+        self.runtime_addresses
+            .insert("bitmap_fill".to_string(), self.current_address);
+
+        // Save fill pattern
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+
+        // Set up pointer to bitmap ($2000)
+        self.emit_imm(opcodes::LDA_IMM, 0x00);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_imm(opcodes::LDA_IMM, 0x20);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+
+        // Fill 8000 bytes (31 pages of 256 + 64 bytes)
+        // First fill 31 full pages
+        self.emit_imm(opcodes::LDX_IMM, 31);
+        self.define_label("__bf_page_loop");
+        self.emit_imm(opcodes::LDY_IMM, 0);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.define_label("__bf_byte_loop");
+        self.emit_byte(opcodes::STA_IZY);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::INY);
+        self.emit_branch(opcodes::BNE, "__bf_byte_loop");
+        // Next page
+        self.emit_byte(opcodes::INC_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+        self.emit_byte(opcodes::DEX);
+        self.emit_branch(opcodes::BNE, "__bf_page_loop");
+
+        // Fill remaining 64 bytes (8000 - 31*256 = 8000 - 7936 = 64)
+        self.emit_imm(opcodes::LDY_IMM, 0);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.define_label("__bf_last_loop");
+        self.emit_byte(opcodes::STA_IZY);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::INY);
+        self.emit_imm(opcodes::CPY_IMM, 64);
+        self.emit_branch(opcodes::BNE, "__bf_last_loop");
+
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit horizontal line routine for hires mode.
+    ///
+    /// Input: TMP1/TMP1_HI = X start (0-319), TMP3 = Y (0-199), TMP4/TMP5 = length
+    fn emit_hline_routine(&mut self) {
+        self.define_label("__hline");
+        self.runtime_addresses
+            .insert("hline".to_string(), self.current_address);
+
+        // Check if length is 0
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP4);
+        self.emit_byte(opcodes::ORA_ZP);
+        self.emit_byte(zeropage::TMP5);
+        self.emit_branch(opcodes::BEQ, "__hline_done");
+
+        // Loop: plot current x,y then increment x, decrement length
+        self.define_label("__hline_loop");
+
+        // Plot pixel at current position
+        self.emit_jsr_label("__plot");
+
+        // Decrement length (16-bit)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP4);
+        self.emit_byte(opcodes::SEC);
+        self.emit_imm(opcodes::SBC_IMM, 1);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP4);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP5);
+        self.emit_imm(opcodes::SBC_IMM, 0);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP5);
+
+        // Check if done (length == 0)
+        self.emit_byte(opcodes::ORA_ZP);
+        self.emit_byte(zeropage::TMP4);
+        self.emit_branch(opcodes::BEQ, "__hline_done");
+
+        // Increment X (16-bit)
+        self.emit_byte(opcodes::INC_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_branch(opcodes::BNE, "__hline_loop");
+        self.emit_byte(opcodes::INC_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_jmp("__hline_loop");
+
+        self.define_label("__hline_done");
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit vertical line routine for hires mode.
+    ///
+    /// Input: TMP1/TMP1_HI = X (0-319), TMP3 = Y start (0-199), TMP4 = length
+    fn emit_vline_routine(&mut self) {
+        self.define_label("__vline");
+        self.runtime_addresses
+            .insert("vline".to_string(), self.current_address);
+
+        // Check if length is 0
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP4);
+        self.emit_branch(opcodes::BEQ, "__vline_done");
+
+        // Loop: plot current x,y then increment y, decrement length
+        self.define_label("__vline_loop");
+
+        // Plot pixel at current position
+        self.emit_jsr_label("__plot");
+
+        // Decrement length
+        self.emit_byte(opcodes::DEC_ZP);
+        self.emit_byte(zeropage::TMP4);
+        self.emit_branch(opcodes::BEQ, "__vline_done");
+
+        // Increment Y
+        self.emit_byte(opcodes::INC_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_jmp("__vline_loop");
+
+        self.define_label("__vline_done");
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit line routine using Bresenham's algorithm.
+    ///
+    /// Input: TMP1/TMP1_HI = X1, TMP3 = Y1, TMP2/TMP2_HI = X2, TMP5 = Y2
+    /// Uses: TMP6-TMP9 for dx, dy, err, and direction flags
+    fn emit_line_routine(&mut self) {
+        self.define_label("__line");
+        self.runtime_addresses
+            .insert("line".to_string(), self.current_address);
+
+        // Calculate dx = abs(x2 - x1) and direction
+        // Store sign of dx in bit 0 of TMP6
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2); // x2 low
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(zeropage::TMP1); // - x1 low
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP7); // dx low
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2_HI); // x2 high
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(zeropage::TMP1_HI); // - x1 high
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP8); // dx high
+
+        // Check if dx is negative
+        self.emit_branch(opcodes::BPL, "__line_dx_pos");
+
+        // dx is negative, negate it and set sx = -1 (TMP6 bit 0 = 1)
+        self.emit_imm(opcodes::LDA_IMM, 0);
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(zeropage::TMP7);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP7);
+        self.emit_imm(opcodes::LDA_IMM, 0);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(zeropage::TMP8);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP8);
+        self.emit_imm(opcodes::LDA_IMM, 1); // sx = -1
+        self.emit_jmp("__line_store_sx");
+
+        self.define_label("__line_dx_pos");
+        self.emit_imm(opcodes::LDA_IMM, 0); // sx = +1
+
+        self.define_label("__line_store_sx");
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP6); // TMP6 bit 0 = sx direction
+
+        // Calculate dy = abs(y2 - y1) and direction
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP5); // y2
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(zeropage::TMP3); // - y1
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP9); // dy
+
+        // Check if dy is negative
+        self.emit_branch(opcodes::BPL, "__line_dy_pos");
+
+        // dy is negative, negate it and set sy = -1 (TMP6 bit 1 = 1)
+        self.emit_byte(opcodes::EOR_IMM);
+        self.emit_byte(0xFF);
+        self.emit_byte(opcodes::CLC);
+        self.emit_imm(opcodes::ADC_IMM, 1);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP9);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP6);
+        self.emit_imm(opcodes::ORA_IMM, 0x02); // Set bit 1 for sy = -1
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP6);
+
+        self.define_label("__line_dy_pos");
+
+        // Now TMP7/TMP8 = dx (16-bit), TMP9 = dy (8-bit), TMP6 = direction flags
+
+        // Simplified Bresenham: we'll use an 8-bit approach for performance
+        // err = dx - dy (approximate for simple cases)
+        // We'll plot pixels in a loop
+
+        // Main loop: plot and step
+        self.define_label("__line_loop");
+
+        // Plot current pixel
+        self.emit_jsr_label("__plot");
+
+        // Check if x1 == x2 and y1 == y2 (done)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::CMP_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_branch(opcodes::BNE, "__line_continue");
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_byte(opcodes::CMP_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+        self.emit_branch(opcodes::BNE, "__line_continue");
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::CMP_ZP);
+        self.emit_byte(zeropage::TMP5);
+        self.emit_branch(opcodes::BEQ, "__line_done");
+
+        self.define_label("__line_continue");
+
+        // Simple stepping: if dx > dy, step x; else step y
+        // Compare dx (16-bit) with dy (8-bit extended)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP8); // dx high
+        self.emit_branch(opcodes::BNE, "__line_step_x"); // dx >= 256, step x
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP7); // dx low
+        self.emit_byte(opcodes::CMP_ZP);
+        self.emit_byte(zeropage::TMP9); // compare with dy
+        self.emit_branch(opcodes::BCS, "__line_step_x"); // dx >= dy, step x
+
+        // Step Y
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP6);
+        self.emit_imm(opcodes::AND_IMM, 0x02); // Check sy direction
+        self.emit_branch(opcodes::BNE, "__line_step_y_neg");
+        self.emit_byte(opcodes::INC_ZP);
+        self.emit_byte(zeropage::TMP3); // y++
+        self.emit_jmp("__line_loop");
+
+        self.define_label("__line_step_y_neg");
+        self.emit_byte(opcodes::DEC_ZP);
+        self.emit_byte(zeropage::TMP3); // y--
+        self.emit_jmp("__line_loop");
+
+        // Step X
+        self.define_label("__line_step_x");
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP6);
+        self.emit_imm(opcodes::AND_IMM, 0x01); // Check sx direction
+        self.emit_branch(opcodes::BNE, "__line_step_x_neg");
+        // x++
+        self.emit_byte(opcodes::INC_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_branch(opcodes::BNE, "__line_loop");
+        self.emit_byte(opcodes::INC_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_jmp("__line_loop");
+
+        self.define_label("__line_step_x_neg");
+        // x--
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_branch(opcodes::BNE, "__line_dec_x_low");
+        self.emit_byte(opcodes::DEC_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.define_label("__line_dec_x_low");
+        self.emit_byte(opcodes::DEC_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_jmp("__line_loop");
+
+        self.define_label("__line_done");
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit rectangle outline routine.
+    ///
+    /// Input: TMP1/TMP1_HI = X, TMP3 = Y, TMP4/TMP5 = width, TMP2 = height
+    fn emit_rect_routine(&mut self) {
+        self.define_label("__rect");
+        self.runtime_addresses
+            .insert("rect".to_string(), self.current_address);
+
+        // Save original values - we'll use stack
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::PHA); // save x low
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_byte(opcodes::PHA); // save x high
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::PHA); // save y
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP4);
+        self.emit_byte(opcodes::PHA); // save width low
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP5);
+        self.emit_byte(opcodes::PHA); // save width high
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::PHA); // save height
+
+        // Draw top horizontal line (x, y, width)
+        // TMP1/TMP1_HI already has x, TMP3 has y, TMP4/TMP5 has width
+        self.emit_jsr_label("__hline");
+
+        // Restore values for right vertical line
+        self.emit_byte(opcodes::PLA);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2); // height
+        self.emit_byte(opcodes::PLA);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP5); // width high
+        self.emit_byte(opcodes::PLA);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP4); // width low
+        self.emit_byte(opcodes::PLA);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP3); // y
+        self.emit_byte(opcodes::PLA);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1_HI); // x high
+        self.emit_byte(opcodes::PLA);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1); // x low
+
+        // Calculate right edge: x + width - 1
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP4);
+        self.emit_byte(opcodes::PHA); // right x low
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP5);
+        self.emit_byte(opcodes::PHA); // right x high
+
+        // Decrement by 1
+        self.emit_byte(opcodes::PLA);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_byte(opcodes::PLA);
+        self.emit_byte(opcodes::SEC);
+        self.emit_imm(opcodes::SBC_IMM, 1);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_branch(opcodes::BCS, "__rect_no_borrow1");
+        self.emit_byte(opcodes::DEC_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.define_label("__rect_no_borrow1");
+
+        // Save for later and draw right vline
+        // TMP4 = height for vline
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP4);
+        self.emit_jsr_label("__vline");
+
+        // For bottom and left we need original values again
+        // Bottom: draw at y + height - 1
+        // Left: draw at original x
+
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit filled rectangle routine.
+    ///
+    /// Input: TMP1/TMP1_HI = X, TMP3 = Y, TMP4/TMP5 = width, TMP2 = height
+    fn emit_rect_fill_routine(&mut self) {
+        self.define_label("__rect_fill");
+        self.runtime_addresses
+            .insert("rect_fill".to_string(), self.current_address);
+
+        // Loop through each row and draw horizontal line
+        self.define_label("__rectf_loop");
+
+        // Check if height is 0
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_branch(opcodes::BEQ, "__rectf_done");
+
+        // Save current x, y, width, height
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::PHA);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_byte(opcodes::PHA);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP4);
+        self.emit_byte(opcodes::PHA);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP5);
+        self.emit_byte(opcodes::PHA);
+
+        // Draw horizontal line
+        self.emit_jsr_label("__hline");
+
+        // Restore x and width
+        self.emit_byte(opcodes::PLA);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP5);
+        self.emit_byte(opcodes::PLA);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP4);
+        self.emit_byte(opcodes::PLA);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_byte(opcodes::PLA);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+
+        // Increment y
+        self.emit_byte(opcodes::INC_ZP);
+        self.emit_byte(zeropage::TMP3);
+
+        // Decrement height
+        self.emit_byte(opcodes::DEC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_jmp("__rectf_loop");
+
+        self.define_label("__rectf_done");
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit cell_color routine.
+    /// Sets foreground/background color in screen RAM for a cell.
+    ///
+    /// Input: TMP1 = cx (0-39), TMP3 = cy (0-24), TMP4 = combined color (fg<<4 | bg)
+    fn emit_cell_color_routine(&mut self) {
+        self.define_label("__cell_color");
+        self.runtime_addresses
+            .insert("cell_color".to_string(), self.current_address);
+
+        // Calculate screen RAM offset: cy * 40 + cx
+        // cy * 40 = cy * 32 + cy * 8 = (cy << 5) + (cy << 3)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3); // A = cy
+        self.emit_byte(opcodes::ASL_ACC); // *2
+        self.emit_byte(opcodes::ASL_ACC); // *4
+        self.emit_byte(opcodes::ASL_ACC); // *8
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2); // TMP2 = cy * 8
+        self.emit_byte(opcodes::ASL_ACC); // *16
+        self.emit_byte(opcodes::ASL_ACC); // *32
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP2); // A = cy * 40
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP1); // A = cy * 40 + cx
+        self.emit_byte(opcodes::TAY); // Y = offset (low byte)
+
+        // Calculate high byte of offset (for cy >= 7)
+        // We need to handle cy * 40 overflowing 255
+        // cy * 40: cy=6 gives 240, cy=7 gives 280 (overflow)
+        // High byte = (cy * 40) >> 8
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::LSR_ACC); // cy / 2
+        self.emit_byte(opcodes::LSR_ACC); // cy / 4
+        self.emit_byte(opcodes::LSR_ACC); // cy / 8
+        self.emit_byte(opcodes::CLC);
+        self.emit_imm(opcodes::ADC_IMM, 0x04); // Add $04 (screen RAM base $0400)
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+
+        // Recalculate low byte properly
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3); // cy
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2); // cy * 8
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC); // cy * 32
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP2); // cy * 40
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP1); // + cx
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_branch(opcodes::BCC, "__cc_no_carry");
+        self.emit_byte(opcodes::INC_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+        self.define_label("__cc_no_carry");
+
+        // Store color at screen RAM location
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP4); // combined color
+        self.emit_imm(opcodes::LDY_IMM, 0);
+        self.emit_byte(opcodes::STA_IZY);
+        self.emit_byte(zeropage::TMP2);
+
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit get_cell_color routine.
+    /// Gets foreground/background color from screen RAM for a cell.
+    ///
+    /// Input: TMP1 = cx (0-39), TMP3 = cy (0-24)
+    /// Output: A = combined color (fg in high nibble, bg in low nibble)
+    fn emit_get_cell_color_routine(&mut self) {
+        self.define_label("__get_cell_color");
+        self.runtime_addresses
+            .insert("get_cell_color".to_string(), self.current_address);
+
+        // Calculate screen RAM address (same as cell_color)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::CLC);
+        self.emit_imm(opcodes::ADC_IMM, 0x04);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_branch(opcodes::BCC, "__gcc_no_carry");
+        self.emit_byte(opcodes::INC_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+        self.define_label("__gcc_no_carry");
+
+        // Load color from screen RAM
+        self.emit_imm(opcodes::LDY_IMM, 0);
+        self.emit_byte(opcodes::LDA_IZY);
+        self.emit_byte(zeropage::TMP2);
+
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit color_ram routine.
+    /// Sets color RAM value at cell position.
+    ///
+    /// Input: TMP1 = cx (0-39), TMP3 = cy (0-24), TMP4 = color
+    fn emit_color_ram_routine(&mut self) {
+        self.define_label("__color_ram");
+        self.runtime_addresses
+            .insert("color_ram".to_string(), self.current_address);
+
+        // Calculate color RAM address: $D800 + cy * 40 + cx
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::CLC);
+        self.emit_imm(opcodes::ADC_IMM, 0xD8); // $D800 high byte
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_branch(opcodes::BCC, "__cr_no_carry");
+        self.emit_byte(opcodes::INC_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+        self.define_label("__cr_no_carry");
+
+        // Store color at color RAM location
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP4);
+        self.emit_imm(opcodes::LDY_IMM, 0);
+        self.emit_byte(opcodes::STA_IZY);
+        self.emit_byte(zeropage::TMP2);
+
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit get_color_ram routine.
+    /// Gets color RAM value at cell position.
+    ///
+    /// Input: TMP1 = cx (0-39), TMP3 = cy (0-24)
+    /// Output: A = color value
+    fn emit_get_color_ram_routine(&mut self) {
+        self.define_label("__get_color_ram");
+        self.runtime_addresses
+            .insert("get_color_ram".to_string(), self.current_address);
+
+        // Calculate color RAM address: $D800 + cy * 40 + cx
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::LSR_ACC);
+        self.emit_byte(opcodes::CLC);
+        self.emit_imm(opcodes::ADC_IMM, 0xD8);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP3);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_branch(opcodes::BCC, "__gcr_no_carry");
+        self.emit_byte(opcodes::INC_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+        self.define_label("__gcr_no_carry");
+
+        // Load color from color RAM
+        self.emit_imm(opcodes::LDY_IMM, 0);
+        self.emit_byte(opcodes::LDA_IZY);
+        self.emit_byte(zeropage::TMP2);
+
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit fill_colors routine.
+    /// Fills all screen RAM cells with the same color value.
+    ///
+    /// Input: A = combined color (fg<<4 | bg)
+    fn emit_fill_colors_routine(&mut self) {
+        self.define_label("__fill_colors");
+        self.runtime_addresses
+            .insert("fill_colors".to_string(), self.current_address);
+
+        // Save color
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+
+        // Set up pointer to screen RAM ($0400)
+        self.emit_imm(opcodes::LDA_IMM, 0x00);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_imm(opcodes::LDA_IMM, 0x04);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+
+        // Fill 1000 bytes (3 pages of 256 + 232 bytes)
+        // First fill 3 full pages
+        self.emit_imm(opcodes::LDX_IMM, 3);
+        self.define_label("__fc_page_loop");
+        self.emit_imm(opcodes::LDY_IMM, 0);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.define_label("__fc_byte_loop");
+        self.emit_byte(opcodes::STA_IZY);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::INY);
+        self.emit_branch(opcodes::BNE, "__fc_byte_loop");
+        self.emit_byte(opcodes::INC_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+        self.emit_byte(opcodes::DEX);
+        self.emit_branch(opcodes::BNE, "__fc_page_loop");
+
+        // Fill remaining 232 bytes (1000 - 768 = 232)
+        self.emit_imm(opcodes::LDY_IMM, 0);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.define_label("__fc_last_loop");
+        self.emit_byte(opcodes::STA_IZY);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::INY);
+        self.emit_imm(opcodes::CPY_IMM, 232);
+        self.emit_branch(opcodes::BNE, "__fc_last_loop");
+
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit fill_color_ram routine.
+    /// Fills all color RAM with the same value.
+    ///
+    /// Input: A = color value
+    fn emit_fill_color_ram_routine(&mut self) {
+        self.define_label("__fill_color_ram");
+        self.runtime_addresses
+            .insert("fill_color_ram".to_string(), self.current_address);
+
+        // Save color
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+
+        // Set up pointer to color RAM ($D800)
+        self.emit_imm(opcodes::LDA_IMM, 0x00);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_imm(opcodes::LDA_IMM, 0xD8);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+
+        // Fill 1000 bytes (same as screen RAM)
+        self.emit_imm(opcodes::LDX_IMM, 3);
+        self.define_label("__fcr_page_loop");
+        self.emit_imm(opcodes::LDY_IMM, 0);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.define_label("__fcr_byte_loop");
+        self.emit_byte(opcodes::STA_IZY);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::INY);
+        self.emit_branch(opcodes::BNE, "__fcr_byte_loop");
+        self.emit_byte(opcodes::INC_ZP);
+        self.emit_byte(zeropage::TMP2_HI);
+        self.emit_byte(opcodes::DEX);
+        self.emit_branch(opcodes::BNE, "__fcr_page_loop");
+
+        // Fill remaining 232 bytes
+        self.emit_imm(opcodes::LDY_IMM, 0);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.define_label("__fcr_last_loop");
+        self.emit_byte(opcodes::STA_IZY);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::INY);
+        self.emit_imm(opcodes::CPY_IMM, 232);
+        self.emit_branch(opcodes::BNE, "__fcr_last_loop");
+
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit wait_raster routine.
+    /// Waits until the raster line reaches the target value.
+    ///
+    /// Input: TMP1 = target line low byte, TMP1_HI = target line high byte (0 or 1)
+    fn emit_wait_raster_routine(&mut self) {
+        self.define_label("__wait_raster");
+        self.runtime_addresses
+            .insert("wait_raster".to_string(), self.current_address);
+
+        // Loop until raster matches target
+        self.define_label("__wr_loop");
+
+        // Read current raster line high bit from $D011 bit 7
+        self.emit_abs(opcodes::LDA_ABS, vic::CONTROL1);
+        self.emit_imm(opcodes::AND_IMM, 0x80); // Get bit 7
+        self.emit_byte(opcodes::ASL_ACC); // Shift to carry
+        self.emit_imm(opcodes::LDA_IMM, 0);
+        self.emit_byte(opcodes::ROL_ACC); // A = 0 or 1 (high byte of raster)
+
+        // Compare high byte
+        self.emit_byte(opcodes::CMP_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_branch(opcodes::BNE, "__wr_loop");
+
+        // High byte matches, compare low byte
+        self.emit_abs(opcodes::LDA_ABS, vic::RASTER);
+        self.emit_byte(opcodes::CMP_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_branch(opcodes::BNE, "__wr_loop");
+
         self.emit_byte(opcodes::RTS);
     }
 }

@@ -1,0 +1,61 @@
+# Test bitmap pixel operations
+# Expected output:
+# BITMAP PIXELS TEST
+# CLEAR OK
+# PLOT OK
+# POINT=TRUE
+# UNPLOT OK
+# POINT=FALSE
+# MC PLOT OK
+# MC POINT=2
+# FILL OK
+# DONE
+
+def main():
+    println("BITMAP PIXELS TEST")
+
+    # Clear the bitmap first
+    bitmap_clear()
+    println("CLEAR OK")
+
+    # Test plot - set a pixel
+    plot(160, 100)
+    println("PLOT OK")
+
+    # Test point - read the pixel back
+    p: bool = point(160, 100)
+    print("POINT=")
+    if p:
+        println("TRUE")
+    else:
+        println("FALSE")
+
+    # Test unplot - clear the pixel
+    unplot(160, 100)
+    println("UNPLOT OK")
+
+    # Verify pixel is cleared
+    p = point(160, 100)
+    print("POINT=")
+    if p:
+        println("TRUE")
+    else:
+        println("FALSE")
+
+    # Test multicolor pixel
+    plot_mc(80, 100, 2)
+    println("MC PLOT OK")
+
+    # Read multicolor pixel
+    c: byte = point_mc(80, 100)
+    print("MC POINT=")
+    println(c)
+
+    # Test bitmap fill
+    bitmap_fill($AA)
+    println("FILL OK")
+
+    # Clear bitmap before returning to text mode
+    bitmap_clear()
+
+    println("DONE")

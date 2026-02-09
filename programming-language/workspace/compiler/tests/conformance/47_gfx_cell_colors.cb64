@@ -1,0 +1,43 @@
+# Test cell color control functions
+# Expected output:
+# CELL COLOR TEST
+# SET CELL OK
+# GET CELL=241
+# SET CRAM OK
+# GET CRAM=5
+# FILL COLORS OK
+# FILL CRAM OK
+# DONE
+
+def main():
+    println("CELL COLOR TEST")
+
+    # Test cell_color - set foreground (15) and background (1) at position 0,0
+    # Combined value should be (15 << 4) | 1 = 241
+    cell_color(0, 0, 15, 1)
+    println("SET CELL OK")
+
+    # Test get_cell_color - read back the value
+    c: byte = get_cell_color(0, 0)
+    print("GET CELL=")
+    println(c)
+
+    # Test color_ram - set color RAM at position 1,0 to color 5
+    color_ram(1, 0, 5)
+    println("SET CRAM OK")
+
+    # Test get_color_ram - read back the value
+    c = get_color_ram(1, 0)
+    print("GET CRAM=")
+    println(c)
+
+    # Test fill_colors - fill all screen cells with white on blue (1, 6)
+    # Combined = (1 << 4) | 6 = 22
+    fill_colors(1, 6)
+    println("FILL COLORS OK")
+
+    # Test fill_color_ram - fill all color RAM with white (1)
+    fill_color_ram(1)
+    println("FILL CRAM OK")
+
+    println("DONE")

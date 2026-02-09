@@ -233,12 +233,12 @@ fn test_conformance_basic_stub_present() {
 #[test]
 fn test_conformance_code_size_reasonable() {
     // Test that generated code sizes are reasonable
-    // Note: sizes increased to accommodate fixed-point, float, PRNG, and SID sound runtime routines
-    // Size increased to 3700 to accommodate note-to-frequency lookup table
+    // Note: sizes increased to accommodate fixed-point, float, PRNG, SID sound, and graphics runtime routines
+    // Size increased to 5000 to accommodate bitmap graphics, drawing primitives, and cell color control
     let test_cases = [
-        ("01_literals.cb64", 100, 3700),
-        ("02_variables.cb64", 100, 3700),
-        ("07_while.cb64", 100, 3700),
+        ("01_literals.cb64", 100, 5000),
+        ("02_variables.cb64", 100, 5000),
+        ("07_while.cb64", 100, 5000),
     ];
 
     for (file, min_size, max_size) in test_cases {

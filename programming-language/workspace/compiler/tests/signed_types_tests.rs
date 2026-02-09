@@ -558,11 +558,12 @@ def main():
     assert!(result.is_ok());
     let code = result.unwrap();
     // Code should be reasonable size (runtime + actual code)
-    // Note: size increased to accommodate fixed-point, float, and SID sound routines
-    // with proper IEEE-754 mantissa arithmetic and note-to-frequency lookup table
+    // Note: size increased to accommodate fixed-point, float, SID sound, and VIC-II graphics routines
+    // with proper IEEE-754 mantissa arithmetic, note-to-frequency lookup table,
+    // and bitmap drawing primitives
     assert!(
-        code.len() < 3400,
-        "Generated code should be under 3400 bytes"
+        code.len() < 4500,
+        "Generated code should be under 4500 bytes"
     );
     assert!(
         code.len() > 100,

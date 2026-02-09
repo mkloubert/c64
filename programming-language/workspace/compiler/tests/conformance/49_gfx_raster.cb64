@@ -1,0 +1,37 @@
+# Test raster functions
+# Expected output:
+# RASTER TEST
+# CONSTANTS OK
+# RASTER READ OK
+# WAIT DONE
+# DONE
+
+def main():
+    println("RASTER TEST")
+
+    # Test raster constants exist and have expected values
+    top: word = RASTER_TOP
+    bottom: word = RASTER_BOTTOM
+    max_pal: word = RASTER_MAX_PAL
+    max_ntsc: word = RASTER_MAX_NTSC
+
+    # Verify constants (50, 250, 311, 261)
+    if top == 50 and bottom == 250 and max_pal == 311 and max_ntsc == 261:
+        println("CONSTANTS OK")
+    else:
+        println("CONSTANTS FAILED")
+
+    # Test raster() - read current raster line
+    r: word = raster()
+    # Raster should be a valid value (0-311 for PAL)
+    if r <= 311:
+        println("RASTER READ OK")
+    else:
+        println("RASTER READ FAILED")
+
+    # Test wait_raster - wait for a specific line
+    # Wait for line 100 (visible area)
+    wait_raster(100)
+    println("WAIT DONE")
+
+    println("DONE")

@@ -1,0 +1,103 @@
+# Cobra64 - A concept for a modern Python-like compiler creating C64 binaries
+#
+# Copyright (C) 2026 Marcel Joachim Kloubert <marcel@kloubert.dev>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+# Multicolor Bitmap Demo
+# Demonstrates multicolor bitmap mode (160x200 pixels, 4 colors per cell)
+
+def setup_multicolor():
+    # Switch to multicolor bitmap mode
+    gfx_multicolor()
+
+    # Clear bitmap
+    bitmap_clear()
+
+    # Background is color 0 (from $D021)
+    background_color(0)    # Black background
+
+def setup_cell_colors(cx: byte, cy: byte):
+    # In multicolor mode, colors are:
+    # 0 = Background ($D021)
+    # 1 = Upper nibble of screen RAM
+    # 2 = Lower nibble of screen RAM
+    # 3 = Color RAM
+
+    # Set screen RAM colors (color 1 and 2)
+    cell_color(cx, cy, 2, 5)   # Red (1), Green (2)
+
+    # Set color RAM (color 3)
+    color_ram(cx, cy, 6)       # Blue
+
+def draw_color_bars():
+    # Draw vertical bars in each color
+
+    # Color 1 bar (Red) - x: 20-39
+    x: byte = 20
+    while x < 40:
+        y: byte = 50
+        while y < 150:
+            plot_mc(x, y, 1)
+            y = y + 1
+        x = x + 1
+
+    # Color 2 bar (Green) - x: 60-79
+    x = 60
+    while x < 80:
+        y: byte = 50
+        while y < 150:
+            plot_mc(x, y, 2)
+            y = y + 1
+        x = x + 1
+
+    # Color 3 bar (Blue) - x: 100-119
+    x = 100
+    while x < 120:
+        y: byte = 50
+        while y < 150:
+            plot_mc(x, y, 3)
+            y = y + 1
+        x = x + 1
+
+def draw_gradient():
+    # Draw a pattern using all colors
+    cx: byte = 0
+    while cx < 20:
+        cy: byte = 0
+        while cy < 25:
+            # Setup colors for this cell
+            setup_cell_colors(cx, cy)
+            cy = cy + 1
+        cx = cx + 1
+
+def main():
+    # Set border color
+    border_color(11)      # Dark gray border
+
+    # Initialize multicolor mode
+    setup_multicolor()
+
+    # Setup colors for cells and draw bars
+    draw_gradient()
+    draw_color_bars()
+
+    # Wait for keypress
+    while get_key() == 0:
+        pass
+
+    # Return to text mode
+    gfx_text()
+    cls()
+    println("MULTICOLOR DEMO FINISHED")

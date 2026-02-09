@@ -494,6 +494,61 @@ export const COBRA64_CONSTANTS: BuiltinConstant[] = [
             '# lower 4 bits = volume (0-15)\n# upper 4 bits = filter mode\npoke(SID_VOLUME, 15)  # max volume',
         ]
     },
+    // VIC-II Graphics Register Constants
+    {
+        name: 'VIC_CONTROL1', type: 'word', value: '$D011', description: 'VIC-II control register 1 (53265)', examples: [
+            '# bits: YSCROLL, RSEL, DEN, BMM, ECM, RST8',
+        ]
+    },
+    {
+        name: 'VIC_CONTROL2', type: 'word', value: '$D016', description: 'VIC-II control register 2 (53270)', examples: [
+            '# bits: XSCROLL, CSEL, MCM',
+        ]
+    },
+    {
+        name: 'VIC_MEMORY', type: 'word', value: '$D018', description: 'VIC-II memory control register (53272)', examples: [
+            '# controls screen, char, and bitmap addresses',
+        ]
+    },
+    {
+        name: 'VIC_RASTER', type: 'word', value: '$D012', description: 'VIC-II raster line register (53266)', examples: [
+            'line: byte = peek(VIC_RASTER)',
+        ]
+    },
+    {
+        name: 'VIC_BORDER', type: 'word', value: '$D020', description: 'VIC-II border color register (53280)', examples: [
+            'poke(VIC_BORDER, COLOR_BLACK)',
+        ]
+    },
+    {
+        name: 'VIC_BACKGROUND', type: 'word', value: '$D021', description: 'VIC-II background color register (53281)', examples: [
+            'poke(VIC_BACKGROUND, COLOR_BLUE)',
+        ]
+    },
+    { name: 'VIC_BACKGROUND1', type: 'word', value: '$D022', description: 'VIC-II extra background 1 (53282)', examples: ['# ECM background 1'] },
+    { name: 'VIC_BACKGROUND2', type: 'word', value: '$D023', description: 'VIC-II extra background 2 (53283)', examples: ['# ECM background 2'] },
+    { name: 'VIC_BACKGROUND3', type: 'word', value: '$D024', description: 'VIC-II extra background 3 (53284)', examples: ['# ECM background 3'] },
+    {
+        name: 'COLOR_RAM', type: 'word', value: '$D800', description: 'Color RAM start address (55296)', examples: [
+            'poke(COLOR_RAM, COLOR_WHITE)  # first cell color',
+        ]
+    },
+    // Graphics Mode Constants
+    { name: 'GFX_TEXT', type: 'byte', value: '0', description: 'Standard character mode (40x25)', examples: ['gfx_mode(GFX_TEXT)'] },
+    { name: 'GFX_TEXT_MC', type: 'byte', value: '1', description: 'Multicolor character mode', examples: ['gfx_mode(GFX_TEXT_MC)'] },
+    { name: 'GFX_BITMAP', type: 'byte', value: '2', description: 'Standard bitmap mode (320x200)', examples: ['gfx_mode(GFX_BITMAP)'] },
+    { name: 'GFX_BITMAP_MC', type: 'byte', value: '3', description: 'Multicolor bitmap mode (160x200)', examples: ['gfx_mode(GFX_BITMAP_MC)'] },
+    { name: 'GFX_TEXT_ECM', type: 'byte', value: '4', description: 'Extended background color mode', examples: ['gfx_mode(GFX_TEXT_ECM)'] },
+    // VIC Bank Constants
+    { name: 'VIC_BANK0', type: 'byte', value: '0', description: 'VIC Bank 0: $0000-$3FFF', examples: ['vic_bank(VIC_BANK0)'] },
+    { name: 'VIC_BANK1', type: 'byte', value: '1', description: 'VIC Bank 1: $4000-$7FFF', examples: ['vic_bank(VIC_BANK1)'] },
+    { name: 'VIC_BANK2', type: 'byte', value: '2', description: 'VIC Bank 2: $8000-$BFFF', examples: ['vic_bank(VIC_BANK2)'] },
+    { name: 'VIC_BANK3', type: 'byte', value: '3', description: 'VIC Bank 3: $C000-$FFFF', examples: ['vic_bank(VIC_BANK3)'] },
+    // Raster Constants
+    { name: 'RASTER_TOP', type: 'word', value: '50', description: 'First visible raster line', examples: ['wait_raster(RASTER_TOP)'] },
+    { name: 'RASTER_BOTTOM', type: 'word', value: '250', description: 'Last visible raster line', examples: ['wait_raster(RASTER_BOTTOM)'] },
+    { name: 'RASTER_MAX_PAL', type: 'word', value: '311', description: 'Maximum raster line (PAL)', examples: ['# PAL has 312 lines (0-311)'] },
+    { name: 'RASTER_MAX_NTSC', type: 'word', value: '261', description: 'Maximum raster line (NTSC)', examples: ['# NTSC has 262 lines (0-261)'] },
 ];
 
 /**
@@ -1525,6 +1580,525 @@ export const COBRA64_BUILTINS: BuiltinFunction[] = [
         returnType: null,
         examples: [
             '# stop only voice 0\nsound_off_voice(0)',
+        ],
+    },
+    // Graphics - Display Control
+    {
+        name: 'border_color',
+        signature: 'border_color(color: byte)',
+        description: 'Sets the border color (0-15).',
+        parameters: [
+            { name: 'color', type: 'byte', description: 'Color (0-15)' },
+        ],
+        returnType: null,
+        examples: [
+            'border_color(0)   # black border\nborder_color(COLOR_BLUE)',
+        ],
+    },
+    {
+        name: 'background_color',
+        signature: 'background_color(color: byte)',
+        description: 'Sets the background color (0-15).',
+        parameters: [
+            { name: 'color', type: 'byte', description: 'Color (0-15)' },
+        ],
+        returnType: null,
+        examples: [
+            'background_color(6)  # blue background',
+        ],
+    },
+    {
+        name: 'get_border_color',
+        signature: 'get_border_color() -> byte',
+        description: 'Returns the current border color.',
+        parameters: [],
+        returnType: 'byte',
+        examples: [
+            'c: byte = get_border_color()',
+        ],
+    },
+    {
+        name: 'get_background_color',
+        signature: 'get_background_color() -> byte',
+        description: 'Returns the current background color.',
+        parameters: [],
+        returnType: 'byte',
+        examples: [
+            'c: byte = get_background_color()',
+        ],
+    },
+    // Graphics - Mode Switching
+    {
+        name: 'gfx_mode',
+        signature: 'gfx_mode(mode: byte)',
+        description: 'Switches graphics mode. Use GFX_* constants (0-4).',
+        parameters: [
+            { name: 'mode', type: 'byte', description: 'Graphics mode (0-4)' },
+        ],
+        returnType: null,
+        examples: [
+            'gfx_mode(GFX_BITMAP)  # 320x200 hires\ngfx_mode(GFX_TEXT)    # text mode',
+        ],
+    },
+    {
+        name: 'get_gfx_mode',
+        signature: 'get_gfx_mode() -> byte',
+        description: 'Returns the current graphics mode.',
+        parameters: [],
+        returnType: 'byte',
+        examples: [
+            'mode: byte = get_gfx_mode()',
+        ],
+    },
+    {
+        name: 'gfx_text',
+        signature: 'gfx_text()',
+        description: 'Switches to standard text mode (shortcut for gfx_mode(0)).',
+        parameters: [],
+        returnType: null,
+        examples: [
+            'gfx_text()  # return to text mode',
+        ],
+    },
+    {
+        name: 'gfx_hires',
+        signature: 'gfx_hires()',
+        description: 'Switches to hires bitmap mode 320x200 (shortcut for gfx_mode(2)).',
+        parameters: [],
+        returnType: null,
+        examples: [
+            'gfx_hires()     # 320x200 bitmap\nbitmap_clear()  # clear screen',
+        ],
+    },
+    {
+        name: 'gfx_multicolor',
+        signature: 'gfx_multicolor()',
+        description: 'Switches to multicolor bitmap mode 160x200 (shortcut for gfx_mode(3)).',
+        parameters: [],
+        returnType: null,
+        examples: [
+            'gfx_multicolor()  # 160x200, 4 colors per cell',
+        ],
+    },
+    {
+        name: 'screen_columns',
+        signature: 'screen_columns(cols: byte)',
+        description: 'Sets 38 or 40 column mode. 38 columns shows border on sides.',
+        parameters: [
+            { name: 'cols', type: 'byte', description: '38 or 40' },
+        ],
+        returnType: null,
+        examples: [
+            'screen_columns(38)  # for smooth scrolling\nscreen_columns(40)  # normal',
+        ],
+    },
+    {
+        name: 'screen_rows',
+        signature: 'screen_rows(rows: byte)',
+        description: 'Sets 24 or 25 row mode. 24 rows shows border on top/bottom.',
+        parameters: [
+            { name: 'rows', type: 'byte', description: '24 or 25' },
+        ],
+        returnType: null,
+        examples: [
+            'screen_rows(24)  # for smooth scrolling',
+        ],
+    },
+    // Graphics - Memory Configuration
+    {
+        name: 'vic_bank',
+        signature: 'vic_bank(bank: byte)',
+        description: 'Sets VIC memory bank (0-3). Use VIC_BANK* constants.',
+        parameters: [
+            { name: 'bank', type: 'byte', description: 'Bank number (0-3)' },
+        ],
+        returnType: null,
+        examples: [
+            'vic_bank(VIC_BANK1)  # use $4000-$7FFF',
+        ],
+    },
+    {
+        name: 'get_vic_bank',
+        signature: 'get_vic_bank() -> byte',
+        description: 'Returns the current VIC bank.',
+        parameters: [],
+        returnType: 'byte',
+        examples: [
+            'bank: byte = get_vic_bank()',
+        ],
+    },
+    {
+        name: 'screen_address',
+        signature: 'screen_address(addr: word)',
+        description: 'Sets screen RAM address (relative to VIC bank).',
+        parameters: [
+            { name: 'addr', type: 'word', description: 'Address within bank' },
+        ],
+        returnType: null,
+        examples: [
+            'screen_address($0400)  # default location',
+        ],
+    },
+    {
+        name: 'bitmap_address',
+        signature: 'bitmap_address(addr: word)',
+        description: 'Sets bitmap address. Only $0000 or $2000 within bank.',
+        parameters: [
+            { name: 'addr', type: 'word', description: 'Address ($0000 or $2000)' },
+        ],
+        returnType: null,
+        examples: [
+            'bitmap_address($2000)  # default location',
+        ],
+    },
+    {
+        name: 'charset_address',
+        signature: 'charset_address(addr: word)',
+        description: 'Sets character set address (relative to VIC bank).',
+        parameters: [
+            { name: 'addr', type: 'word', description: 'Address within bank' },
+        ],
+        returnType: null,
+        examples: [
+            'charset_address($0800)  # custom charset',
+        ],
+    },
+    // Graphics - Pixel Operations
+    {
+        name: 'plot',
+        signature: 'plot(x: word, y: byte)',
+        description: 'Sets a pixel in hires bitmap mode.',
+        parameters: [
+            { name: 'x', type: 'word', description: 'X coordinate (0-319)' },
+            { name: 'y', type: 'byte', description: 'Y coordinate (0-199)' },
+        ],
+        returnType: null,
+        examples: [
+            'plot(160, 100)  # pixel at center',
+        ],
+    },
+    {
+        name: 'unplot',
+        signature: 'unplot(x: word, y: byte)',
+        description: 'Clears a pixel in hires bitmap mode.',
+        parameters: [
+            { name: 'x', type: 'word', description: 'X coordinate (0-319)' },
+            { name: 'y', type: 'byte', description: 'Y coordinate (0-199)' },
+        ],
+        returnType: null,
+        examples: [
+            'unplot(160, 100)  # clear pixel',
+        ],
+    },
+    {
+        name: 'point',
+        signature: 'point(x: word, y: byte) -> bool',
+        description: 'Tests if a pixel is set in hires bitmap mode.',
+        parameters: [
+            { name: 'x', type: 'word', description: 'X coordinate (0-319)' },
+            { name: 'y', type: 'byte', description: 'Y coordinate (0-199)' },
+        ],
+        returnType: 'bool',
+        examples: [
+            'if point(160, 100):\n    println("PIXEL SET")',
+        ],
+    },
+    {
+        name: 'plot_mc',
+        signature: 'plot_mc(x: byte, y: byte, color: byte)',
+        description: 'Sets a pixel in multicolor bitmap mode (4 colors per cell).',
+        parameters: [
+            { name: 'x', type: 'byte', description: 'X coordinate (0-159)' },
+            { name: 'y', type: 'byte', description: 'Y coordinate (0-199)' },
+            { name: 'color', type: 'byte', description: 'Color (0-3)' },
+        ],
+        returnType: null,
+        examples: [
+            '# colors: 0=bg, 1=screen hi, 2=screen lo, 3=color RAM\nplot_mc(80, 100, 2)',
+        ],
+    },
+    {
+        name: 'point_mc',
+        signature: 'point_mc(x: byte, y: byte) -> byte',
+        description: 'Gets pixel color in multicolor bitmap mode.',
+        parameters: [
+            { name: 'x', type: 'byte', description: 'X coordinate (0-159)' },
+            { name: 'y', type: 'byte', description: 'Y coordinate (0-199)' },
+        ],
+        returnType: 'byte',
+        examples: [
+            'c: byte = point_mc(80, 100)  # 0-3',
+        ],
+    },
+    {
+        name: 'bitmap_clear',
+        signature: 'bitmap_clear()',
+        description: 'Clears the bitmap (fills with 0).',
+        parameters: [],
+        returnType: null,
+        examples: [
+            'gfx_hires()\nbitmap_clear()',
+        ],
+    },
+    {
+        name: 'bitmap_fill',
+        signature: 'bitmap_fill(pattern: byte)',
+        description: 'Fills the bitmap with a pattern byte.',
+        parameters: [
+            { name: 'pattern', type: 'byte', description: 'Fill pattern' },
+        ],
+        returnType: null,
+        examples: [
+            'bitmap_fill($55)  # vertical stripes',
+        ],
+    },
+    // Graphics - Drawing Primitives
+    {
+        name: 'line',
+        signature: 'line(x1: word, y1: byte, x2: word, y2: byte)',
+        description: 'Draws a line in hires bitmap mode (Bresenham algorithm).',
+        parameters: [
+            { name: 'x1', type: 'word', description: 'Start X (0-319)' },
+            { name: 'y1', type: 'byte', description: 'Start Y (0-199)' },
+            { name: 'x2', type: 'word', description: 'End X (0-319)' },
+            { name: 'y2', type: 'byte', description: 'End Y (0-199)' },
+        ],
+        returnType: null,
+        examples: [
+            'line(0, 0, 319, 199)  # diagonal',
+        ],
+    },
+    {
+        name: 'hline',
+        signature: 'hline(x: word, y: byte, length: word)',
+        description: 'Draws a fast horizontal line.',
+        parameters: [
+            { name: 'x', type: 'word', description: 'Start X (0-319)' },
+            { name: 'y', type: 'byte', description: 'Y coordinate (0-199)' },
+            { name: 'length', type: 'word', description: 'Line length' },
+        ],
+        returnType: null,
+        examples: [
+            'hline(0, 100, 320)  # full width line',
+        ],
+    },
+    {
+        name: 'vline',
+        signature: 'vline(x: word, y: byte, length: byte)',
+        description: 'Draws a fast vertical line.',
+        parameters: [
+            { name: 'x', type: 'word', description: 'X coordinate (0-319)' },
+            { name: 'y', type: 'byte', description: 'Start Y (0-199)' },
+            { name: 'length', type: 'byte', description: 'Line length' },
+        ],
+        returnType: null,
+        examples: [
+            'vline(160, 0, 200)  # full height line',
+        ],
+    },
+    {
+        name: 'rect',
+        signature: 'rect(x: word, y: byte, width: word, height: byte)',
+        description: 'Draws a rectangle outline.',
+        parameters: [
+            { name: 'x', type: 'word', description: 'Left X (0-319)' },
+            { name: 'y', type: 'byte', description: 'Top Y (0-199)' },
+            { name: 'width', type: 'word', description: 'Width' },
+            { name: 'height', type: 'byte', description: 'Height' },
+        ],
+        returnType: null,
+        examples: [
+            'rect(10, 10, 100, 80)',
+        ],
+    },
+    {
+        name: 'rect_fill',
+        signature: 'rect_fill(x: word, y: byte, width: word, height: byte)',
+        description: 'Draws a filled rectangle.',
+        parameters: [
+            { name: 'x', type: 'word', description: 'Left X (0-319)' },
+            { name: 'y', type: 'byte', description: 'Top Y (0-199)' },
+            { name: 'width', type: 'word', description: 'Width' },
+            { name: 'height', type: 'byte', description: 'Height' },
+        ],
+        returnType: null,
+        examples: [
+            'rect_fill(10, 10, 100, 80)',
+        ],
+    },
+    // Graphics - Cell Color Control
+    {
+        name: 'cell_color',
+        signature: 'cell_color(cx: byte, cy: byte, fg: byte, bg: byte)',
+        description: 'Sets cell foreground and background colors (bitmap mode).',
+        parameters: [
+            { name: 'cx', type: 'byte', description: 'Cell X (0-39)' },
+            { name: 'cy', type: 'byte', description: 'Cell Y (0-24)' },
+            { name: 'fg', type: 'byte', description: 'Foreground color (0-15)' },
+            { name: 'bg', type: 'byte', description: 'Background color (0-15)' },
+        ],
+        returnType: null,
+        examples: [
+            'cell_color(20, 12, 1, 0)  # white on black',
+        ],
+    },
+    {
+        name: 'get_cell_color',
+        signature: 'get_cell_color(cx: byte, cy: byte) -> byte',
+        description: 'Gets cell colors (fg in high nibble, bg in low nibble).',
+        parameters: [
+            { name: 'cx', type: 'byte', description: 'Cell X (0-39)' },
+            { name: 'cy', type: 'byte', description: 'Cell Y (0-24)' },
+        ],
+        returnType: 'byte',
+        examples: [
+            'c: byte = get_cell_color(20, 12)',
+        ],
+    },
+    {
+        name: 'color_ram',
+        signature: 'color_ram(cx: byte, cy: byte, color: byte)',
+        description: 'Sets color RAM at cell position.',
+        parameters: [
+            { name: 'cx', type: 'byte', description: 'Cell X (0-39)' },
+            { name: 'cy', type: 'byte', description: 'Cell Y (0-24)' },
+            { name: 'color', type: 'byte', description: 'Color (0-15)' },
+        ],
+        returnType: null,
+        examples: [
+            'color_ram(20, 12, 5)  # green',
+        ],
+    },
+    {
+        name: 'get_color_ram',
+        signature: 'get_color_ram(cx: byte, cy: byte) -> byte',
+        description: 'Gets color RAM value at cell position.',
+        parameters: [
+            { name: 'cx', type: 'byte', description: 'Cell X (0-39)' },
+            { name: 'cy', type: 'byte', description: 'Cell Y (0-24)' },
+        ],
+        returnType: 'byte',
+        examples: [
+            'c: byte = get_color_ram(20, 12)',
+        ],
+    },
+    {
+        name: 'fill_colors',
+        signature: 'fill_colors(fg: byte, bg: byte)',
+        description: 'Fills all cells with foreground/background colors.',
+        parameters: [
+            { name: 'fg', type: 'byte', description: 'Foreground color (0-15)' },
+            { name: 'bg', type: 'byte', description: 'Background color (0-15)' },
+        ],
+        returnType: null,
+        examples: [
+            'fill_colors(1, 0)  # white on black',
+        ],
+    },
+    {
+        name: 'fill_color_ram',
+        signature: 'fill_color_ram(color: byte)',
+        description: 'Fills color RAM with a single color.',
+        parameters: [
+            { name: 'color', type: 'byte', description: 'Color (0-15)' },
+        ],
+        returnType: null,
+        examples: [
+            'fill_color_ram(1)  # all white',
+        ],
+    },
+    // Graphics - Hardware Scrolling
+    {
+        name: 'scroll_x',
+        signature: 'scroll_x(offset: byte)',
+        description: 'Sets horizontal scroll offset (0-7 pixels).',
+        parameters: [
+            { name: 'offset', type: 'byte', description: 'Scroll offset (0-7)' },
+        ],
+        returnType: null,
+        examples: [
+            'scroll_x(4)  # scroll 4 pixels right',
+        ],
+    },
+    {
+        name: 'scroll_y',
+        signature: 'scroll_y(offset: byte)',
+        description: 'Sets vertical scroll offset (0-7 pixels).',
+        parameters: [
+            { name: 'offset', type: 'byte', description: 'Scroll offset (0-7)' },
+        ],
+        returnType: null,
+        examples: [
+            'scroll_y(4)  # scroll 4 pixels down',
+        ],
+    },
+    {
+        name: 'get_scroll_x',
+        signature: 'get_scroll_x() -> byte',
+        description: 'Gets current horizontal scroll offset.',
+        parameters: [],
+        returnType: 'byte',
+        examples: [
+            'sx: byte = get_scroll_x()',
+        ],
+    },
+    {
+        name: 'get_scroll_y',
+        signature: 'get_scroll_y() -> byte',
+        description: 'Gets current vertical scroll offset.',
+        parameters: [],
+        returnType: 'byte',
+        examples: [
+            'sy: byte = get_scroll_y()',
+        ],
+    },
+    // Graphics - Raster Functions
+    {
+        name: 'raster',
+        signature: 'raster() -> word',
+        description: 'Returns current raster line (0-311 PAL, 0-261 NTSC).',
+        parameters: [],
+        returnType: 'word',
+        examples: [
+            'r: word = raster()',
+        ],
+    },
+    {
+        name: 'wait_raster',
+        signature: 'wait_raster(line: word)',
+        description: 'Waits until raster reaches the specified line.',
+        parameters: [
+            { name: 'line', type: 'word', description: 'Raster line (0-311)' },
+        ],
+        returnType: null,
+        examples: [
+            'wait_raster(250)  # sync to line 250\nborder_color(2)   # change color',
+        ],
+    },
+    // Graphics - Extended Color Mode
+    {
+        name: 'ecm_background',
+        signature: 'ecm_background(index: byte, color: byte)',
+        description: 'Sets ECM background color (index 0-3 maps to $D021-$D024).',
+        parameters: [
+            { name: 'index', type: 'byte', description: 'Background index (0-3)' },
+            { name: 'color', type: 'byte', description: 'Color (0-15)' },
+        ],
+        returnType: null,
+        examples: [
+            '# ECM uses 4 background colors\necm_background(0, 0)  # black\necm_background(1, 2)  # red',
+        ],
+    },
+    {
+        name: 'get_ecm_background',
+        signature: 'get_ecm_background(index: byte) -> byte',
+        description: 'Gets ECM background color.',
+        parameters: [
+            { name: 'index', type: 'byte', description: 'Background index (0-3)' },
+        ],
+        returnType: 'byte',
+        examples: [
+            'c: byte = get_ecm_background(1)',
         ],
     },
 ];

@@ -255,9 +255,11 @@ proptest! {
             // proper mantissa arithmetic, float/fixed/int conversion routines,
             // print_fixed, print_float, rand() with inline branch structure
             // instead of lookup table, string conversion routines,
-            // SID sound routines including note-to-frequency lookup table)
+            // SID sound routines including note-to-frequency lookup table,
+            // VIC-II graphics mode switching, bitmap pixel operations,
+            // drawing primitives, cell color control, scrolling, and raster functions)
             let min_expected = 20 + count * 5;
-            let max_expected = 3300 + count * 50;
+            let max_expected = 4500 + count * 50;
 
             prop_assert!(
                 code.len() >= min_expected,

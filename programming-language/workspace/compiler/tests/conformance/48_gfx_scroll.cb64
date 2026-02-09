@@ -1,0 +1,37 @@
+# Test hardware scrolling functions
+# Expected output:
+# SCROLL TEST
+# SET X OK
+# GET X=3
+# SET Y OK
+# GET Y=5
+# RESET OK
+# DONE
+
+def main():
+    println("SCROLL TEST")
+
+    # Test scroll_x - set horizontal scroll to 3
+    scroll_x(3)
+    println("SET X OK")
+
+    # Test get_scroll_x - read back the value
+    x: byte = get_scroll_x()
+    print("GET X=")
+    println(x)
+
+    # Test scroll_y - set vertical scroll to 5
+    scroll_y(5)
+    println("SET Y OK")
+
+    # Test get_scroll_y - read back the value
+    y: byte = get_scroll_y()
+    print("GET Y=")
+    println(y)
+
+    # Reset scroll to 0,0
+    scroll_x(0)
+    scroll_y(0)
+    println("RESET OK")
+
+    println("DONE")

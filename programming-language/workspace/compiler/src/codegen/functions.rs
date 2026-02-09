@@ -25,7 +25,7 @@
 use super::emit::EmitHelpers;
 use super::expressions::ExpressionEmitter;
 use super::labels::LabelManager;
-use super::mos6510::{kernal, opcodes, petscii, sid, sprite, zeropage};
+use super::mos6510::{cia, kernal, opcodes, petscii, sid, sprite, vic, zeropage};
 use super::type_inference::TypeInference;
 use super::CodeGenerator;
 use crate::ast::{Expr, Type};
@@ -1023,6 +1023,713 @@ impl FunctionCallEmitter for CodeGenerator {
                 // sound_off_voice(voice: byte) - silence specific voice
                 if !args.is_empty() {
                     self.generate_sound_off_voice(&args[0])?;
+                }
+            }
+
+            // =================================================================
+            // VIC-II Graphics Functions
+            // =================================================================
+
+            "border_color" => {
+                // border_color(color: byte) - set border color
+                if !args.is_empty() {
+                    self.generate_expression(&args[0])?;
+                    self.emit_abs(opcodes::STA_ABS, vic::BORDER);
+                }
+            }
+
+            "background_color" => {
+                // background_color(color: byte) - set background color
+                if !args.is_empty() {
+                    self.generate_expression(&args[0])?;
+                    self.emit_abs(opcodes::STA_ABS, vic::BACKGROUND0);
+                }
+            }
+
+            "get_border_color" => {
+                // get_border_color() -> byte - get current border color
+                self.emit_abs(opcodes::LDA_ABS, vic::BORDER);
+            }
+
+            "get_background_color" => {
+                // get_background_color() -> byte - get current background color
+                self.emit_abs(opcodes::LDA_ABS, vic::BACKGROUND0);
+            }
+
+            "gfx_mode" => {
+                // gfx_mode(mode: byte) - switch to graphics mode (0-4)
+                // Mode 0: ECM=0, BMM=0, MCM=0 (Standard Text)
+                // Mode 1: ECM=0, BMM=0, MCM=1 (Multicolor Text)
+                // Mode 2: ECM=0, BMM=1, MCM=0 (Hires Bitmap)
+                // Mode 3: ECM=0, BMM=1, MCM=1 (Multicolor Bitmap)
+                // Mode 4: ECM=1, BMM=0, MCM=0 (ECM Text)
+                if !args.is_empty() {
+                    self.generate_expression(&args[0])?;
+                    self.emit_jsr_label("__gfx_mode");
+                }
+            }
+
+            "get_gfx_mode" => {
+                // get_gfx_mode() -> byte - get current graphics mode
+                self.emit_jsr_label("__get_gfx_mode");
+            }
+
+            "gfx_text" => {
+                // gfx_text() - switch to standard text mode (mode 0)
+                self.emit_imm(opcodes::LDA_IMM, vic::MODE_TEXT);
+                self.emit_jsr_label("__gfx_mode");
+            }
+
+            "gfx_hires" => {
+                // gfx_hires() - switch to hires bitmap mode (mode 2)
+                self.emit_imm(opcodes::LDA_IMM, vic::MODE_BITMAP);
+                self.emit_jsr_label("__gfx_mode");
+            }
+
+            "gfx_multicolor" => {
+                // gfx_multicolor() - switch to multicolor bitmap mode (mode 3)
+                self.emit_imm(opcodes::LDA_IMM, vic::MODE_BITMAP_MC);
+                self.emit_jsr_label("__gfx_mode");
+            }
+
+            "screen_columns" => {
+                // screen_columns(cols: byte) - set 38 or 40 column mode
+                // Bit 3 of $D016: 0 = 38 columns, 1 = 40 columns
+                if !args.is_empty() {
+                    self.generate_expression(&args[0])?;
+                    // Compare with 40
+                    self.emit_imm(opcodes::CMP_IMM, 40);
+                    let label_38col = self.make_label("col38");
+                    let label_done = self.make_label("coldone");
+                    self.emit_branch(opcodes::BNE, &label_38col);
+                    // 40 columns: set bit 3
+                    self.emit_abs(opcodes::LDA_ABS, vic::CONTROL2);
+                    self.emit_imm(opcodes::ORA_IMM, vic::CSEL);
+                    self.emit_abs(opcodes::STA_ABS, vic::CONTROL2);
+                    self.emit_jmp(&label_done);
+                    // 38 columns: clear bit 3
+                    self.define_label(&label_38col);
+                    self.emit_abs(opcodes::LDA_ABS, vic::CONTROL2);
+                    self.emit_imm(opcodes::AND_IMM, !vic::CSEL);
+                    self.emit_abs(opcodes::STA_ABS, vic::CONTROL2);
+                    self.define_label(&label_done);
+                }
+            }
+
+            "screen_rows" => {
+                // screen_rows(rows: byte) - set 24 or 25 row mode
+                // Bit 3 of $D011: 0 = 24 rows, 1 = 25 rows
+                if !args.is_empty() {
+                    self.generate_expression(&args[0])?;
+                    // Compare with 25
+                    self.emit_imm(opcodes::CMP_IMM, 25);
+                    let label_24row = self.make_label("row24");
+                    let label_done = self.make_label("rowdone");
+                    self.emit_branch(opcodes::BNE, &label_24row);
+                    // 25 rows: set bit 3
+                    self.emit_abs(opcodes::LDA_ABS, vic::CONTROL1);
+                    self.emit_imm(opcodes::ORA_IMM, vic::RSEL);
+                    self.emit_abs(opcodes::STA_ABS, vic::CONTROL1);
+                    self.emit_jmp(&label_done);
+                    // 24 rows: clear bit 3
+                    self.define_label(&label_24row);
+                    self.emit_abs(opcodes::LDA_ABS, vic::CONTROL1);
+                    self.emit_imm(opcodes::AND_IMM, !vic::RSEL);
+                    self.emit_abs(opcodes::STA_ABS, vic::CONTROL1);
+                    self.define_label(&label_done);
+                }
+            }
+
+            "vic_bank" => {
+                // vic_bank(bank: byte) - set VIC memory bank (0-3)
+                // CIA2 Port A bits 0-1 control VIC bank (inverted):
+                // Bank 0 ($0000-$3FFF) = %11, Bank 1 ($4000-$7FFF) = %10
+                // Bank 2 ($8000-$BFFF) = %01, Bank 3 ($C000-$FFFF) = %00
+                if !args.is_empty() {
+                    self.generate_expression(&args[0])?;
+                    // Invert the bank number (XOR with 3)
+                    self.emit_imm(opcodes::EOR_IMM, 0x03);
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    // Read current CIA2 Port A
+                    self.emit_abs(opcodes::LDA_ABS, cia::CIA2_PRA);
+                    // Clear bits 0-1
+                    self.emit_imm(opcodes::AND_IMM, !cia::VIC_BANK_MASK);
+                    // OR in the new bank value
+                    self.emit_byte(opcodes::ORA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    // Write back
+                    self.emit_abs(opcodes::STA_ABS, cia::CIA2_PRA);
+                }
+            }
+
+            "get_vic_bank" => {
+                // get_vic_bank() -> byte - get current VIC bank (0-3)
+                // Read CIA2 Port A bits 0-1 and invert
+                self.emit_abs(opcodes::LDA_ABS, cia::CIA2_PRA);
+                self.emit_imm(opcodes::AND_IMM, cia::VIC_BANK_MASK);
+                self.emit_imm(opcodes::EOR_IMM, 0x03); // Invert
+            }
+
+            "screen_address" => {
+                // screen_address(addr: word) - set screen RAM address
+                // $D018 bits 4-7 = screen address / 1024
+                // addr must be within current VIC bank (0-16383 offset)
+                if !args.is_empty() {
+                    self.generate_expression(&args[0])?;
+                    // A = low byte, X = high byte
+                    // We need (addr / 1024) << 4 = (addr >> 10) << 4 = addr >> 6
+                    // But we need high nibble, so take high byte and mask upper 4 bits
+                    self.emit_byte(opcodes::TXA); // A = high byte
+                    self.emit_imm(opcodes::AND_IMM, 0x3C); // Mask to get bits 2-5 (screen addr bits)
+                    self.emit_byte(opcodes::ASL_ACC); // Shift left to bits 4-7
+                    self.emit_byte(opcodes::ASL_ACC);
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    // Read current $D018, clear bits 4-7, OR in new value
+                    self.emit_abs(opcodes::LDA_ABS, vic::MEMORY);
+                    self.emit_imm(opcodes::AND_IMM, 0x0F); // Keep lower nibble
+                    self.emit_byte(opcodes::ORA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_abs(opcodes::STA_ABS, vic::MEMORY);
+                }
+            }
+
+            "bitmap_address" => {
+                // bitmap_address(addr: word) - set bitmap address
+                // $D018 bit 3 = bitmap at offset 0 (0) or 8192 (1)
+                if !args.is_empty() {
+                    self.generate_expression(&args[0])?;
+                    // A = low byte, X = high byte
+                    // Check if high byte >= $20 (8192 = $2000)
+                    self.emit_byte(opcodes::TXA);
+                    self.emit_imm(opcodes::CMP_IMM, 0x20);
+                    let label_low = self.make_label("bmp_low");
+                    let label_done = self.make_label("bmp_done");
+                    self.emit_branch(opcodes::BCC, &label_low);
+                    // Bitmap at 8192: set bit 3
+                    self.emit_abs(opcodes::LDA_ABS, vic::MEMORY);
+                    self.emit_imm(opcodes::ORA_IMM, 0x08);
+                    self.emit_abs(opcodes::STA_ABS, vic::MEMORY);
+                    self.emit_jmp(&label_done);
+                    // Bitmap at 0: clear bit 3
+                    self.define_label(&label_low);
+                    self.emit_abs(opcodes::LDA_ABS, vic::MEMORY);
+                    self.emit_imm(opcodes::AND_IMM, !0x08);
+                    self.emit_abs(opcodes::STA_ABS, vic::MEMORY);
+                    self.define_label(&label_done);
+                }
+            }
+
+            "charset_address" => {
+                // charset_address(addr: word) - set character set address
+                // $D018 bits 1-3 = charset address / 2048
+                if !args.is_empty() {
+                    self.generate_expression(&args[0])?;
+                    // A = low byte, X = high byte
+                    // We need (addr / 2048) << 1 = (addr >> 11) << 1 = addr >> 10
+                    // Take high byte, shift right 2, mask bits 1-3
+                    self.emit_byte(opcodes::TXA); // A = high byte
+                    self.emit_byte(opcodes::LSR_ACC); // >> 1
+                    self.emit_byte(opcodes::LSR_ACC); // >> 2
+                    self.emit_imm(opcodes::AND_IMM, 0x0E); // Mask bits 1-3
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    // Read current $D018, clear bits 1-3, OR in new value
+                    self.emit_abs(opcodes::LDA_ABS, vic::MEMORY);
+                    self.emit_imm(opcodes::AND_IMM, 0xF1); // Clear bits 1-3
+                    self.emit_byte(opcodes::ORA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_abs(opcodes::STA_ABS, vic::MEMORY);
+                }
+            }
+
+            // =================================================================
+            // Bitmap Graphics Functions
+            // =================================================================
+
+            "plot" => {
+                // plot(x: word, y: byte) - set pixel in hires mode
+                if args.len() >= 2 {
+                    // Store Y coordinate in TMP3
+                    self.generate_expression(&args[1])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP3);
+                    // Store X coordinate in TMP1/TMP1_HI
+                    self.generate_expression(&args[0])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_byte(opcodes::STX_ZP);
+                    self.emit_byte(zeropage::TMP1_HI);
+                    // Call plot routine
+                    self.emit_jsr_label("__plot");
+                }
+            }
+
+            "unplot" => {
+                // unplot(x: word, y: byte) - clear pixel in hires mode
+                if args.len() >= 2 {
+                    // Store Y coordinate in TMP3
+                    self.generate_expression(&args[1])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP3);
+                    // Store X coordinate in TMP1/TMP1_HI
+                    self.generate_expression(&args[0])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_byte(opcodes::STX_ZP);
+                    self.emit_byte(zeropage::TMP1_HI);
+                    // Call unplot routine
+                    self.emit_jsr_label("__unplot");
+                }
+            }
+
+            "point" => {
+                // point(x: word, y: byte) -> bool - test if pixel is set
+                if args.len() >= 2 {
+                    // Store Y coordinate in TMP3
+                    self.generate_expression(&args[1])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP3);
+                    // Store X coordinate in TMP1/TMP1_HI
+                    self.generate_expression(&args[0])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_byte(opcodes::STX_ZP);
+                    self.emit_byte(zeropage::TMP1_HI);
+                    // Call point routine (returns 0 or 1 in A)
+                    self.emit_jsr_label("__point");
+                }
+            }
+
+            "plot_mc" => {
+                // plot_mc(x: byte, y: byte, color: byte) - set multicolor pixel
+                if args.len() >= 3 {
+                    // Store color in TMP4
+                    self.generate_expression(&args[2])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP4);
+                    // Store Y coordinate in TMP3
+                    self.generate_expression(&args[1])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP3);
+                    // Store X coordinate in TMP1
+                    self.generate_expression(&args[0])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    // Call plot_mc routine
+                    self.emit_jsr_label("__plot_mc");
+                }
+            }
+
+            "point_mc" => {
+                // point_mc(x: byte, y: byte) -> byte - get multicolor pixel color
+                if args.len() >= 2 {
+                    // Store Y coordinate in TMP3
+                    self.generate_expression(&args[1])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP3);
+                    // Store X coordinate in TMP1
+                    self.generate_expression(&args[0])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    // Call point_mc routine (returns color 0-3 in A)
+                    self.emit_jsr_label("__point_mc");
+                }
+            }
+
+            "bitmap_clear" => {
+                // bitmap_clear() - clear entire bitmap
+                self.emit_imm(opcodes::LDA_IMM, 0);
+                self.emit_jsr_label("__bitmap_fill");
+            }
+
+            "bitmap_fill" => {
+                // bitmap_fill(pattern: byte) - fill entire bitmap with pattern
+                if !args.is_empty() {
+                    self.generate_expression(&args[0])?;
+                    self.emit_jsr_label("__bitmap_fill");
+                }
+            }
+
+            // =================================================================
+            // Drawing Primitives
+            // =================================================================
+
+            "line" => {
+                // line(x1: word, y1: byte, x2: word, y2: byte)
+                // Uses Bresenham's line algorithm
+                if args.len() >= 4 {
+                    // Store y2 in TMP5
+                    self.generate_expression(&args[3])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP5);
+                    // Store x2 in stack (will use runtime vars)
+                    self.generate_expression(&args[2])?;
+                    self.emit_byte(opcodes::PHA); // x2 low
+                    self.emit_byte(opcodes::TXA);
+                    self.emit_byte(opcodes::PHA); // x2 high
+                    // Store y1 in TMP3
+                    self.generate_expression(&args[1])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP3);
+                    // Store x1 in TMP1/TMP1_HI
+                    self.generate_expression(&args[0])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_byte(opcodes::STX_ZP);
+                    self.emit_byte(zeropage::TMP1_HI);
+                    // Pop x2 into TMP2/TMP2_HI
+                    self.emit_byte(opcodes::PLA); // x2 high
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP2_HI);
+                    self.emit_byte(opcodes::PLA); // x2 low
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP2);
+                    // Call line routine
+                    self.emit_jsr_label("__line");
+                }
+            }
+
+            "hline" => {
+                // hline(x: word, y: byte, length: word) - fast horizontal line
+                if args.len() >= 3 {
+                    // Store length in TMP4/TMP5
+                    self.generate_expression(&args[2])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP4);
+                    self.emit_byte(opcodes::STX_ZP);
+                    self.emit_byte(zeropage::TMP5);
+                    // Store y in TMP3
+                    self.generate_expression(&args[1])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP3);
+                    // Store x in TMP1/TMP1_HI
+                    self.generate_expression(&args[0])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_byte(opcodes::STX_ZP);
+                    self.emit_byte(zeropage::TMP1_HI);
+                    // Call hline routine
+                    self.emit_jsr_label("__hline");
+                }
+            }
+
+            "vline" => {
+                // vline(x: word, y: byte, length: byte) - fast vertical line
+                if args.len() >= 3 {
+                    // Store length in TMP4
+                    self.generate_expression(&args[2])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP4);
+                    // Store y in TMP3
+                    self.generate_expression(&args[1])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP3);
+                    // Store x in TMP1/TMP1_HI
+                    self.generate_expression(&args[0])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_byte(opcodes::STX_ZP);
+                    self.emit_byte(zeropage::TMP1_HI);
+                    // Call vline routine
+                    self.emit_jsr_label("__vline");
+                }
+            }
+
+            "rect" => {
+                // rect(x: word, y: byte, width: word, height: byte)
+                if args.len() >= 4 {
+                    // Store height
+                    self.generate_expression(&args[3])?;
+                    self.emit_byte(opcodes::PHA);
+                    // Store width
+                    self.generate_expression(&args[2])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP4);
+                    self.emit_byte(opcodes::STX_ZP);
+                    self.emit_byte(zeropage::TMP5);
+                    // Store y
+                    self.generate_expression(&args[1])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP3);
+                    // Store x
+                    self.generate_expression(&args[0])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_byte(opcodes::STX_ZP);
+                    self.emit_byte(zeropage::TMP1_HI);
+                    // Pop height into A and push to runtime location
+                    self.emit_byte(opcodes::PLA);
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP2); // Use TMP2 for height
+                    // Call rect routine
+                    self.emit_jsr_label("__rect");
+                }
+            }
+
+            "rect_fill" => {
+                // rect_fill(x: word, y: byte, width: word, height: byte)
+                if args.len() >= 4 {
+                    // Store height
+                    self.generate_expression(&args[3])?;
+                    self.emit_byte(opcodes::PHA);
+                    // Store width
+                    self.generate_expression(&args[2])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP4);
+                    self.emit_byte(opcodes::STX_ZP);
+                    self.emit_byte(zeropage::TMP5);
+                    // Store y
+                    self.generate_expression(&args[1])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP3);
+                    // Store x
+                    self.generate_expression(&args[0])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_byte(opcodes::STX_ZP);
+                    self.emit_byte(zeropage::TMP1_HI);
+                    // Pop height
+                    self.emit_byte(opcodes::PLA);
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP2);
+                    // Call rect_fill routine
+                    self.emit_jsr_label("__rect_fill");
+                }
+            }
+
+            // =================================================================
+            // Cell Color Control
+            // =================================================================
+            "cell_color" => {
+                // cell_color(cx: byte, cy: byte, fg: byte, bg: byte)
+                // Set foreground (high nibble) and background (low nibble) at screen RAM position
+                if args.len() >= 4 {
+                    // Calculate combined color: (fg << 4) | bg
+                    // Store bg in TMP4
+                    self.generate_expression(&args[3])?;
+                    self.emit_imm(opcodes::AND_IMM, 0x0F); // Mask to lower nibble
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP4);
+                    // Get fg, shift left 4, combine with bg
+                    self.generate_expression(&args[2])?;
+                    self.emit_imm(opcodes::AND_IMM, 0x0F); // Mask to lower nibble
+                    self.emit_byte(opcodes::ASL_ACC);
+                    self.emit_byte(opcodes::ASL_ACC);
+                    self.emit_byte(opcodes::ASL_ACC);
+                    self.emit_byte(opcodes::ASL_ACC);
+                    self.emit_byte(opcodes::ORA_ZP);
+                    self.emit_byte(zeropage::TMP4);
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP4); // TMP4 = combined color
+                    // Store cy in TMP3
+                    self.generate_expression(&args[1])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP3);
+                    // Store cx in TMP1
+                    self.generate_expression(&args[0])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    // Call cell_color routine
+                    self.emit_jsr_label("__cell_color");
+                }
+            }
+
+            "get_cell_color" => {
+                // get_cell_color(cx: byte, cy: byte) -> byte
+                if args.len() >= 2 {
+                    // Store cy in TMP3
+                    self.generate_expression(&args[1])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP3);
+                    // Store cx in TMP1
+                    self.generate_expression(&args[0])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    // Call get_cell_color routine, result in A
+                    self.emit_jsr_label("__get_cell_color");
+                }
+            }
+
+            "color_ram" => {
+                // color_ram(cx: byte, cy: byte, color: byte)
+                if args.len() >= 3 {
+                    // Store color in TMP4
+                    self.generate_expression(&args[2])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP4);
+                    // Store cy in TMP3
+                    self.generate_expression(&args[1])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP3);
+                    // Store cx in TMP1
+                    self.generate_expression(&args[0])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    // Call color_ram routine
+                    self.emit_jsr_label("__color_ram");
+                }
+            }
+
+            "get_color_ram" => {
+                // get_color_ram(cx: byte, cy: byte) -> byte
+                if args.len() >= 2 {
+                    // Store cy in TMP3
+                    self.generate_expression(&args[1])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP3);
+                    // Store cx in TMP1
+                    self.generate_expression(&args[0])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    // Call get_color_ram routine, result in A
+                    self.emit_jsr_label("__get_color_ram");
+                }
+            }
+
+            "fill_colors" => {
+                // fill_colors(fg: byte, bg: byte)
+                if args.len() >= 2 {
+                    // Calculate combined color: (fg << 4) | bg
+                    self.generate_expression(&args[1])?;
+                    self.emit_imm(opcodes::AND_IMM, 0x0F);
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.generate_expression(&args[0])?;
+                    self.emit_imm(opcodes::AND_IMM, 0x0F);
+                    self.emit_byte(opcodes::ASL_ACC);
+                    self.emit_byte(opcodes::ASL_ACC);
+                    self.emit_byte(opcodes::ASL_ACC);
+                    self.emit_byte(opcodes::ASL_ACC);
+                    self.emit_byte(opcodes::ORA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    // A = combined color, call fill routine
+                    self.emit_jsr_label("__fill_colors");
+                }
+            }
+
+            "fill_color_ram" => {
+                // fill_color_ram(color: byte)
+                if args.len() >= 1 {
+                    self.generate_expression(&args[0])?;
+                    // A = color, call fill routine
+                    self.emit_jsr_label("__fill_color_ram");
+                }
+            }
+
+            // =================================================================
+            // Hardware Scrolling
+            // =================================================================
+            "scroll_x" => {
+                // scroll_x(offset: byte) - set horizontal scroll (0-7)
+                // Modifies bits 0-2 of $D016, preserves bits 3-7
+                if args.len() >= 1 {
+                    self.generate_expression(&args[0])?;
+                    self.emit_imm(opcodes::AND_IMM, 0x07); // Mask to 0-7
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    // Read current $D016, clear bits 0-2, OR with new value
+                    self.emit_abs(opcodes::LDA_ABS, vic::CONTROL2);
+                    self.emit_imm(opcodes::AND_IMM, 0xF8); // Clear bits 0-2
+                    self.emit_byte(opcodes::ORA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_abs(opcodes::STA_ABS, vic::CONTROL2);
+                }
+            }
+
+            "scroll_y" => {
+                // scroll_y(offset: byte) - set vertical scroll (0-7)
+                // Modifies bits 0-2 of $D011, preserves bits 3-7
+                if args.len() >= 1 {
+                    self.generate_expression(&args[0])?;
+                    self.emit_imm(opcodes::AND_IMM, 0x07); // Mask to 0-7
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    // Read current $D011, clear bits 0-2, OR with new value
+                    self.emit_abs(opcodes::LDA_ABS, vic::CONTROL1);
+                    self.emit_imm(opcodes::AND_IMM, 0xF8); // Clear bits 0-2
+                    self.emit_byte(opcodes::ORA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_abs(opcodes::STA_ABS, vic::CONTROL1);
+                }
+            }
+
+            "get_scroll_x" => {
+                // get_scroll_x() -> byte - get horizontal scroll (0-7)
+                // Read bits 0-2 of $D016
+                self.emit_abs(opcodes::LDA_ABS, vic::CONTROL2);
+                self.emit_imm(opcodes::AND_IMM, 0x07);
+            }
+
+            "get_scroll_y" => {
+                // get_scroll_y() -> byte - get vertical scroll (0-7)
+                // Read bits 0-2 of $D011
+                self.emit_abs(opcodes::LDA_ABS, vic::CONTROL1);
+                self.emit_imm(opcodes::AND_IMM, 0x07);
+            }
+
+            // =================================================================
+            // Raster Functions
+            // =================================================================
+            "raster" => {
+                // raster() -> word - get current raster line
+                // Low byte from $D012, bit 8 from bit 7 of $D011
+                // Result: A = low byte, X = high byte (0 or 1)
+                self.emit_abs(opcodes::LDA_ABS, vic::CONTROL1);
+                self.emit_imm(opcodes::AND_IMM, 0x80); // Get bit 7
+                self.emit_byte(opcodes::ASL_ACC); // Shift into carry
+                self.emit_imm(opcodes::LDA_IMM, 0);
+                self.emit_byte(opcodes::ROL_ACC); // Rotate carry into bit 0
+                self.emit_byte(opcodes::TAX); // X = high byte (0 or 1)
+                self.emit_abs(opcodes::LDA_ABS, vic::RASTER); // A = low byte
+            }
+
+            "wait_raster" => {
+                // wait_raster(line: word) - wait until raster reaches specific line
+                if args.len() >= 1 {
+                    // Store target line in TMP1/TMP1_HI
+                    self.generate_expression(&args[0])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_byte(opcodes::STX_ZP);
+                    self.emit_byte(zeropage::TMP1_HI);
+                    // Call wait_raster routine
+                    self.emit_jsr_label("__wait_raster");
+                }
+            }
+
+            // =================================================================
+            // Extended Background Color Mode (ECM)
+            // =================================================================
+            "ecm_background" => {
+                // ecm_background(index: byte, color: byte)
+                // index 0-3 maps to $D021-$D024
+                if args.len() >= 2 {
+                    // Store color in TMP1
+                    self.generate_expression(&args[1])?;
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    // Get index
+                    self.generate_expression(&args[0])?;
+                    self.emit_imm(opcodes::AND_IMM, 0x03); // Mask to 0-3
+                    self.emit_byte(opcodes::TAX);
+                    // Load color
+                    self.emit_byte(opcodes::LDA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    // Store to $D021 + index
+                    self.emit_abs(opcodes::STA_ABX, vic::BACKGROUND0);
+                }
+            }
+
+            "get_ecm_background" => {
+                // get_ecm_background(index: byte) -> byte
+                if args.len() >= 1 {
+                    self.generate_expression(&args[0])?;
+                    self.emit_imm(opcodes::AND_IMM, 0x03); // Mask to 0-3
+                    self.emit_byte(opcodes::TAX);
+                    // Load from $D021 + index
+                    self.emit_abs(opcodes::LDA_ABX, vic::BACKGROUND0);
                 }
             }
 

@@ -1,0 +1,151 @@
+# Cobra64 - A concept for a modern Python-like compiler creating C64 binaries
+#
+# Copyright (C) 2026 Marcel Joachim Kloubert <marcel@kloubert.dev>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+# Hardware Scrolling Demo
+# Demonstrates VIC-II hardware scroll registers
+
+def fill_screen():
+    # Fill screen with a pattern for scrolling effect
+    i: word = 0
+    while i < 1000:
+        addr: word = 1024 + i
+        c: byte = (i & 255) as byte
+        poke(addr, c)
+        i = i + 1
+
+def horizontal_scroll():
+    # Horizontal smooth scroll demo
+    # Set 38-column mode to hide scroll artifacts at edges
+    screen_columns(38)
+
+    cycles: byte = 0
+    while cycles < 16:
+        offset: byte = 0
+        while offset < 8:
+            # Wait for specific raster line (smooth timing)
+            wait_raster(250)
+
+            # Set horizontal scroll offset
+            scroll_x(offset)
+
+            # Small delay
+            delay(2)
+            offset = offset + 1
+        cycles = cycles + 1
+
+    # Reset to 40 columns
+    screen_columns(40)
+    scroll_x(0)
+
+def vertical_scroll():
+    # Vertical smooth scroll demo
+    # Set 24-row mode to hide scroll artifacts
+    screen_rows(24)
+
+    cycles: byte = 0
+    while cycles < 16:
+        offset: byte = 0
+        while offset < 8:
+            # Wait for raster
+            wait_raster(250)
+
+            # Set vertical scroll offset
+            scroll_y(offset)
+
+            # Small delay
+            delay(2)
+            offset = offset + 1
+        cycles = cycles + 1
+
+    # Reset to 25 rows
+    screen_rows(25)
+    scroll_y(0)
+
+def diagonal_scroll():
+    # Combined horizontal and vertical scroll
+    screen_columns(38)
+    screen_rows(24)
+
+    cycles: byte = 0
+    while cycles < 16:
+        offset: byte = 0
+        while offset < 8:
+            wait_raster(250)
+            scroll_x(offset)
+            scroll_y(offset)
+            delay(2)
+            offset = offset + 1
+        cycles = cycles + 1
+
+    # Reset
+    screen_columns(40)
+    screen_rows(25)
+    scroll_x(0)
+    scroll_y(0)
+
+def raster_bar():
+    # Simple raster bar effect
+    i: byte = 0
+    while i < 100:
+        line: word = 100
+
+        while line < 180:
+            wait_raster(line)
+            c: byte = ((line - 100) / 5) as byte
+            border_color(c & 15)
+            line = line + 1
+
+        wait_raster(250)
+        border_color(0)
+
+        i = i + 1
+
+def main():
+    cls()
+    println("SCROLL DEMO")
+    println("-----------")
+    println("1. FILL PATTERN")
+    println("2. H-SCROLL")
+    println("3. V-SCROLL")
+    println("4. DIAGONAL")
+    println("5. RASTER BARS")
+    delay(30)
+
+    # Set colors
+    border_color(0)
+    background_color(6)
+
+    fill_screen()
+    delay(30)
+
+    horizontal_scroll()
+    delay(20)
+
+    vertical_scroll()
+    delay(20)
+
+    diagonal_scroll()
+    delay(20)
+
+    border_color(0)
+    raster_bar()
+
+    # End
+    cls()
+    background_color(6)
+    border_color(14)
+    println("SCROLL DEMO FINISHED")

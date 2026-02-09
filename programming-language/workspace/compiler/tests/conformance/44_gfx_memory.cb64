@@ -1,0 +1,48 @@
+# Test VIC-II memory configuration functions
+# Expected output:
+# GFX MEMORY TEST
+# BANK=0
+# BANK SET
+# BANK=1
+# BANK RESTORED
+# SCREEN OK
+# BITMAP OK
+# CHARSET OK
+# DONE
+
+def main():
+    println("GFX MEMORY TEST")
+
+    # Test get_vic_bank - should start at bank 0
+    b: byte = get_vic_bank()
+    print("BANK=")
+    println(b)
+
+    # Test vic_bank - switch to bank 1
+    vic_bank(1)
+    println("BANK SET")
+
+    b = get_vic_bank()
+    print("BANK=")
+    println(b)
+
+    # Restore bank 0
+    vic_bank(0)
+    println("BANK RESTORED")
+
+    # Test screen_address (set screen RAM to $0400 = 1024)
+    screen_address($0400)
+    println("SCREEN OK")
+
+    # Test bitmap_address (set bitmap to $2000 = 8192)
+    bitmap_address($2000)
+    println("BITMAP OK")
+
+    # Test charset_address (set charset to $1000 = 4096)
+    charset_address($1000)
+    println("CHARSET OK")
+
+    # Restore default charset ($1000 is actually default)
+    charset_address($1000)
+
+    println("DONE")

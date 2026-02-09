@@ -1,0 +1,86 @@
+# Cobra64 - A concept for a modern Python-like compiler creating C64 binaries
+#
+# Copyright (C) 2026 Marcel Joachim Kloubert <marcel@kloubert.dev>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+# Bitmap Graphics Demo
+# Demonstrates hires bitmap mode (320x200 pixels)
+
+def setup_bitmap():
+    # Switch to hires bitmap mode
+    gfx_hires()
+
+    # Clear bitmap
+    bitmap_clear()
+
+    # Set all cells to white on black
+    fill_colors(1, 0)
+
+def draw_border_frame():
+    # Draw a frame around the screen
+    hline(0, 0, 320)        # Top
+    hline(0, 199, 320)      # Bottom
+    vline(0, 0, 200)        # Left
+    vline(319, 0, 200)      # Right
+
+def draw_diagonals():
+    # Draw diagonal lines
+    line(0, 0, 319, 199)    # Top-left to bottom-right
+    line(319, 0, 0, 199)    # Top-right to bottom-left
+
+def draw_rectangles():
+    # Draw some rectangles
+    rect(20, 20, 80, 60)           # Outline rectangle
+    rect_fill(220, 20, 80, 60)     # Filled rectangle
+
+    # Nested rectangles
+    rect(100, 100, 120, 80)
+    rect(110, 110, 100, 60)
+    rect(120, 120, 80, 40)
+
+def draw_pattern():
+    # Draw a pixel pattern
+    x: word = 140
+    while x < 180:
+        y: byte = 40
+        while y < 80:
+            # Checkerboard pattern
+            if ((x + y) & 1) == 1:
+                plot(x, y)
+            y = y + 1
+        x = x + 1
+
+def main():
+    # Set colors
+    border_color(0)       # Black border
+    background_color(0)   # Black background
+
+    # Initialize bitmap
+    setup_bitmap()
+
+    # Draw various shapes
+    draw_border_frame()
+    draw_diagonals()
+    draw_rectangles()
+    draw_pattern()
+
+    # Wait for keypress
+    while get_key() == 0:
+        pass
+
+    # Return to text mode
+    gfx_text()
+    cls()
+    println("DEMO FINISHED")

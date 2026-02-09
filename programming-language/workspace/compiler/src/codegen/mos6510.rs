@@ -320,12 +320,20 @@ pub mod zeropage {
     pub const TMP2: u8 = 0xFD;
     pub const TMP2_HI: u8 = 0xFE;
 
-    /// Additional temporaries ($02-$05 are safe on C64).
+    /// Additional temporaries ($02-$0D are safe on C64 when not using BASIC floats).
     /// TMP3/TMP3_HI form a 16-bit word for fixed-point operations.
     pub const TMP3: u8 = 0x02;
     pub const TMP3_HI: u8 = 0x03;
     pub const TMP4: u8 = 0x04;
     pub const TMP5: u8 = 0x05;
+
+    /// Extended temporaries for complex operations (using $08-$0D).
+    pub const TMP6: u8 = 0x08;
+    pub const TMP7: u8 = 0x09;
+    pub const TMP8: u8 = 0x0A;
+    pub const TMP9: u8 = 0x0B;
+    pub const TMP10: u8 = 0x0C;
+    pub const TMP11: u8 = 0x0D;
 
     /// Pointer for string operations ($22-$23).
     pub const STR_PTR: u8 = 0x22;
@@ -514,8 +522,174 @@ pub mod sid {
 /// VIC-II registers.
 #[allow(dead_code)]
 pub mod vic {
+    // =========================================================================
+    // VIC-II Base Address
+    // =========================================================================
+
+    /// VIC-II base address.
+    pub const BASE: u16 = 0xD000;
+
+    // =========================================================================
+    // Control Registers
+    // =========================================================================
+
+    /// Control register 1 ($D011).
+    /// Bits: RST8 | ECM | BMM | DEN | RSEL | YSCROLL(2-0)
+    /// - Bit 7: RST8 - Raster line bit 8
+    /// - Bit 6: ECM - Extended color mode
+    /// - Bit 5: BMM - Bitmap mode
+    /// - Bit 4: DEN - Display enable
+    /// - Bit 3: RSEL - Row select (24/25 rows)
+    /// - Bits 0-2: YSCROLL - Vertical scroll (0-7)
+    pub const CONTROL1: u16 = 0xD011;
+
+    /// Control register 2 ($D016).
+    /// Bits: - | - | RES | MCM | CSEL | XSCROLL(2-0)
+    /// - Bit 5: RES - Reset (unused)
+    /// - Bit 4: MCM - Multicolor mode
+    /// - Bit 3: CSEL - Column select (38/40 columns)
+    /// - Bits 0-2: XSCROLL - Horizontal scroll (0-7)
+    pub const CONTROL2: u16 = 0xD016;
+
+    /// Memory control register ($D018).
+    /// Bits: VM13-VM10 | CB13-CB11 | -
+    /// - Bits 4-7: VM - Video matrix base address
+    /// - Bits 1-3: CB - Character/bitmap base address
+    pub const MEMORY: u16 = 0xD018;
+
+    // =========================================================================
+    // Raster Registers
+    // =========================================================================
+
     /// Current raster line (bits 0-7).
     pub const RASTER: u16 = 0xD012;
+
+    // =========================================================================
+    // Color Registers
+    // =========================================================================
+
+    /// Border color register.
+    pub const BORDER: u16 = 0xD020;
+
+    /// Background color 0 (main background).
+    pub const BACKGROUND0: u16 = 0xD021;
+
+    /// Background color 1 (ECM/multicolor).
+    pub const BACKGROUND1: u16 = 0xD022;
+
+    /// Background color 2 (ECM/multicolor).
+    pub const BACKGROUND2: u16 = 0xD023;
+
+    /// Background color 3 (ECM only).
+    pub const BACKGROUND3: u16 = 0xD024;
+
+    // =========================================================================
+    // Control Bit Constants
+    // =========================================================================
+
+    /// Bitmap mode bit (bit 5 of $D011).
+    pub const BMM: u8 = 0x20;
+
+    /// Extended color mode bit (bit 6 of $D011).
+    pub const ECM: u8 = 0x40;
+
+    /// Multicolor mode bit (bit 4 of $D016).
+    pub const MCM: u8 = 0x10;
+
+    /// Display enable bit (bit 4 of $D011).
+    pub const DEN: u8 = 0x10;
+
+    /// Row select bit - 25 rows (bit 3 of $D011).
+    pub const RSEL: u8 = 0x08;
+
+    /// Column select bit - 40 columns (bit 3 of $D016).
+    pub const CSEL: u8 = 0x08;
+
+    /// Y scroll mask (bits 0-2 of $D011).
+    pub const YSCROLL_MASK: u8 = 0x07;
+
+    /// X scroll mask (bits 0-2 of $D016).
+    pub const XSCROLL_MASK: u8 = 0x07;
+
+    // =========================================================================
+    // Graphics Mode Constants (for gfx_mode function)
+    // =========================================================================
+
+    /// Standard text mode (ECM=0, BMM=0, MCM=0).
+    pub const MODE_TEXT: u8 = 0;
+
+    /// Multicolor text mode (ECM=0, BMM=0, MCM=1).
+    pub const MODE_TEXT_MC: u8 = 1;
+
+    /// Standard bitmap/hires mode (ECM=0, BMM=1, MCM=0).
+    pub const MODE_BITMAP: u8 = 2;
+
+    /// Multicolor bitmap mode (ECM=0, BMM=1, MCM=1).
+    pub const MODE_BITMAP_MC: u8 = 3;
+
+    /// Extended background color mode (ECM=1, BMM=0, MCM=0).
+    pub const MODE_TEXT_ECM: u8 = 4;
+
+    // =========================================================================
+    // Memory Bank Constants (via CIA2 $DD00)
+    // =========================================================================
+
+    /// VIC bank 0: $0000-$3FFF (default).
+    pub const BANK0: u8 = 0;
+
+    /// VIC bank 1: $4000-$7FFF.
+    pub const BANK1: u8 = 1;
+
+    /// VIC bank 2: $8000-$BFFF.
+    pub const BANK2: u8 = 2;
+
+    /// VIC bank 3: $C000-$FFFF.
+    pub const BANK3: u8 = 3;
+
+    // =========================================================================
+    // Default Values
+    // =========================================================================
+
+    /// Default value for $D011 (text mode, 25 rows, display enabled).
+    pub const CONTROL1_DEFAULT: u8 = 0x1B;
+
+    /// Default value for $D016 (no multicolor, 40 columns).
+    pub const CONTROL2_DEFAULT: u8 = 0xC8;
+
+    // =========================================================================
+    // Raster Constants
+    // =========================================================================
+
+    /// First visible raster line (PAL).
+    pub const RASTER_TOP: u16 = 50;
+
+    /// Last visible raster line (PAL).
+    pub const RASTER_BOTTOM: u16 = 250;
+
+    /// Maximum raster line (PAL).
+    pub const RASTER_MAX_PAL: u16 = 311;
+
+    /// Maximum raster line (NTSC).
+    pub const RASTER_MAX_NTSC: u16 = 261;
+
+    // =========================================================================
+    // Bitmap Memory Constants
+    // =========================================================================
+
+    /// Default bitmap address ($2000 = 8192).
+    pub const BITMAP_DEFAULT: u16 = 0x2000;
+
+    /// Bitmap size in bytes (320x200 / 8 = 8000 bytes).
+    pub const BITMAP_SIZE: u16 = 8000;
+
+    /// Screen width in pixels (hires mode).
+    pub const SCREEN_WIDTH: u16 = 320;
+
+    /// Screen height in pixels.
+    pub const SCREEN_HEIGHT: u8 = 200;
+
+    /// Screen width in pixels (multicolor mode).
+    pub const SCREEN_WIDTH_MC: u8 = 160;
 }
 
 /// VIC-II sprite registers.
@@ -643,6 +817,19 @@ pub mod cia {
     pub const CIA1_TIMER_B_LO: u16 = 0xDC06;
     /// CIA1 Timer B high byte.
     pub const CIA1_TIMER_B_HI: u16 = 0xDC07;
+
+    /// CIA2 Port A Data Direction Register.
+    pub const CIA2_DDRA: u16 = 0xDD02;
+    /// CIA2 Port A - VIC bank selection (bits 0-1).
+    /// Bits 0-1 select VIC bank (inverted):
+    /// - %11 = Bank 0 ($0000-$3FFF)
+    /// - %10 = Bank 1 ($4000-$7FFF)
+    /// - %01 = Bank 2 ($8000-$BFFF)
+    /// - %00 = Bank 3 ($C000-$FFFF)
+    pub const CIA2_PRA: u16 = 0xDD00;
+
+    /// VIC bank mask (bits 0-1 of CIA2 Port A).
+    pub const VIC_BANK_MASK: u8 = 0x03;
 }
 
 /// PETSCII character codes.
