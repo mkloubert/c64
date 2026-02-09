@@ -1,0 +1,138 @@
+# Cobra64 Sound Effects Example
+# Game-like sound effects using SID
+
+def main():
+    cls()
+    println("SOUND EFFECTS DEMO")
+    println("")
+
+    sid_reset()
+    sid_volume(15)
+
+    println("Press any key for each effect...")
+    println("")
+
+    println("1. Laser shot")
+    read()
+    laser_sound()
+
+    println("2. Explosion")
+    read()
+    explosion_sound()
+
+    println("3. Coin pickup")
+    read()
+    coin_sound()
+
+    println("4. Jump")
+    read()
+    jump_sound()
+
+    println("5. Power up")
+    read()
+    powerup_sound()
+
+    println("")
+    println("Demo complete!")
+    sound_off()
+
+
+def laser_sound():
+    # High pitched descending tone
+    sid_envelope(0, 0, 0, 0, 8)
+    sid_waveform(0, WAVE_PULSE)
+    sid_pulse_width(0, 512)
+
+    freq: word = 15000
+    sid_gate(0, true)
+    while freq > 3000:
+        sid_frequency(0, freq)
+        freq = freq - 500
+        short_delay()
+    sid_gate(0, false)
+
+
+def explosion_sound():
+    # Noise with falling filter
+    sid_envelope(0, 0, 12, 0, 12)
+    sid_waveform(0, WAVE_NOISE)
+    sid_frequency(0, 1000)
+    sid_filter_route(1)
+    sid_filter_resonance(8)
+    sid_filter_mode(FILTER_LOWPASS)
+
+    sid_gate(0, true)
+    cutoff: word = 2000
+    while cutoff > 100:
+        sid_filter_cutoff(cutoff)
+        cutoff = cutoff - 50
+        short_delay()
+
+    sid_gate(0, false)
+    sid_filter_route(0)
+
+
+def coin_sound():
+    # Two quick high notes
+    sid_envelope(0, 0, 8, 0, 0)
+    sid_waveform(0, WAVE_TRIANGLE)
+
+    # First note
+    sid_frequency(0, 12000)
+    sid_gate(0, true)
+    delay(80)
+    sid_gate(0, false)
+    delay(30)
+
+    # Second note (higher)
+    sid_frequency(0, 16000)
+    sid_gate(0, true)
+    delay(80)
+    sid_gate(0, false)
+
+
+def jump_sound():
+    # Rising pitch
+    sid_envelope(0, 0, 0, 8, 4)
+    sid_waveform(0, WAVE_TRIANGLE)
+
+    freq: word = 2000
+    sid_gate(0, true)
+    while freq < 8000:
+        sid_frequency(0, freq)
+        freq = freq + 300
+        short_delay()
+    sid_gate(0, false)
+
+
+def powerup_sound():
+    # Ascending arpeggio
+    sid_envelope(0, 0, 4, 8, 4)
+    sid_waveform(0, WAVE_SAWTOOTH)
+
+    # Play ascending notes
+    i: byte = 0
+    freq: word = 3000
+    while i < 6:
+        sid_frequency(0, freq)
+        sid_gate(0, true)
+        delay(100)
+        sid_gate(0, false)
+        delay(20)
+        freq = freq + 1000
+        i = i + 1
+
+
+def short_delay():
+    j: byte = 0
+    while j < 100:
+        j = j + 1
+
+
+def delay(ms: word):
+    i: word = 0
+    while i < ms:
+        j: byte = 0
+        while j < 200:
+            j = j + 1
+        i = i + 1

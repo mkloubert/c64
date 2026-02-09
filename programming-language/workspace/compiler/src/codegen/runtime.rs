@@ -77,6 +77,9 @@ pub trait RuntimeEmitter {
     fn emit_prng_init_routine(&mut self);
     fn emit_prng_next_routine(&mut self);
     fn emit_rand_routine(&mut self);
+
+    // Sound routines
+    fn emit_note_to_freq_routine(&mut self);
 }
 
 impl RuntimeEmitter for CodeGenerator {
@@ -132,6 +135,9 @@ impl RuntimeEmitter for CodeGenerator {
         self.emit_prng_init_routine();
         self.emit_prng_next_routine();
         self.emit_rand_routine();
+
+        // Sound routines
+        self.emit_note_to_freq_routine();
     }
 
     /// Emit print string routine.
@@ -1933,6 +1939,127 @@ impl RuntimeEmitter for CodeGenerator {
         // A now contains 0-15 (the fractional part)
         // X = 0 (integer part is always 0)
         self.emit_imm(opcodes::LDX_IMM, 0);
+        self.emit_byte(opcodes::RTS);
+    }
+
+    /// Emit note-to-frequency conversion routine for SID.
+    ///
+    /// Input: A = note (0-11: C, C#, D, D#, E, F, F#, G, G#, A, A#, B)
+    ///        TMP2 = octave (0-7)
+    /// Output: A = frequency low byte, X = frequency high byte
+    ///
+    /// Uses PAL frequency values. The base frequencies are for octave 4,
+    /// then shifted based on the requested octave.
+    fn emit_note_to_freq_routine(&mut self) {
+        self.define_label("__note_to_freq");
+        self.runtime_addresses
+            .insert("note_to_freq".to_string(), self.current_address);
+
+        // Jump over the data table first
+        self.emit_jmp("__ntf_code");
+
+        // Frequency table for octave 4 (PAL values)
+        // C4=262Hz, C#4=277Hz, D4=294Hz, D#4=311Hz, E4=330Hz, F4=349Hz,
+        // F#4=370Hz, G4=392Hz, G#4=415Hz, A4=440Hz, A#4=466Hz, B4=494Hz
+        // SID freq = Hz * 17.028 (PAL)
+        self.define_label("__note_freq_table");
+        let table_addr = self.current_address;
+        // C4: 4460 = $116C
+        self.emit_byte(0x6C);
+        self.emit_byte(0x11);
+        // C#4: 4724 = $1274
+        self.emit_byte(0x74);
+        self.emit_byte(0x12);
+        // D4: 5005 = $138D
+        self.emit_byte(0x8D);
+        self.emit_byte(0x13);
+        // D#4: 5303 = $14B7
+        self.emit_byte(0xB7);
+        self.emit_byte(0x14);
+        // E4: 5620 = $15F4
+        self.emit_byte(0xF4);
+        self.emit_byte(0x15);
+        // F4: 5955 = $1743
+        self.emit_byte(0x43);
+        self.emit_byte(0x17);
+        // F#4: 6310 = $18A6
+        self.emit_byte(0xA6);
+        self.emit_byte(0x18);
+        // G4: 6685 = $1A1D
+        self.emit_byte(0x1D);
+        self.emit_byte(0x1A);
+        // G#4: 7083 = $1BAB
+        self.emit_byte(0xAB);
+        self.emit_byte(0x1B);
+        // A4: 7503 = $1D4F
+        self.emit_byte(0x4F);
+        self.emit_byte(0x1D);
+        // A#4: 7949 = $1F0D
+        self.emit_byte(0x0D);
+        self.emit_byte(0x1F);
+        // B4: 8421 = $20E5
+        self.emit_byte(0xE5);
+        self.emit_byte(0x20);
+
+        self.define_label("__ntf_code");
+        // A = note (0-11), multiply by 2 for table lookup
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::TAY); // Y = note * 2
+
+        // Load base frequency from table
+        self.emit_aby(opcodes::LDA_ABY, table_addr);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1); // TMP1 = freq low
+        self.emit_byte(opcodes::INY);
+        self.emit_aby(opcodes::LDA_ABY, table_addr);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1_HI); // TMP1_HI = freq high
+
+        // Now scale based on octave (TMP2)
+        // Octave 4 = no shift, octave 5 = shift left 1, octave 3 = shift right 1
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2); // A = octave
+        self.emit_byte(opcodes::SEC);
+        self.emit_imm(opcodes::SBC_IMM, 4); // A = octave - 4
+
+        // If zero, no shift needed
+        self.emit_branch(opcodes::BEQ, "__ntf_done");
+
+        // If negative (octave < 4), shift right
+        self.emit_branch(opcodes::BMI, "__ntf_shift_right");
+
+        // Positive: shift left (octave > 4)
+        self.emit_byte(opcodes::TAX); // X = shift count
+        self.define_label("__ntf_shift_left");
+        self.emit_byte(opcodes::ASL_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::ROL_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_byte(opcodes::DEX);
+        self.emit_branch(opcodes::BNE, "__ntf_shift_left");
+        self.emit_jmp("__ntf_done");
+
+        // Negative: shift right (negate to get positive count)
+        self.define_label("__ntf_shift_right");
+        self.emit_byte(opcodes::EOR_IMM);
+        self.emit_byte(0xFF); // Invert
+        self.emit_byte(opcodes::CLC);
+        self.emit_imm(opcodes::ADC_IMM, 1); // +1 = negate
+        self.emit_byte(opcodes::TAX); // X = shift count (positive)
+        self.define_label("__ntf_shift_right_loop");
+        self.emit_byte(opcodes::LSR_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_byte(opcodes::ROR_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::DEX);
+        self.emit_branch(opcodes::BNE, "__ntf_shift_right_loop");
+
+        self.define_label("__ntf_done");
+        // Return frequency in A (low), X (high)
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::LDX_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
         self.emit_byte(opcodes::RTS);
     }
 }

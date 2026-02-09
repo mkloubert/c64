@@ -353,6 +353,147 @@ export const COBRA64_CONSTANTS: BuiltinConstant[] = [
     { name: 'VIC_SPRITE5_COLOR', type: 'word', value: '$D02C', description: 'Sprite 5 color (53292)', examples: ['poke(VIC_SPRITE5_COLOR, COLOR_CYAN)'] },
     { name: 'VIC_SPRITE6_COLOR', type: 'word', value: '$D02D', description: 'Sprite 6 color (53293)', examples: ['poke(VIC_SPRITE6_COLOR, COLOR_PURPLE)'] },
     { name: 'VIC_SPRITE7_COLOR', type: 'word', value: '$D02E', description: 'Sprite 7 color (53294)', examples: ['poke(VIC_SPRITE7_COLOR, COLOR_ORANGE)'] },
+    // SID Sound Waveform Constants
+    {
+        name: 'WAVE_TRIANGLE', type: 'byte', value: '16', description: 'Triangle waveform for SID voice (soft, mellow tone)', examples: [
+            '# smooth, flute-like sound\nsid_waveform(0, WAVE_TRIANGLE)',
+        ]
+    },
+    {
+        name: 'WAVE_SAWTOOTH', type: 'byte', value: '32', description: 'Sawtooth waveform for SID voice (bright, harsh tone)', examples: [
+            '# bright, buzzy sound - good for bass\nsid_waveform(0, WAVE_SAWTOOTH)',
+        ]
+    },
+    {
+        name: 'WAVE_PULSE', type: 'byte', value: '64', description: 'Pulse/square waveform for SID voice (hollow, rich tone)', examples: [
+            '# classic 8-bit sound\n# vary pulse width for different tones\nsid_waveform(0, WAVE_PULSE)\nsid_pulse_width(0, 2048)  # 50% = square wave',
+        ]
+    },
+    {
+        name: 'WAVE_NOISE', type: 'byte', value: '128', description: 'White noise waveform for SID voice (drums, explosions)', examples: [
+            '# use for drums, explosions, wind, laser sounds\nsid_waveform(0, WAVE_NOISE)',
+        ]
+    },
+    // SID Filter Mode Constants
+    {
+        name: 'FILTER_LOWPASS', type: 'byte', value: '16', description: 'Low-pass filter mode (passes low frequencies)', examples: [
+            '# cuts high frequencies - warm, muffled sound\nsid_filter_mode(FILTER_LOWPASS)\nsid_filter_cutoff(512)',
+        ]
+    },
+    {
+        name: 'FILTER_BANDPASS', type: 'byte', value: '32', description: 'Band-pass filter mode (passes mid frequencies)', examples: [
+            '# passes frequencies around cutoff\n# nasal, telephone-like sound\nsid_filter_mode(FILTER_BANDPASS)',
+        ]
+    },
+    {
+        name: 'FILTER_HIGHPASS', type: 'byte', value: '64', description: 'High-pass filter mode (passes high frequencies)', examples: [
+            '# cuts low frequencies - thin, bright sound\nsid_filter_mode(FILTER_HIGHPASS)',
+        ]
+    },
+    // SID Note Constants
+    {
+        name: 'NOTE_C', type: 'byte', value: '0', description: 'Musical note C (for play_note function)', examples: [
+            '# play middle C (C4)\nplay_note(0, NOTE_C, 4)',
+        ]
+    },
+    {
+        name: 'NOTE_CS', type: 'byte', value: '1', description: 'Musical note C#/Db (for play_note function)', examples: [
+            'play_note(0, NOTE_CS, 4)',
+        ]
+    },
+    {
+        name: 'NOTE_D', type: 'byte', value: '2', description: 'Musical note D (for play_note function)', examples: [
+            'play_note(0, NOTE_D, 4)',
+        ]
+    },
+    {
+        name: 'NOTE_DS', type: 'byte', value: '3', description: 'Musical note D#/Eb (for play_note function)', examples: [
+            'play_note(0, NOTE_DS, 4)',
+        ]
+    },
+    {
+        name: 'NOTE_E', type: 'byte', value: '4', description: 'Musical note E (for play_note function)', examples: [
+            'play_note(0, NOTE_E, 4)',
+        ]
+    },
+    {
+        name: 'NOTE_F', type: 'byte', value: '5', description: 'Musical note F (for play_note function)', examples: [
+            'play_note(0, NOTE_F, 4)',
+        ]
+    },
+    {
+        name: 'NOTE_FS', type: 'byte', value: '6', description: 'Musical note F#/Gb (for play_note function)', examples: [
+            'play_note(0, NOTE_FS, 4)',
+        ]
+    },
+    {
+        name: 'NOTE_G', type: 'byte', value: '7', description: 'Musical note G (for play_note function)', examples: [
+            'play_note(0, NOTE_G, 4)',
+        ]
+    },
+    {
+        name: 'NOTE_GS', type: 'byte', value: '8', description: 'Musical note G#/Ab (for play_note function)', examples: [
+            'play_note(0, NOTE_GS, 4)',
+        ]
+    },
+    {
+        name: 'NOTE_A', type: 'byte', value: '9', description: 'Musical note A (for play_note function)', examples: [
+            '# A4 = 440 Hz (concert pitch)\nplay_note(0, NOTE_A, 4)',
+        ]
+    },
+    {
+        name: 'NOTE_AS', type: 'byte', value: '10', description: 'Musical note A#/Bb (for play_note function)', examples: [
+            'play_note(0, NOTE_AS, 4)',
+        ]
+    },
+    {
+        name: 'NOTE_B', type: 'byte', value: '11', description: 'Musical note B (for play_note function)', examples: [
+            'play_note(0, NOTE_B, 4)',
+        ]
+    },
+    // SID Register Address Constants
+    {
+        name: 'SID_BASE', type: 'word', value: '$D400', description: 'SID chip base address (54272)', examples: [
+            '# all SID registers start at $D400\n# voices are at 7-byte offsets',
+        ]
+    },
+    { name: 'SID_VOICE1_FREQ_LO', type: 'word', value: '$D400', description: 'Voice 1 frequency low byte (54272)', examples: ['poke(SID_VOICE1_FREQ_LO, $22)'] },
+    { name: 'SID_VOICE1_FREQ_HI', type: 'word', value: '$D401', description: 'Voice 1 frequency high byte (54273)', examples: ['poke(SID_VOICE1_FREQ_HI, $1C)'] },
+    { name: 'SID_VOICE1_PW_LO', type: 'word', value: '$D402', description: 'Voice 1 pulse width low byte (54274)', examples: ['# 12-bit pulse width (0-4095)'] },
+    { name: 'SID_VOICE1_PW_HI', type: 'word', value: '$D403', description: 'Voice 1 pulse width high byte (54275)', examples: ['# upper 4 bits of pulse width'] },
+    { name: 'SID_VOICE1_CTRL', type: 'word', value: '$D404', description: 'Voice 1 control register (54276)', examples: ['# gate, sync, ring mod, test, waveform'] },
+    { name: 'SID_VOICE1_AD', type: 'word', value: '$D405', description: 'Voice 1 attack/decay (54277)', examples: ['# upper 4 bits = attack, lower = decay'] },
+    { name: 'SID_VOICE1_SR', type: 'word', value: '$D406', description: 'Voice 1 sustain/release (54278)', examples: ['# upper 4 bits = sustain, lower = release'] },
+    { name: 'SID_VOICE2_FREQ_LO', type: 'word', value: '$D407', description: 'Voice 2 frequency low byte (54279)', examples: ['poke(SID_VOICE2_FREQ_LO, freq_lo)'] },
+    { name: 'SID_VOICE2_FREQ_HI', type: 'word', value: '$D408', description: 'Voice 2 frequency high byte (54280)', examples: ['poke(SID_VOICE2_FREQ_HI, freq_hi)'] },
+    { name: 'SID_VOICE2_PW_LO', type: 'word', value: '$D409', description: 'Voice 2 pulse width low byte (54281)', examples: ['poke(SID_VOICE2_PW_LO, pw_lo)'] },
+    { name: 'SID_VOICE2_PW_HI', type: 'word', value: '$D40A', description: 'Voice 2 pulse width high byte (54282)', examples: ['poke(SID_VOICE2_PW_HI, pw_hi)'] },
+    { name: 'SID_VOICE2_CTRL', type: 'word', value: '$D40B', description: 'Voice 2 control register (54283)', examples: ['poke(SID_VOICE2_CTRL, $21)'] },
+    { name: 'SID_VOICE2_AD', type: 'word', value: '$D40C', description: 'Voice 2 attack/decay (54284)', examples: ['poke(SID_VOICE2_AD, $00)'] },
+    { name: 'SID_VOICE2_SR', type: 'word', value: '$D40D', description: 'Voice 2 sustain/release (54285)', examples: ['poke(SID_VOICE2_SR, $F9)'] },
+    { name: 'SID_VOICE3_FREQ_LO', type: 'word', value: '$D40E', description: 'Voice 3 frequency low byte (54286)', examples: ['poke(SID_VOICE3_FREQ_LO, freq_lo)'] },
+    { name: 'SID_VOICE3_FREQ_HI', type: 'word', value: '$D40F', description: 'Voice 3 frequency high byte (54287)', examples: ['poke(SID_VOICE3_FREQ_HI, freq_hi)'] },
+    { name: 'SID_VOICE3_PW_LO', type: 'word', value: '$D410', description: 'Voice 3 pulse width low byte (54288)', examples: ['poke(SID_VOICE3_PW_LO, pw_lo)'] },
+    { name: 'SID_VOICE3_PW_HI', type: 'word', value: '$D411', description: 'Voice 3 pulse width high byte (54289)', examples: ['poke(SID_VOICE3_PW_HI, pw_hi)'] },
+    { name: 'SID_VOICE3_CTRL', type: 'word', value: '$D412', description: 'Voice 3 control register (54290)', examples: ['poke(SID_VOICE3_CTRL, $21)'] },
+    { name: 'SID_VOICE3_AD', type: 'word', value: '$D413', description: 'Voice 3 attack/decay (54291)', examples: ['poke(SID_VOICE3_AD, $00)'] },
+    { name: 'SID_VOICE3_SR', type: 'word', value: '$D414', description: 'Voice 3 sustain/release (54292)', examples: ['poke(SID_VOICE3_SR, $F9)'] },
+    {
+        name: 'SID_FILTER_CUTOFF_LO', type: 'word', value: '$D415', description: 'Filter cutoff low byte - only lower 3 bits used (54293)', examples: [
+            '# 11-bit filter cutoff frequency (0-2047)',
+        ]
+    },
+    { name: 'SID_FILTER_CUTOFF_HI', type: 'word', value: '$D416', description: 'Filter cutoff high byte (54294)', examples: ['poke(SID_FILTER_CUTOFF_HI, $40)'] },
+    {
+        name: 'SID_FILTER_CTRL', type: 'word', value: '$D417', description: 'Filter control - resonance and voice routing (54295)', examples: [
+            '# upper 4 bits = resonance (0-15)\n# lower 4 bits = voice routing mask',
+        ]
+    },
+    {
+        name: 'SID_VOLUME', type: 'word', value: '$D418', description: 'Master volume and filter mode (54296)', examples: [
+            '# lower 4 bits = volume (0-15)\n# upper 4 bits = filter mode\npoke(SID_VOLUME, 15)  # max volume',
+        ]
+    },
 ];
 
 /**
@@ -1080,6 +1221,310 @@ export const COBRA64_BUILTINS: BuiltinFunction[] = [
         examples: [
             '# simplified collision check for common cases\nif sprite_collides(%00000001):\n    # sprite 0 (player) hit something\n    lives = lives - 1',
             '# check if any enemy sprite hit player\nif sprite_collides(%00011110):  # sprites 1-4 (enemies)\n    game_over()',
+        ],
+    },
+    // SID Sound Functions - Basic Control
+    {
+        name: 'sid_reset',
+        signature: 'sid_reset()',
+        description: 'Clears all 25 SID registers, silencing all sound.',
+        parameters: [],
+        returnType: null,
+        examples: [
+            '# initialize SID to silence at program start\ndef main():\n    sid_reset()\n    sid_volume(15)',
+        ],
+    },
+    {
+        name: 'sid_volume',
+        signature: 'sid_volume(vol: byte)',
+        description: 'Sets the master volume (0-15). 0 = silent, 15 = maximum.',
+        parameters: [
+            { name: 'vol', type: 'byte', description: 'Volume level (0-15)' },
+        ],
+        returnType: null,
+        examples: [
+            '# set maximum volume\nsid_volume(15)',
+            '# fade out effect\nfor v in 15 downto 0:\n    sid_volume(v)\n    # delay',
+        ],
+    },
+    {
+        name: 'sid_frequency',
+        signature: 'sid_frequency(voice: byte, freq: word)',
+        description: 'Sets the 16-bit frequency for a voice (0-2). Hz = freq × 0.0596 (PAL).',
+        parameters: [
+            { name: 'voice', type: 'byte', description: 'Voice number (0-2)' },
+            { name: 'freq', type: 'word', description: '16-bit frequency value' },
+        ],
+        returnType: null,
+        examples: [
+            '# voice 0 at ~440 Hz (A4)\n# 440 / 0.0596 ≈ 7383\nsid_frequency(0, 7383)',
+            '# sweep frequency up\nfreq: word = 1000\nwhile freq < 10000:\n    sid_frequency(0, freq)\n    freq = freq + 100',
+        ],
+    },
+    {
+        name: 'sid_waveform',
+        signature: 'sid_waveform(voice: byte, wave: byte)',
+        description: 'Sets the waveform for a voice. Use WAVE_* constants. Preserves gate bit.',
+        parameters: [
+            { name: 'voice', type: 'byte', description: 'Voice number (0-2)' },
+            { name: 'wave', type: 'byte', description: 'Waveform (WAVE_TRIANGLE/SAWTOOTH/PULSE/NOISE)' },
+        ],
+        returnType: null,
+        examples: [
+            '# set different waveforms\nsid_waveform(0, WAVE_PULSE)    # square wave\nsid_waveform(1, WAVE_SAWTOOTH) # bright, buzzy\nsid_waveform(2, WAVE_NOISE)    # drums/effects',
+        ],
+    },
+    {
+        name: 'sid_gate',
+        signature: 'sid_gate(voice: byte, on: byte)',
+        description: 'Controls the gate bit to start/stop the ADSR envelope.',
+        parameters: [
+            { name: 'voice', type: 'byte', description: 'Voice number (0-2)' },
+            { name: 'on', type: 'byte', description: '1 = start note (attack), 0 = release note' },
+        ],
+        returnType: null,
+        examples: [
+            '# play a note\nsid_gate(0, 1)  # start attack phase\n# wait for note duration\nsid_gate(0, 0)  # start release phase',
+        ],
+    },
+    // SID Sound Functions - ADSR Envelope
+    {
+        name: 'sid_attack',
+        signature: 'sid_attack(voice: byte, val: byte)',
+        description: 'Sets attack time (0-15). Higher = longer attack. 0=2ms, 15=8s.',
+        parameters: [
+            { name: 'voice', type: 'byte', description: 'Voice number (0-2)' },
+            { name: 'val', type: 'byte', description: 'Attack time (0-15)' },
+        ],
+        returnType: null,
+        examples: [
+            '# quick attack for percussive sounds\nsid_attack(0, 0)',
+            '# slow attack for pads\nsid_attack(0, 10)',
+        ],
+    },
+    {
+        name: 'sid_decay',
+        signature: 'sid_decay(voice: byte, val: byte)',
+        description: 'Sets decay time (0-15). Higher = longer decay.',
+        parameters: [
+            { name: 'voice', type: 'byte', description: 'Voice number (0-2)' },
+            { name: 'val', type: 'byte', description: 'Decay time (0-15)' },
+        ],
+        returnType: null,
+        examples: [
+            'sid_decay(0, 5)  # medium decay',
+        ],
+    },
+    {
+        name: 'sid_sustain',
+        signature: 'sid_sustain(voice: byte, val: byte)',
+        description: 'Sets sustain level (0-15). 15 = full volume, 0 = silent.',
+        parameters: [
+            { name: 'voice', type: 'byte', description: 'Voice number (0-2)' },
+            { name: 'val', type: 'byte', description: 'Sustain level (0-15)' },
+        ],
+        returnType: null,
+        examples: [
+            '# sustained organ-like sound\nsid_sustain(0, 15)',
+            '# pluck/piano-like (no sustain)\nsid_sustain(0, 0)',
+        ],
+    },
+    {
+        name: 'sid_release',
+        signature: 'sid_release(voice: byte, val: byte)',
+        description: 'Sets release time (0-15). Higher = longer release after gate off.',
+        parameters: [
+            { name: 'voice', type: 'byte', description: 'Voice number (0-2)' },
+            { name: 'val', type: 'byte', description: 'Release time (0-15)' },
+        ],
+        returnType: null,
+        examples: [
+            '# short release for staccato\nsid_release(0, 2)',
+            '# long release for reverb-like effect\nsid_release(0, 12)',
+        ],
+    },
+    {
+        name: 'sid_envelope',
+        signature: 'sid_envelope(voice: byte, a: byte, d: byte, s: byte, r: byte)',
+        description: 'Sets the full ADSR envelope at once.',
+        parameters: [
+            { name: 'voice', type: 'byte', description: 'Voice number (0-2)' },
+            { name: 'a', type: 'byte', description: 'Attack (0-15)' },
+            { name: 'd', type: 'byte', description: 'Decay (0-15)' },
+            { name: 's', type: 'byte', description: 'Sustain (0-15)' },
+            { name: 'r', type: 'byte', description: 'Release (0-15)' },
+        ],
+        returnType: null,
+        examples: [
+            '# piano-like: quick attack, medium decay, no sustain\nsid_envelope(0, 0, 5, 0, 8)',
+            '# pad: slow attack, full sustain\nsid_envelope(0, 10, 5, 15, 10)',
+            '# percussion: instant attack/decay, no sustain\nsid_envelope(0, 0, 2, 0, 2)',
+        ],
+    },
+    // SID Sound Functions - Pulse Width
+    {
+        name: 'sid_pulse_width',
+        signature: 'sid_pulse_width(voice: byte, width: word)',
+        description: 'Sets the 12-bit pulse width (0-4095) for pulse waveform. 2048 = 50% duty cycle.',
+        parameters: [
+            { name: 'voice', type: 'byte', description: 'Voice number (0-2)' },
+            { name: 'width', type: 'word', description: 'Pulse width (0-4095)' },
+        ],
+        returnType: null,
+        examples: [
+            '# square wave (50% duty cycle)\nsid_waveform(0, WAVE_PULSE)\nsid_pulse_width(0, 2048)',
+            '# thin sound (12.5% duty cycle)\nsid_pulse_width(0, 512)',
+            '# PWM effect - sweep pulse width\nfor pw in 512 to 3584:\n    sid_pulse_width(0, pw)',
+        ],
+    },
+    // SID Sound Functions - Advanced Voice Control
+    {
+        name: 'sid_ring_mod',
+        signature: 'sid_ring_mod(voice: byte, enable: byte)',
+        description: 'Enables ring modulation. Voice N modulated by voice N-1 (0 by 2).',
+        parameters: [
+            { name: 'voice', type: 'byte', description: 'Voice number (0-2)' },
+            { name: 'enable', type: 'byte', description: '1 = enable, 0 = disable' },
+        ],
+        returnType: null,
+        examples: [
+            '# ring modulation creates bell/metallic tones\n# voice 0 is modulated by voice 2\nsid_ring_mod(0, 1)',
+        ],
+    },
+    {
+        name: 'sid_sync',
+        signature: 'sid_sync(voice: byte, enable: byte)',
+        description: 'Enables hard oscillator sync. Voice N syncs to voice N-1.',
+        parameters: [
+            { name: 'voice', type: 'byte', description: 'Voice number (0-2)' },
+            { name: 'enable', type: 'byte', description: '1 = enable, 0 = disable' },
+        ],
+        returnType: null,
+        examples: [
+            '# sync creates harsh, metallic timbres\n# classic lead synth sound\nsid_sync(1, 1)',
+        ],
+    },
+    {
+        name: 'sid_test',
+        signature: 'sid_test(voice: byte, enable: byte)',
+        description: 'Controls the test bit. Resets and holds oscillator at zero.',
+        parameters: [
+            { name: 'voice', type: 'byte', description: 'Voice number (0-2)' },
+            { name: 'enable', type: 'byte', description: '1 = hold at zero, 0 = normal' },
+        ],
+        returnType: null,
+        examples: [
+            '# used for special effects\nsid_test(0, 1)  # silence oscillator\nsid_test(0, 0)  # release',
+        ],
+    },
+    // SID Sound Functions - Filter Control
+    {
+        name: 'sid_filter_cutoff',
+        signature: 'sid_filter_cutoff(freq: word)',
+        description: 'Sets the 11-bit filter cutoff frequency (0-2047).',
+        parameters: [
+            { name: 'freq', type: 'word', description: 'Filter cutoff (0-2047)' },
+        ],
+        returnType: null,
+        examples: [
+            '# low cutoff = dark, muffled sound\nsid_filter_cutoff(256)',
+            '# high cutoff = bright sound\nsid_filter_cutoff(1800)',
+            '# filter sweep effect\nfor cut in 0 to 2047:\n    sid_filter_cutoff(cut)',
+        ],
+    },
+    {
+        name: 'sid_filter_resonance',
+        signature: 'sid_filter_resonance(val: byte)',
+        description: 'Sets filter resonance (0-15). Higher = more pronounced resonance peak.',
+        parameters: [
+            { name: 'val', type: 'byte', description: 'Resonance (0-15)' },
+        ],
+        returnType: null,
+        examples: [
+            '# subtle filtering\nsid_filter_resonance(4)',
+            '# screaming resonance\nsid_filter_resonance(15)',
+        ],
+    },
+    {
+        name: 'sid_filter_route',
+        signature: 'sid_filter_route(voices: byte)',
+        description: 'Routes voices through the filter using a bitmask.',
+        parameters: [
+            { name: 'voices', type: 'byte', description: 'Bitmask (bit 0 = voice 0, etc.)' },
+        ],
+        returnType: null,
+        examples: [
+            '# filter only voice 0\nsid_filter_route(1)',
+            '# filter voices 0 and 1\nsid_filter_route(%00000011)',
+            '# filter all voices\nsid_filter_route(7)',
+        ],
+    },
+    {
+        name: 'sid_filter_mode',
+        signature: 'sid_filter_mode(mode: byte)',
+        description: 'Sets the filter mode using FILTER_* constants. Can combine modes.',
+        parameters: [
+            { name: 'mode', type: 'byte', description: 'Filter mode (FILTER_LOWPASS/BANDPASS/HIGHPASS)' },
+        ],
+        returnType: null,
+        examples: [
+            '# low-pass for warm bass\nsid_filter_mode(FILTER_LOWPASS)',
+            '# band-pass for vocal/nasal sound\nsid_filter_mode(FILTER_BANDPASS)',
+            '# notch filter (low + high)\nsid_filter_mode(FILTER_LOWPASS | FILTER_HIGHPASS)',
+        ],
+    },
+    // SID Sound Functions - High-Level Music
+    {
+        name: 'play_note',
+        signature: 'play_note(voice: byte, note: byte, octave: byte)',
+        description: 'Plays a musical note using NOTE_* constants and octave (0-7).',
+        parameters: [
+            { name: 'voice', type: 'byte', description: 'Voice number (0-2)' },
+            { name: 'note', type: 'byte', description: 'Note constant (NOTE_C through NOTE_B)' },
+            { name: 'octave', type: 'byte', description: 'Octave (0-7, 4 = middle octave)' },
+        ],
+        returnType: null,
+        examples: [
+            '# play middle C\nplay_note(0, NOTE_C, 4)',
+            '# play C major chord\nplay_note(0, NOTE_C, 4)\nplay_note(1, NOTE_E, 4)\nplay_note(2, NOTE_G, 4)',
+            '# simple melody\nplay_note(0, NOTE_C, 4)\ndelay(10)\nplay_note(0, NOTE_E, 4)\ndelay(10)\nplay_note(0, NOTE_G, 4)',
+        ],
+    },
+    {
+        name: 'play_tone',
+        signature: 'play_tone(voice: byte, freq: word, wave: byte, duration: byte)',
+        description: 'Plays a tone with automatic gate control. Duration is in frames (~1/60s).',
+        parameters: [
+            { name: 'voice', type: 'byte', description: 'Voice number (0-2)' },
+            { name: 'freq', type: 'word', description: 'Frequency value' },
+            { name: 'wave', type: 'byte', description: 'Waveform constant' },
+            { name: 'duration', type: 'byte', description: 'Duration in frames' },
+        ],
+        returnType: null,
+        examples: [
+            '# play a tone for ~1 second\nplay_tone(0, 7383, WAVE_PULSE, 60)',
+        ],
+    },
+    {
+        name: 'sound_off',
+        signature: 'sound_off()',
+        description: 'Silences all voices by clearing gate bits and waveforms.',
+        parameters: [],
+        returnType: null,
+        examples: [
+            '# stop all sound immediately\nsound_off()',
+        ],
+    },
+    {
+        name: 'sound_off_voice',
+        signature: 'sound_off_voice(voice: byte)',
+        description: 'Silences a specific voice.',
+        parameters: [
+            { name: 'voice', type: 'byte', description: 'Voice number (0-2)' },
+        ],
+        returnType: null,
+        examples: [
+            '# stop only voice 0\nsound_off_voice(0)',
         ],
     },
 ];

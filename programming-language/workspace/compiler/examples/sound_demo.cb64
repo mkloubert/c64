@@ -1,0 +1,116 @@
+# Cobra64 Sound Demo
+# Demonstrates SID sound functions
+
+def main():
+    # Clear screen and show title
+    cls()
+    println("=== COBRA64 SOUND DEMO ===")
+    println("")
+
+    # Reset SID and set volume
+    sid_reset()
+    sid_volume(15)
+
+    # Setup voice 1 with a nice envelope
+    sid_envelope(0, 0, 9, 9, 0)
+
+    println("Playing scale on voice 1...")
+    println("")
+
+    # Play a C major scale
+    play_scale()
+
+    println("")
+    println("Playing different waveforms...")
+
+    # Demonstrate different waveforms
+    demo_waveforms()
+
+    println("")
+    println("Filter sweep demo...")
+
+    # Filter demo
+    demo_filter()
+
+    println("")
+    println("Demo complete!")
+
+    # Silence
+    sound_off()
+
+
+def play_scale():
+    # C major scale: C, D, E, F, G, A, B, C (octave 4-5)
+    notes: byte[] = [0, 2, 4, 5, 7, 9, 11, 0]
+    octaves: byte[] = [4, 4, 4, 4, 4, 4, 4, 5]
+
+    sid_waveform(0, WAVE_PULSE)
+    sid_pulse_width(0, 2048)
+
+    i: byte = 0
+    while i < 8:
+        play_note(0, notes[i], octaves[i])
+        delay(200)
+        sound_off_voice(0)
+        delay(50)
+        i = i + 1
+
+
+def demo_waveforms():
+    freq: word = 7503
+
+    println("  Triangle...")
+    sid_waveform(0, WAVE_TRIANGLE)
+    sid_frequency(0, freq)
+    sid_gate(0, true)
+    delay(500)
+    sid_gate(0, false)
+    delay(100)
+
+    println("  Sawtooth...")
+    sid_waveform(0, WAVE_SAWTOOTH)
+    sid_gate(0, true)
+    delay(500)
+    sid_gate(0, false)
+    delay(100)
+
+    println("  Pulse...")
+    sid_waveform(0, WAVE_PULSE)
+    sid_pulse_width(0, 512)
+    sid_gate(0, true)
+    delay(500)
+    sid_gate(0, false)
+    delay(100)
+
+    println("  Noise...")
+    sid_waveform(0, WAVE_NOISE)
+    sid_gate(0, true)
+    delay(500)
+    sid_gate(0, false)
+
+
+def demo_filter():
+    sid_waveform(0, WAVE_SAWTOOTH)
+    sid_frequency(0, 4000)
+    sid_filter_route(1)
+    sid_filter_resonance(12)
+    sid_filter_mode(FILTER_LOWPASS)
+    sid_gate(0, true)
+
+    cutoff: word = 0
+    while cutoff < 2000:
+        sid_filter_cutoff(cutoff)
+        delay(5)
+        cutoff = cutoff + 20
+
+    sid_gate(0, false)
+    sid_filter_route(0)
+
+
+def delay(ms: word):
+    i: word = 0
+    while i < ms:
+        j: byte = 0
+        while j < 200:
+            j = j + 1
+        i = i + 1

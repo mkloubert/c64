@@ -29,7 +29,7 @@ use super::binary_ops::BinaryOpsEmitter;
 use super::conversions::TypeConversions;
 use super::emit::EmitHelpers;
 use super::functions::FunctionCallEmitter;
-use super::mos6510::{colors, opcodes, sprite, zeropage};
+use super::mos6510::{colors, opcodes, sid, sprite, zeropage};
 use super::strings::StringManager;
 use super::type_inference::TypeInference;
 use super::types::{decimal_string_to_binary16, decimal_string_to_fixed};
@@ -98,6 +98,68 @@ fn get_builtin_constant(name: &str) -> Option<(u16, bool)> {
         "VIC_SPRITE5_COLOR" => Some((sprite::SPRITE5_COLOR, true)),
         "VIC_SPRITE6_COLOR" => Some((sprite::SPRITE6_COLOR, true)),
         "VIC_SPRITE7_COLOR" => Some((sprite::SPRITE7_COLOR, true)),
+
+        // SID base address
+        "SID_BASE" => Some((sid::BASE, true)),
+
+        // SID waveform constants (byte values)
+        "WAVE_TRIANGLE" => Some((sid::WAVEFORM_TRIANGLE as u16, false)),
+        "WAVE_SAWTOOTH" => Some((sid::WAVEFORM_SAWTOOTH as u16, false)),
+        "WAVE_PULSE" => Some((sid::WAVEFORM_PULSE as u16, false)),
+        "WAVE_NOISE" => Some((sid::WAVEFORM_NOISE as u16, false)),
+
+        // SID filter mode constants (byte values)
+        "FILTER_LOWPASS" => Some((sid::FILTER_LP as u16, false)),
+        "FILTER_BANDPASS" => Some((sid::FILTER_BP as u16, false)),
+        "FILTER_HIGHPASS" => Some((sid::FILTER_HP as u16, false)),
+
+        // Musical note constants (byte values, 0-11)
+        "NOTE_C" => Some((0, false)),
+        "NOTE_CS" => Some((1, false)),
+        "NOTE_D" => Some((2, false)),
+        "NOTE_DS" => Some((3, false)),
+        "NOTE_E" => Some((4, false)),
+        "NOTE_F" => Some((5, false)),
+        "NOTE_FS" => Some((6, false)),
+        "NOTE_G" => Some((7, false)),
+        "NOTE_GS" => Some((8, false)),
+        "NOTE_A" => Some((9, false)),
+        "NOTE_AS" => Some((10, false)),
+        "NOTE_B" => Some((11, false)),
+
+        // SID Voice 1 register addresses
+        "SID_VOICE1_FREQ_LO" => Some((sid::VOICE1_FREQ_LO, true)),
+        "SID_VOICE1_FREQ_HI" => Some((sid::VOICE1_FREQ_HI, true)),
+        "SID_VOICE1_PULSE_LO" => Some((sid::VOICE1_PULSE_LO, true)),
+        "SID_VOICE1_PULSE_HI" => Some((sid::VOICE1_PULSE_HI, true)),
+        "SID_VOICE1_CTRL" => Some((sid::VOICE1_CTRL, true)),
+        "SID_VOICE1_AD" => Some((sid::VOICE1_ATTACK_DECAY, true)),
+        "SID_VOICE1_SR" => Some((sid::VOICE1_SUSTAIN_RELEASE, true)),
+
+        // SID Voice 2 register addresses
+        "SID_VOICE2_FREQ_LO" => Some((sid::VOICE2_FREQ_LO, true)),
+        "SID_VOICE2_FREQ_HI" => Some((sid::VOICE2_FREQ_HI, true)),
+        "SID_VOICE2_PULSE_LO" => Some((sid::VOICE2_PULSE_LO, true)),
+        "SID_VOICE2_PULSE_HI" => Some((sid::VOICE2_PULSE_HI, true)),
+        "SID_VOICE2_CTRL" => Some((sid::VOICE2_CTRL, true)),
+        "SID_VOICE2_AD" => Some((sid::VOICE2_ATTACK_DECAY, true)),
+        "SID_VOICE2_SR" => Some((sid::VOICE2_SUSTAIN_RELEASE, true)),
+
+        // SID Voice 3 register addresses
+        "SID_VOICE3_FREQ_LO" => Some((sid::VOICE3_FREQ_LO, true)),
+        "SID_VOICE3_FREQ_HI" => Some((sid::VOICE3_FREQ_HI, true)),
+        "SID_VOICE3_PULSE_LO" => Some((sid::VOICE3_PULSE_LO, true)),
+        "SID_VOICE3_PULSE_HI" => Some((sid::VOICE3_PULSE_HI, true)),
+        "SID_VOICE3_CTRL" => Some((sid::VOICE3_CTRL, true)),
+        "SID_VOICE3_AD" => Some((sid::VOICE3_ATTACK_DECAY, true)),
+        "SID_VOICE3_SR" => Some((sid::VOICE3_SUSTAIN_RELEASE, true)),
+
+        // SID filter and volume registers
+        "SID_FILTER_CUTOFF_LO" => Some((sid::FILTER_CUTOFF_LO, true)),
+        "SID_FILTER_CUTOFF_HI" => Some((sid::FILTER_CUTOFF_HI, true)),
+        "SID_FILTER_RESONANCE" => Some((sid::FILTER_RESONANCE, true)),
+        "SID_VOLUME" => Some((sid::FILTER_MODE_VOLUME, true)),
+
         _ => None,
     }
 }

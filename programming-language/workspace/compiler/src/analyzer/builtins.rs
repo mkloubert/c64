@@ -195,6 +195,91 @@ impl BuiltinRegistry for Analyzer {
         // sprite_collides(mask) -> bool - check if any sprite in mask has collision
         self.define_builtin("sprite_collides", vec![Type::Byte], Some(Type::Bool));
 
+        // =====================================================================
+        // SID Sound Functions
+        // =====================================================================
+
+        // Basic sound control
+        // sid_reset() - reset all SID registers to zero
+        self.define_builtin("sid_reset", vec![], None);
+
+        // sid_volume(volume) - set main volume (0-15)
+        self.define_builtin("sid_volume", vec![Type::Byte], None);
+
+        // Voice frequency control
+        // sid_frequency(voice, frequency) - set voice frequency (voice 0-2)
+        self.define_builtin("sid_frequency", vec![Type::Byte, Type::Word], None);
+
+        // sid_waveform(voice, waveform) - set voice waveform
+        self.define_builtin("sid_waveform", vec![Type::Byte, Type::Byte], None);
+
+        // sid_gate(voice, on) - control gate bit (start/release note)
+        self.define_builtin("sid_gate", vec![Type::Byte, Type::Bool], None);
+
+        // ADSR envelope control
+        // sid_attack(voice, value) - set attack time (0-15)
+        self.define_builtin("sid_attack", vec![Type::Byte, Type::Byte], None);
+
+        // sid_decay(voice, value) - set decay time (0-15)
+        self.define_builtin("sid_decay", vec![Type::Byte, Type::Byte], None);
+
+        // sid_sustain(voice, value) - set sustain level (0-15)
+        self.define_builtin("sid_sustain", vec![Type::Byte, Type::Byte], None);
+
+        // sid_release(voice, value) - set release time (0-15)
+        self.define_builtin("sid_release", vec![Type::Byte, Type::Byte], None);
+
+        // sid_envelope(voice, attack, decay, sustain, release) - set full ADSR
+        self.define_builtin(
+            "sid_envelope",
+            vec![Type::Byte, Type::Byte, Type::Byte, Type::Byte, Type::Byte],
+            None,
+        );
+
+        // Pulse width control
+        // sid_pulse_width(voice, width) - set pulse wave duty cycle (0-4095)
+        self.define_builtin("sid_pulse_width", vec![Type::Byte, Type::Word], None);
+
+        // Advanced voice control
+        // sid_ring_mod(voice, enable) - enable/disable ring modulation
+        self.define_builtin("sid_ring_mod", vec![Type::Byte, Type::Bool], None);
+
+        // sid_sync(voice, enable) - enable/disable oscillator sync
+        self.define_builtin("sid_sync", vec![Type::Byte, Type::Bool], None);
+
+        // sid_test(voice, enable) - enable/disable test bit (disable oscillator)
+        self.define_builtin("sid_test", vec![Type::Byte, Type::Bool], None);
+
+        // Filter control
+        // sid_filter_cutoff(frequency) - set filter cutoff (0-2047)
+        self.define_builtin("sid_filter_cutoff", vec![Type::Word], None);
+
+        // sid_filter_resonance(value) - set filter resonance (0-15)
+        self.define_builtin("sid_filter_resonance", vec![Type::Byte], None);
+
+        // sid_filter_route(voices) - route voices through filter (bitmask)
+        self.define_builtin("sid_filter_route", vec![Type::Byte], None);
+
+        // sid_filter_mode(mode) - set filter mode (bitmask: LP/BP/HP)
+        self.define_builtin("sid_filter_mode", vec![Type::Byte], None);
+
+        // High-level sound functions
+        // play_note(voice, note, octave) - play musical note
+        self.define_builtin("play_note", vec![Type::Byte, Type::Byte, Type::Byte], None);
+
+        // play_tone(voice, frequency, waveform, duration) - play tone for duration
+        self.define_builtin(
+            "play_tone",
+            vec![Type::Byte, Type::Word, Type::Byte, Type::Word],
+            None,
+        );
+
+        // sound_off() - silence all voices
+        self.define_builtin("sound_off", vec![], None);
+
+        // sound_off_voice(voice) - silence specific voice
+        self.define_builtin("sound_off_voice", vec![Type::Byte], None);
+
         // C64 color constants (VIC-II palette)
         self.define_builtin_constant("COLOR_BLACK", Type::Byte);
         self.define_builtin_constant("COLOR_WHITE", Type::Byte);
@@ -253,6 +338,68 @@ impl BuiltinRegistry for Analyzer {
         self.define_builtin_constant("VIC_SPRITE5_COLOR", Type::Word);
         self.define_builtin_constant("VIC_SPRITE6_COLOR", Type::Word);
         self.define_builtin_constant("VIC_SPRITE7_COLOR", Type::Word);
+
+        // =====================================================================
+        // SID Sound Constants
+        // =====================================================================
+
+        // SID base address
+        self.define_builtin_constant("SID_BASE", Type::Word);
+
+        // Waveform constants
+        self.define_builtin_constant("WAVE_TRIANGLE", Type::Byte);
+        self.define_builtin_constant("WAVE_SAWTOOTH", Type::Byte);
+        self.define_builtin_constant("WAVE_PULSE", Type::Byte);
+        self.define_builtin_constant("WAVE_NOISE", Type::Byte);
+
+        // Filter mode constants
+        self.define_builtin_constant("FILTER_LOWPASS", Type::Byte);
+        self.define_builtin_constant("FILTER_BANDPASS", Type::Byte);
+        self.define_builtin_constant("FILTER_HIGHPASS", Type::Byte);
+
+        // Musical note constants (for play_note function)
+        self.define_builtin_constant("NOTE_C", Type::Byte);
+        self.define_builtin_constant("NOTE_CS", Type::Byte); // C#
+        self.define_builtin_constant("NOTE_D", Type::Byte);
+        self.define_builtin_constant("NOTE_DS", Type::Byte); // D#
+        self.define_builtin_constant("NOTE_E", Type::Byte);
+        self.define_builtin_constant("NOTE_F", Type::Byte);
+        self.define_builtin_constant("NOTE_FS", Type::Byte); // F#
+        self.define_builtin_constant("NOTE_G", Type::Byte);
+        self.define_builtin_constant("NOTE_GS", Type::Byte); // G#
+        self.define_builtin_constant("NOTE_A", Type::Byte);
+        self.define_builtin_constant("NOTE_AS", Type::Byte); // A#
+        self.define_builtin_constant("NOTE_B", Type::Byte);
+
+        // SID register address constants (for direct access via poke)
+        self.define_builtin_constant("SID_VOICE1_FREQ_LO", Type::Word);
+        self.define_builtin_constant("SID_VOICE1_FREQ_HI", Type::Word);
+        self.define_builtin_constant("SID_VOICE1_PULSE_LO", Type::Word);
+        self.define_builtin_constant("SID_VOICE1_PULSE_HI", Type::Word);
+        self.define_builtin_constant("SID_VOICE1_CTRL", Type::Word);
+        self.define_builtin_constant("SID_VOICE1_AD", Type::Word);
+        self.define_builtin_constant("SID_VOICE1_SR", Type::Word);
+
+        self.define_builtin_constant("SID_VOICE2_FREQ_LO", Type::Word);
+        self.define_builtin_constant("SID_VOICE2_FREQ_HI", Type::Word);
+        self.define_builtin_constant("SID_VOICE2_PULSE_LO", Type::Word);
+        self.define_builtin_constant("SID_VOICE2_PULSE_HI", Type::Word);
+        self.define_builtin_constant("SID_VOICE2_CTRL", Type::Word);
+        self.define_builtin_constant("SID_VOICE2_AD", Type::Word);
+        self.define_builtin_constant("SID_VOICE2_SR", Type::Word);
+
+        self.define_builtin_constant("SID_VOICE3_FREQ_LO", Type::Word);
+        self.define_builtin_constant("SID_VOICE3_FREQ_HI", Type::Word);
+        self.define_builtin_constant("SID_VOICE3_PULSE_LO", Type::Word);
+        self.define_builtin_constant("SID_VOICE3_PULSE_HI", Type::Word);
+        self.define_builtin_constant("SID_VOICE3_CTRL", Type::Word);
+        self.define_builtin_constant("SID_VOICE3_AD", Type::Word);
+        self.define_builtin_constant("SID_VOICE3_SR", Type::Word);
+
+        self.define_builtin_constant("SID_FILTER_CUTOFF_LO", Type::Word);
+        self.define_builtin_constant("SID_FILTER_CUTOFF_HI", Type::Word);
+        self.define_builtin_constant("SID_FILTER_RESONANCE", Type::Word);
+        self.define_builtin_constant("SID_VOLUME", Type::Word);
     }
 
     fn define_builtin(&mut self, name: &str, params: Vec<Type>, return_type: Option<Type>) {

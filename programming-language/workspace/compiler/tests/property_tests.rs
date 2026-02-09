@@ -254,9 +254,10 @@ proptest! {
             // fixed-point 12.4 routines, IEEE-754 binary16 float routines with
             // proper mantissa arithmetic, float/fixed/int conversion routines,
             // print_fixed, print_float, rand() with inline branch structure
-            // instead of lookup table, string conversion routines)
+            // instead of lookup table, string conversion routines,
+            // SID sound routines including note-to-frequency lookup table)
             let min_expected = 20 + count * 5;
-            let max_expected = 3100 + count * 50;
+            let max_expected = 3300 + count * 50;
 
             prop_assert!(
                 code.len() >= min_expected,

@@ -337,22 +337,178 @@ pub mod zeropage {
 }
 
 /// SID (Sound Interface Device) registers.
+///
+/// The SID chip provides 3 independent voices with full ADSR envelope control,
+/// 4 waveforms (triangle, sawtooth, pulse, noise), and a programmable filter.
+/// Memory mapped at $D400-$D41C.
 #[allow(dead_code)]
 pub mod sid {
     /// SID base address.
     pub const BASE: u16 = 0xD400;
 
+    // =========================================================================
+    // Voice 1 Registers ($D400-$D406)
+    // =========================================================================
+
+    /// Voice 1 frequency low byte.
+    pub const VOICE1_FREQ_LO: u16 = 0xD400;
+    /// Voice 1 frequency high byte.
+    pub const VOICE1_FREQ_HI: u16 = 0xD401;
+    /// Voice 1 pulse wave duty cycle low byte.
+    pub const VOICE1_PULSE_LO: u16 = 0xD402;
+    /// Voice 1 pulse wave duty cycle high byte (bits 0-3 only).
+    pub const VOICE1_PULSE_HI: u16 = 0xD403;
+    /// Voice 1 control register (waveform, gate, sync, ring mod, test).
+    pub const VOICE1_CTRL: u16 = 0xD404;
+    /// Voice 1 attack (high nibble) and decay (low nibble).
+    pub const VOICE1_ATTACK_DECAY: u16 = 0xD405;
+    /// Voice 1 sustain (high nibble) and release (low nibble).
+    pub const VOICE1_SUSTAIN_RELEASE: u16 = 0xD406;
+
+    // =========================================================================
+    // Voice 2 Registers ($D407-$D40D)
+    // =========================================================================
+
+    /// Voice 2 frequency low byte.
+    pub const VOICE2_FREQ_LO: u16 = 0xD407;
+    /// Voice 2 frequency high byte.
+    pub const VOICE2_FREQ_HI: u16 = 0xD408;
+    /// Voice 2 pulse wave duty cycle low byte.
+    pub const VOICE2_PULSE_LO: u16 = 0xD409;
+    /// Voice 2 pulse wave duty cycle high byte (bits 0-3 only).
+    pub const VOICE2_PULSE_HI: u16 = 0xD40A;
+    /// Voice 2 control register (waveform, gate, sync, ring mod, test).
+    pub const VOICE2_CTRL: u16 = 0xD40B;
+    /// Voice 2 attack (high nibble) and decay (low nibble).
+    pub const VOICE2_ATTACK_DECAY: u16 = 0xD40C;
+    /// Voice 2 sustain (high nibble) and release (low nibble).
+    pub const VOICE2_SUSTAIN_RELEASE: u16 = 0xD40D;
+
+    // =========================================================================
+    // Voice 3 Registers ($D40E-$D414)
+    // =========================================================================
+
     /// Voice 3 frequency low byte.
     pub const VOICE3_FREQ_LO: u16 = 0xD40E;
     /// Voice 3 frequency high byte.
     pub const VOICE3_FREQ_HI: u16 = 0xD40F;
-    /// Voice 3 control register.
+    /// Voice 3 pulse wave duty cycle low byte.
+    pub const VOICE3_PULSE_LO: u16 = 0xD410;
+    /// Voice 3 pulse wave duty cycle high byte (bits 0-3 only).
+    pub const VOICE3_PULSE_HI: u16 = 0xD411;
+    /// Voice 3 control register (waveform, gate, sync, ring mod, test).
     pub const VOICE3_CTRL: u16 = 0xD412;
+    /// Voice 3 attack (high nibble) and decay (low nibble).
+    pub const VOICE3_ATTACK_DECAY: u16 = 0xD413;
+    /// Voice 3 sustain (high nibble) and release (low nibble).
+    pub const VOICE3_SUSTAIN_RELEASE: u16 = 0xD414;
+
+    // =========================================================================
+    // Filter and Volume Registers ($D415-$D418)
+    // =========================================================================
+
+    /// Filter cutoff frequency low byte (bits 0-2 only).
+    pub const FILTER_CUTOFF_LO: u16 = 0xD415;
+    /// Filter cutoff frequency high byte.
+    pub const FILTER_CUTOFF_HI: u16 = 0xD416;
+    /// Filter resonance (high nibble) and voice routing (low nibble).
+    pub const FILTER_RESONANCE: u16 = 0xD417;
+    /// Filter mode (high nibble) and main volume (low nibble).
+    pub const FILTER_MODE_VOLUME: u16 = 0xD418;
+
+    // =========================================================================
+    // Read-Only Registers ($D419-$D41C)
+    // =========================================================================
+
+    /// Potentiometer X (paddle) read.
+    pub const POT_X: u16 = 0xD419;
+    /// Potentiometer Y (paddle) read.
+    pub const POT_Y: u16 = 0xD41A;
     /// Voice 3 oscillator output (random when noise waveform).
     pub const VOICE3_OSC: u16 = 0xD41B;
+    /// Voice 3 envelope output.
+    pub const VOICE3_ENV: u16 = 0xD41C;
 
-    /// Waveform: Noise.
+    // =========================================================================
+    // Waveform Bit Constants (for control register)
+    // =========================================================================
+
+    /// Triangle waveform (bit 4).
+    pub const WAVEFORM_TRIANGLE: u8 = 0x10;
+    /// Sawtooth waveform (bit 5).
+    pub const WAVEFORM_SAWTOOTH: u8 = 0x20;
+    /// Pulse/square waveform (bit 6).
+    pub const WAVEFORM_PULSE: u8 = 0x40;
+    /// Noise waveform (bit 7).
     pub const WAVEFORM_NOISE: u8 = 0x80;
+
+    // =========================================================================
+    // Control Register Bit Constants
+    // =========================================================================
+
+    /// Gate bit - start/release note (bit 0).
+    pub const CTRL_GATE: u8 = 0x01;
+    /// Sync bit - synchronize with previous voice (bit 1).
+    pub const CTRL_SYNC: u8 = 0x02;
+    /// Ring modulation bit - modulate with previous voice (bit 2).
+    pub const CTRL_RING_MOD: u8 = 0x04;
+    /// Test bit - disable oscillator (bit 3).
+    pub const CTRL_TEST: u8 = 0x08;
+
+    // =========================================================================
+    // Filter Mode Bit Constants (for $D418 high nibble)
+    // =========================================================================
+
+    /// Low-pass filter mode (bit 4).
+    pub const FILTER_LP: u8 = 0x10;
+    /// Band-pass filter mode (bit 5).
+    pub const FILTER_BP: u8 = 0x20;
+    /// High-pass filter mode (bit 6).
+    pub const FILTER_HP: u8 = 0x40;
+    /// Disconnect voice 3 from audio output (bit 7).
+    pub const FILTER_VOICE3_OFF: u8 = 0x80;
+
+    // =========================================================================
+    // Filter Routing Bit Constants (for $D417 low nibble)
+    // =========================================================================
+
+    /// Route voice 1 through filter (bit 0).
+    pub const FILTER_VOICE1: u8 = 0x01;
+    /// Route voice 2 through filter (bit 1).
+    pub const FILTER_VOICE2: u8 = 0x02;
+    /// Route voice 3 through filter (bit 2).
+    pub const FILTER_VOICE3: u8 = 0x04;
+    /// Route external audio input through filter (bit 3).
+    pub const FILTER_EXT: u8 = 0x08;
+
+    // =========================================================================
+    // Voice Register Offsets (for calculating addresses)
+    // =========================================================================
+
+    /// Offset between voice register blocks (7 bytes per voice).
+    pub const VOICE_OFFSET: u16 = 7;
+
+    /// Offset from voice base to frequency low byte.
+    pub const OFFSET_FREQ_LO: u16 = 0;
+    /// Offset from voice base to frequency high byte.
+    pub const OFFSET_FREQ_HI: u16 = 1;
+    /// Offset from voice base to pulse width low byte.
+    pub const OFFSET_PULSE_LO: u16 = 2;
+    /// Offset from voice base to pulse width high byte.
+    pub const OFFSET_PULSE_HI: u16 = 3;
+    /// Offset from voice base to control register.
+    pub const OFFSET_CTRL: u16 = 4;
+    /// Offset from voice base to attack/decay register.
+    pub const OFFSET_ATTACK_DECAY: u16 = 5;
+    /// Offset from voice base to sustain/release register.
+    pub const OFFSET_SUSTAIN_RELEASE: u16 = 6;
+
+    // =========================================================================
+    // SID Register Count
+    // =========================================================================
+
+    /// Total number of SID registers (for reset loop).
+    pub const REGISTER_COUNT: u8 = 25;
 }
 
 /// VIC-II registers.

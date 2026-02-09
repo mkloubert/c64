@@ -1,0 +1,48 @@
+# Cobra64 Basic Sound Example
+# Simple demonstration of SID sound
+
+def main():
+    cls()
+    println("BASIC SOUND TEST")
+    println("")
+
+    # Initialize SID
+    sid_reset()
+    sid_volume(15)
+
+    # Set up voice 0 with ADSR
+    sid_attack(0, 0)     # Instant attack
+    sid_decay(0, 5)      # Medium decay
+    sid_sustain(0, 10)   # High sustain
+    sid_release(0, 5)    # Medium release
+
+    # Play a simple tone
+    println("Playing A4 (440 Hz)...")
+    sid_frequency(0, 7503)      # A4 frequency for PAL
+    sid_waveform(0, WAVE_PULSE)
+    sid_pulse_width(0, 2048)    # 50% duty cycle
+    sid_gate(0, true)           # Start note
+
+    # Wait a bit
+    delay(1000)
+
+    # Stop note
+    sid_gate(0, false)
+
+    println("Playing C5...")
+    sid_frequency(0, 8934)      # C5
+    sid_gate(0, true)
+    delay(1000)
+    sid_gate(0, false)
+
+    println("")
+    println("Done!")
+
+
+def delay(ms: word):
+    i: word = 0
+    while i < ms:
+        j: byte = 0
+        while j < 200:
+            j = j + 1
+        i = i + 1

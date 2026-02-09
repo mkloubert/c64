@@ -22,6 +22,14 @@ A modern programming language and compiler for the Commodore 64.
    - [Functions](#functions)
    - [Comments](#comments)
 5. [Built-in Functions](#built-in-functions)
+   - [Screen Functions](#screen-functions)
+   - [Output Functions](#output-functions)
+   - [Input Functions](#input-functions)
+   - [Memory Functions](#memory-functions)
+   - [Array and String Functions](#array-and-string-functions)
+   - [Random Number Functions](#random-number-functions)
+   - [Sprite Functions](#sprite-functions)
+   - [Sound Functions](#sound-functions)
 6. [Example Programs](#example-programs)
 7. [Error Messages](#error-messages)
 8. [Limitations](#limitations)
@@ -1415,6 +1423,431 @@ def main():
 | `sprite_collision_bg() -> byte`     | Sprite-background collision |
 | `sprite_collides(mask) -> bool`     | Check collision             |
 
+### Sound Functions
+
+The C64 SID (Sound Interface Device) chip provides 3 independent voices with waveform generators, ADSR envelopes, and filters. Cobra64 offers comprehensive sound control through built-in functions.
+
+#### SID Basics
+
+Each voice can produce one of four waveforms (triangle, sawtooth, pulse, noise) at any frequency from ~0.06 Hz to ~4 kHz. The SID also includes a resonant multimode filter that can process any combination of voices.
+
+#### Basic Sound Control
+
+##### `sid_reset()`
+
+Clears all 25 SID registers, silencing all sound.
+
+```python
+def main():
+    sid_reset()  # Initialize SID to silence
+```
+
+##### `sid_volume(vol: byte)`
+
+Sets the master volume (0-15).
+
+```python
+def main():
+    sid_volume(15)  # Maximum volume
+    sid_volume(0)   # Mute
+```
+
+##### `sid_frequency(voice: byte, freq: word)`
+
+Sets the 16-bit frequency for a voice (0-2). The frequency value maps to actual Hz using the formula: Hz = freq × 0.0596 (PAL).
+
+```python
+def main():
+    # Voice 0 at ~440 Hz (A4)
+    sid_frequency(0, 7382)
+```
+
+##### `sid_waveform(voice: byte, wave: byte)`
+
+Sets the waveform for a voice. Use waveform constants. Preserves the gate bit state.
+
+```python
+def main():
+    sid_waveform(0, WAVE_PULSE)    # Pulse/square wave
+    sid_waveform(1, WAVE_SAWTOOTH) # Sawtooth wave
+    sid_waveform(2, WAVE_TRIANGLE) # Triangle wave
+```
+
+##### `sid_gate(voice: byte, on: byte)`
+
+Controls the gate bit to start/stop the ADSR envelope.
+
+```python
+def main():
+    sid_gate(0, 1)  # Start attack phase
+    sid_gate(0, 0)  # Start release phase
+```
+
+#### ADSR Envelope
+
+The ADSR (Attack, Decay, Sustain, Release) envelope shapes the volume of each note.
+
+##### `sid_attack(voice: byte, val: byte)`
+
+Sets attack time (0-15). Higher values = longer attack.
+
+| Value | Time (ms) | Value | Time (ms) |
+| ----- | --------- | ----- | --------- |
+| 0     | 2         | 8     | 100       |
+| 1     | 8         | 9     | 250       |
+| 2     | 16        | 10    | 500       |
+| 3     | 24        | 11    | 800       |
+| 4     | 38        | 12    | 1000      |
+| 5     | 56        | 13    | 3000      |
+| 6     | 68        | 14    | 5000      |
+| 7     | 80        | 15    | 8000      |
+
+##### `sid_decay(voice: byte, val: byte)`
+
+Sets decay time (0-15). Same timing table as attack.
+
+##### `sid_sustain(voice: byte, val: byte)`
+
+Sets sustain level (0-15). 15 = full volume, 0 = silent.
+
+##### `sid_release(voice: byte, val: byte)`
+
+Sets release time (0-15). Same timing table as attack.
+
+##### `sid_envelope(voice: byte, a: byte, d: byte, s: byte, r: byte)`
+
+Sets all ADSR values at once.
+
+```python
+def main():
+    # Quick attack, medium decay, half sustain, long release
+    sid_envelope(0, 0, 5, 8, 10)
+```
+
+#### Pulse Width
+
+##### `sid_pulse_width(voice: byte, width: word)`
+
+Sets the 12-bit pulse width (0-4095) for pulse waveform. 2048 = 50% duty cycle (square wave).
+
+```python
+def main():
+    sid_waveform(0, WAVE_PULSE)
+    sid_pulse_width(0, 2048)  # Square wave
+    sid_pulse_width(0, 512)   # 12.5% duty cycle (thin sound)
+```
+
+#### Advanced Voice Control
+
+##### `sid_ring_mod(voice: byte, enable: byte)`
+
+Enables ring modulation. Voice N is modulated by voice N-1 (voice 0 by voice 2).
+
+```python
+def main():
+    sid_ring_mod(0, 1)  # Enable ring mod on voice 0
+```
+
+##### `sid_sync(voice: byte, enable: byte)`
+
+Enables hard oscillator sync. Voice N syncs to voice N-1.
+
+```python
+def main():
+    sid_sync(1, 1)  # Sync voice 1 to voice 0
+```
+
+##### `sid_test(voice: byte, enable: byte)`
+
+Controls the test bit (resets oscillator, used for special effects).
+
+```python
+def main():
+    sid_test(0, 1)  # Hold oscillator at zero
+    sid_test(0, 0)  # Release oscillator
+```
+
+#### Filter Control
+
+The SID filter is a resonant multimode filter (low-pass, band-pass, high-pass).
+
+##### `sid_filter_cutoff(freq: word)`
+
+Sets the 11-bit filter cutoff frequency (0-2047).
+
+```python
+def main():
+    sid_filter_cutoff(1024)  # Mid-range cutoff
+```
+
+##### `sid_filter_resonance(val: byte)`
+
+Sets filter resonance (0-15). Higher values = more pronounced resonance peak.
+
+```python
+def main():
+    sid_filter_resonance(8)  # Medium resonance
+```
+
+##### `sid_filter_route(voices: byte)`
+
+Routes voices through the filter. Use a bitmask (bit 0 = voice 0, etc.).
+
+```python
+def main():
+    sid_filter_route(1)  # Filter voice 0 only
+    sid_filter_route(7)  # Filter all three voices
+```
+
+##### `sid_filter_mode(mode: byte)`
+
+Sets the filter mode. Can combine modes with OR.
+
+```python
+def main():
+    sid_filter_mode(FILTER_LOWPASS)   # Low-pass only
+    sid_filter_mode(FILTER_BANDPASS)  # Band-pass only
+    sid_filter_mode(FILTER_LOWPASS | FILTER_HIGHPASS)  # Notch filter
+```
+
+#### High-Level Music Functions
+
+##### `play_note(voice: byte, note: byte, octave: byte)`
+
+Plays a musical note using note constants (NOTE_C through NOTE_B) and octave (0-7).
+
+```python
+def main():
+    sid_volume(15)
+    sid_envelope(0, 0, 5, 10, 8)
+    sid_waveform(0, WAVE_PULSE)
+    sid_pulse_width(0, 2048)
+
+    # Play C major chord
+    play_note(0, NOTE_C, 4)  # Middle C
+    play_note(1, NOTE_E, 4)  # E4
+    play_note(2, NOTE_G, 4)  # G4
+```
+
+##### `play_tone(voice: byte, freq: word, wave: byte, duration: byte)`
+
+Plays a tone with automatic gate control. Duration is in frames (~1/60 second).
+
+```python
+def main():
+    sid_volume(15)
+    sid_envelope(0, 0, 2, 8, 4)
+
+    # Play a 440 Hz pulse tone for ~1 second
+    play_tone(0, 7382, WAVE_PULSE, 60)
+```
+
+##### `sound_off()`
+
+Silences all voices by clearing gate bits and waveforms.
+
+```python
+def main():
+    sound_off()  # Stop all sound
+```
+
+##### `sound_off_voice(voice: byte)`
+
+Silences a specific voice.
+
+```python
+def main():
+    sound_off_voice(0)  # Silence voice 0 only
+```
+
+#### Sound Constants
+
+##### Waveform Constants
+
+| Constant        | Value | Description       |
+| --------------- | ----- | ----------------- |
+| `WAVE_TRIANGLE` | 16    | Triangle wave     |
+| `WAVE_SAWTOOTH` | 32    | Sawtooth wave     |
+| `WAVE_PULSE`    | 64    | Pulse/square wave |
+| `WAVE_NOISE`    | 128   | White noise       |
+
+##### Filter Mode Constants
+
+| Constant          | Value | Description           |
+| ----------------- | ----- | --------------------- |
+| `FILTER_LOWPASS`  | 16    | Low-pass filter mode  |
+| `FILTER_BANDPASS` | 32    | Band-pass filter mode |
+| `FILTER_HIGHPASS` | 64    | High-pass filter mode |
+
+##### Note Constants
+
+| Constant  | Value | Note  |
+| --------- | ----- | ----- |
+| `NOTE_C`  | 0     | C     |
+| `NOTE_CS` | 1     | C#/Db |
+| `NOTE_D`  | 2     | D     |
+| `NOTE_DS` | 3     | D#/Eb |
+| `NOTE_E`  | 4     | E     |
+| `NOTE_F`  | 5     | F     |
+| `NOTE_FS` | 6     | F#/Gb |
+| `NOTE_G`  | 7     | G     |
+| `NOTE_GS` | 8     | G#/Ab |
+| `NOTE_A`  | 9     | A     |
+| `NOTE_AS` | 10    | A#/Bb |
+| `NOTE_B`  | 11    | B     |
+
+##### SID Register Address Constants
+
+| Constant               | Address | Description                |
+| ---------------------- | ------- | -------------------------- |
+| `SID_BASE`             | $D400   | SID chip base address      |
+| `SID_VOICE1_FREQ_LO`   | $D400   | Voice 1 frequency low      |
+| `SID_VOICE1_FREQ_HI`   | $D401   | Voice 1 frequency high     |
+| `SID_VOICE1_PW_LO`     | $D402   | Voice 1 pulse width low    |
+| `SID_VOICE1_PW_HI`     | $D403   | Voice 1 pulse width high   |
+| `SID_VOICE1_CTRL`      | $D404   | Voice 1 control register   |
+| `SID_VOICE1_AD`        | $D405   | Voice 1 attack/decay       |
+| `SID_VOICE1_SR`        | $D406   | Voice 1 sustain/release    |
+| `SID_VOICE2_FREQ_LO`   | $D407   | Voice 2 frequency low      |
+| `SID_VOICE2_FREQ_HI`   | $D408   | Voice 2 frequency high     |
+| `SID_VOICE2_PW_LO`     | $D409   | Voice 2 pulse width low    |
+| `SID_VOICE2_PW_HI`     | $D40A   | Voice 2 pulse width high   |
+| `SID_VOICE2_CTRL`      | $D40B   | Voice 2 control register   |
+| `SID_VOICE2_AD`        | $D40C   | Voice 2 attack/decay       |
+| `SID_VOICE2_SR`        | $D40D   | Voice 2 sustain/release    |
+| `SID_VOICE3_FREQ_LO`   | $D40E   | Voice 3 frequency low      |
+| `SID_VOICE3_FREQ_HI`   | $D40F   | Voice 3 frequency high     |
+| `SID_VOICE3_PW_LO`     | $D410   | Voice 3 pulse width low    |
+| `SID_VOICE3_PW_HI`     | $D411   | Voice 3 pulse width high   |
+| `SID_VOICE3_CTRL`      | $D412   | Voice 3 control register   |
+| `SID_VOICE3_AD`        | $D413   | Voice 3 attack/decay       |
+| `SID_VOICE3_SR`        | $D414   | Voice 3 sustain/release    |
+| `SID_FILTER_CUTOFF_LO` | $D415   | Filter cutoff low (3 bits) |
+| `SID_FILTER_CUTOFF_HI` | $D416   | Filter cutoff high         |
+| `SID_FILTER_CTRL`      | $D417   | Filter resonance/routing   |
+| `SID_VOLUME`           | $D418   | Volume and filter mode     |
+
+#### Complete Sound Example
+
+```python
+# Sound demo - plays a simple melody
+
+def main():
+    cls()
+    println("SOUND DEMO")
+
+    # Initialize SID
+    sid_reset()
+    sid_volume(15)
+
+    # Setup voice 0 for melody
+    sid_envelope(0, 0, 5, 10, 8)
+    sid_waveform(0, WAVE_PULSE)
+    sid_pulse_width(0, 2048)
+
+    # Play C major scale
+    notes: byte[] = [NOTE_C, NOTE_D, NOTE_E, NOTE_F, NOTE_G, NOTE_A, NOTE_B]
+    i: byte = 0
+    while i < 7:
+        play_note(0, notes[i], 4)
+        delay(15)  # Wait ~250ms between notes
+        i = i + 1
+
+    # Play final high C
+    play_note(0, NOTE_C, 5)
+    delay(30)
+
+    sound_off()
+    println("DONE")
+
+def delay(frames: byte):
+    # Simple delay loop
+    f: byte = 0
+    while f < frames:
+        # Wait for raster to reach bottom of screen
+        while peek($D012) < 255:
+            pass
+        while peek($D012) == 255:
+            pass
+        f = f + 1
+```
+
+#### Sound Effects Example
+
+```python
+# Game sound effects
+
+def laser_sound():
+    sid_envelope(0, 0, 0, 15, 4)
+    sid_waveform(0, WAVE_NOISE)
+    sid_frequency(0, 8000)
+    sid_gate(0, 1)
+    # Pitch sweep down
+    freq: word = 8000
+    while freq > 500:
+        sid_frequency(0, freq)
+        freq = freq - 200
+    sid_gate(0, 0)
+
+def explosion_sound():
+    sid_envelope(1, 0, 8, 0, 12)
+    sid_waveform(1, WAVE_NOISE)
+    sid_frequency(1, 500)
+    sid_gate(1, 1)
+
+def coin_sound():
+    sid_envelope(2, 0, 2, 0, 4)
+    sid_waveform(2, WAVE_TRIANGLE)
+    play_note(2, NOTE_E, 6)
+    delay(5)
+    play_note(2, NOTE_A, 6)
+
+def main():
+    sid_reset()
+    sid_volume(15)
+
+    println("PRESS KEYS FOR SOUNDS:")
+    println("L = LASER")
+    println("E = EXPLOSION")
+    println("C = COIN")
+
+    while true:
+        k: byte = get_key()
+        if k == 'L':
+            laser_sound()
+        elif k == 'E':
+            explosion_sound()
+        elif k == 'C':
+            coin_sound()
+```
+
+#### Sound Function Reference
+
+| Function                            | Description                   |
+| ----------------------------------- | ----------------------------- |
+| `sid_reset()`                       | Clear all SID registers       |
+| `sid_volume(vol)`                   | Set master volume (0-15)      |
+| `sid_frequency(voice, freq)`        | Set 16-bit frequency          |
+| `sid_waveform(voice, wave)`         | Set waveform (preserves gate) |
+| `sid_gate(voice, on)`               | Control gate bit              |
+| `sid_attack(voice, val)`            | Set attack time (0-15)        |
+| `sid_decay(voice, val)`             | Set decay time (0-15)         |
+| `sid_sustain(voice, val)`           | Set sustain level (0-15)      |
+| `sid_release(voice, val)`           | Set release time (0-15)       |
+| `sid_envelope(voice, a, d, s, r)`   | Set full ADSR envelope        |
+| `sid_pulse_width(voice, width)`     | Set 12-bit pulse width        |
+| `sid_ring_mod(voice, enable)`       | Enable ring modulation        |
+| `sid_sync(voice, enable)`           | Enable oscillator sync        |
+| `sid_test(voice, enable)`           | Control test bit              |
+| `sid_filter_cutoff(freq)`           | Set 11-bit filter cutoff      |
+| `sid_filter_resonance(val)`         | Set resonance (0-15)          |
+| `sid_filter_route(voices)`          | Route voices through filter   |
+| `sid_filter_mode(mode)`             | Set filter mode (LP/BP/HP)    |
+| `play_note(voice, note, octave)`    | Play musical note             |
+| `play_tone(voice, freq, wave, dur)` | Play tone with duration       |
+| `sound_off()`                       | Silence all voices            |
+| `sound_off_voice(voice)`            | Silence specific voice        |
+
 ---
 
 ## Example Programs
@@ -1817,6 +2250,18 @@ The generated PRG and D64 files should work with any C64 emulator that supports 
 ---
 
 ## Version History
+
+- **0.13.0** - Sound & Music Functions
+  - Added comprehensive SID chip support with 20 new built-in functions
+  - Basic sound: `sid_reset()`, `sid_volume()`, `sid_frequency()`, `sid_waveform()`, `sid_gate()`
+  - ADSR envelope: `sid_attack()`, `sid_decay()`, `sid_sustain()`, `sid_release()`, `sid_envelope()`
+  - Pulse width: `sid_pulse_width()`
+  - Advanced: `sid_ring_mod()`, `sid_sync()`, `sid_test()`
+  - Filter: `sid_filter_cutoff()`, `sid_filter_resonance()`, `sid_filter_route()`, `sid_filter_mode()`
+  - High-level: `play_note()`, `play_tone()`, `sound_off()`, `sound_off_voice()`
+  - Added 45+ sound constants (waveforms, filters, notes, SID registers)
+  - Built-in note frequency lookup table with octave scaling (0-7)
+  - New example programs: `sound_demo.cb64`, `sound_basic.cb64`, `sound_effects.cb64`
 
 - **0.12.0** - LSP Documentation Examples
   - Added code examples (1-3 per item) for all built-in functions in VS Code extension

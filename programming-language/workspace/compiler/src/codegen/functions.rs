@@ -25,7 +25,7 @@
 use super::emit::EmitHelpers;
 use super::expressions::ExpressionEmitter;
 use super::labels::LabelManager;
-use super::mos6510::{kernal, opcodes, petscii, sprite, zeropage};
+use super::mos6510::{kernal, opcodes, petscii, sid, sprite, zeropage};
 use super::type_inference::TypeInference;
 use super::CodeGenerator;
 use crate::ast::{Expr, Type};
@@ -797,6 +797,235 @@ impl FunctionCallEmitter for CodeGenerator {
                     self.define_label(&done_label);
                 }
             }
+
+            // =================================================================
+            // SID Sound Functions
+            // =================================================================
+
+            "sid_reset" => {
+                // sid_reset() - clear all 25 SID registers
+                self.emit_imm(opcodes::LDA_IMM, 0);
+                self.emit_imm(opcodes::LDX_IMM, sid::REGISTER_COUNT - 1);
+                let loop_label = self.make_label("sid_reset_loop");
+                self.define_label(&loop_label);
+                self.emit_abx(opcodes::STA_ABX, sid::BASE);
+                self.emit_byte(opcodes::DEX);
+                self.emit_branch(opcodes::BPL, &loop_label);
+            }
+
+            "sid_volume" => {
+                // sid_volume(volume: byte) - set main volume (0-15)
+                if !args.is_empty() {
+                    self.generate_expression(&args[0])?;
+                    // Mask to low nibble and preserve high nibble (filter mode)
+                    self.emit_imm(opcodes::AND_IMM, 0x0F);
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_abs(opcodes::LDA_ABS, sid::FILTER_MODE_VOLUME);
+                    self.emit_imm(opcodes::AND_IMM, 0xF0); // Keep filter mode bits
+                    self.emit_byte(opcodes::ORA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_abs(opcodes::STA_ABS, sid::FILTER_MODE_VOLUME);
+                }
+            }
+
+            "sid_frequency" => {
+                // sid_frequency(voice: byte, frequency: word)
+                if args.len() >= 2 {
+                    self.generate_sid_frequency(&args[0], &args[1])?;
+                }
+            }
+
+            "sid_waveform" => {
+                // sid_waveform(voice: byte, waveform: byte)
+                if args.len() >= 2 {
+                    self.generate_sid_waveform(&args[0], &args[1])?;
+                }
+            }
+
+            "sid_gate" => {
+                // sid_gate(voice: byte, on: bool)
+                if args.len() >= 2 {
+                    self.generate_sid_gate(&args[0], &args[1])?;
+                }
+            }
+
+            "sid_attack" => {
+                // sid_attack(voice: byte, value: byte) - set attack (high nibble)
+                if args.len() >= 2 {
+                    self.generate_sid_attack(&args[0], &args[1])?;
+                }
+            }
+
+            "sid_decay" => {
+                // sid_decay(voice: byte, value: byte) - set decay (low nibble)
+                if args.len() >= 2 {
+                    self.generate_sid_decay(&args[0], &args[1])?;
+                }
+            }
+
+            "sid_sustain" => {
+                // sid_sustain(voice: byte, value: byte) - set sustain (high nibble)
+                if args.len() >= 2 {
+                    self.generate_sid_sustain(&args[0], &args[1])?;
+                }
+            }
+
+            "sid_release" => {
+                // sid_release(voice: byte, value: byte) - set release (low nibble)
+                if args.len() >= 2 {
+                    self.generate_sid_release(&args[0], &args[1])?;
+                }
+            }
+
+            "sid_envelope" => {
+                // sid_envelope(voice, attack, decay, sustain, release)
+                if args.len() >= 5 {
+                    self.generate_sid_envelope(&args[0], &args[1], &args[2], &args[3], &args[4])?;
+                }
+            }
+
+            "sid_pulse_width" => {
+                // sid_pulse_width(voice: byte, width: word) - 12-bit pulse width
+                if args.len() >= 2 {
+                    self.generate_sid_pulse_width(&args[0], &args[1])?;
+                }
+            }
+
+            "sid_ring_mod" => {
+                // sid_ring_mod(voice: byte, enable: bool)
+                if args.len() >= 2 {
+                    self.generate_sid_control_bit(&args[0], &args[1], sid::CTRL_RING_MOD)?;
+                }
+            }
+
+            "sid_sync" => {
+                // sid_sync(voice: byte, enable: bool)
+                if args.len() >= 2 {
+                    self.generate_sid_control_bit(&args[0], &args[1], sid::CTRL_SYNC)?;
+                }
+            }
+
+            "sid_test" => {
+                // sid_test(voice: byte, enable: bool)
+                if args.len() >= 2 {
+                    self.generate_sid_control_bit(&args[0], &args[1], sid::CTRL_TEST)?;
+                }
+            }
+
+            "sid_filter_cutoff" => {
+                // sid_filter_cutoff(frequency: word) - 11-bit cutoff
+                if !args.is_empty() {
+                    self.generate_expression(&args[0])?;
+                    // A = low byte, X = high byte
+                    // Low 3 bits go to $D415, high 8 bits go to $D416
+                    self.emit_byte(opcodes::PHA); // Save low byte
+                    self.emit_imm(opcodes::AND_IMM, 0x07); // Low 3 bits
+                    self.emit_abs(opcodes::STA_ABS, sid::FILTER_CUTOFF_LO);
+                    self.emit_byte(opcodes::PLA); // Restore low byte
+                    // Combine: (low >> 3) | (high << 5)
+                    self.emit_byte(opcodes::LSR_ACC);
+                    self.emit_byte(opcodes::LSR_ACC);
+                    self.emit_byte(opcodes::LSR_ACC);
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_byte(opcodes::TXA); // High byte
+                    self.emit_byte(opcodes::ASL_ACC);
+                    self.emit_byte(opcodes::ASL_ACC);
+                    self.emit_byte(opcodes::ASL_ACC);
+                    self.emit_byte(opcodes::ASL_ACC);
+                    self.emit_byte(opcodes::ASL_ACC);
+                    self.emit_byte(opcodes::ORA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_abs(opcodes::STA_ABS, sid::FILTER_CUTOFF_HI);
+                }
+            }
+
+            "sid_filter_resonance" => {
+                // sid_filter_resonance(value: byte) - set resonance (0-15)
+                if !args.is_empty() {
+                    self.generate_expression(&args[0])?;
+                    // Shift to high nibble, preserve low nibble (voice routing)
+                    self.emit_byte(opcodes::ASL_ACC);
+                    self.emit_byte(opcodes::ASL_ACC);
+                    self.emit_byte(opcodes::ASL_ACC);
+                    self.emit_byte(opcodes::ASL_ACC);
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_abs(opcodes::LDA_ABS, sid::FILTER_RESONANCE);
+                    self.emit_imm(opcodes::AND_IMM, 0x0F); // Keep voice routing
+                    self.emit_byte(opcodes::ORA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_abs(opcodes::STA_ABS, sid::FILTER_RESONANCE);
+                }
+            }
+
+            "sid_filter_route" => {
+                // sid_filter_route(voices: byte) - route voices through filter
+                if !args.is_empty() {
+                    self.generate_expression(&args[0])?;
+                    // Low nibble = voice routing, preserve high nibble (resonance)
+                    self.emit_imm(opcodes::AND_IMM, 0x0F);
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_abs(opcodes::LDA_ABS, sid::FILTER_RESONANCE);
+                    self.emit_imm(opcodes::AND_IMM, 0xF0); // Keep resonance
+                    self.emit_byte(opcodes::ORA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_abs(opcodes::STA_ABS, sid::FILTER_RESONANCE);
+                }
+            }
+
+            "sid_filter_mode" => {
+                // sid_filter_mode(mode: byte) - set filter mode (LP/BP/HP)
+                if !args.is_empty() {
+                    self.generate_expression(&args[0])?;
+                    // High nibble = filter mode, preserve low nibble (volume)
+                    self.emit_imm(opcodes::AND_IMM, 0xF0);
+                    self.emit_byte(opcodes::STA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_abs(opcodes::LDA_ABS, sid::FILTER_MODE_VOLUME);
+                    self.emit_imm(opcodes::AND_IMM, 0x0F); // Keep volume
+                    self.emit_byte(opcodes::ORA_ZP);
+                    self.emit_byte(zeropage::TMP1);
+                    self.emit_abs(opcodes::STA_ABS, sid::FILTER_MODE_VOLUME);
+                }
+            }
+
+            "play_note" => {
+                // play_note(voice: byte, note: byte, octave: byte)
+                if args.len() >= 3 {
+                    self.generate_play_note(&args[0], &args[1], &args[2])?;
+                }
+            }
+
+            "play_tone" => {
+                // play_tone(voice, frequency, waveform, duration)
+                if args.len() >= 4 {
+                    self.generate_play_tone(&args[0], &args[1], &args[2], &args[3])?;
+                }
+            }
+
+            "sound_off" => {
+                // sound_off() - silence all voices (clear gate bits)
+                self.emit_abs(opcodes::LDA_ABS, sid::VOICE1_CTRL);
+                self.emit_imm(opcodes::AND_IMM, !sid::CTRL_GATE);
+                self.emit_abs(opcodes::STA_ABS, sid::VOICE1_CTRL);
+                self.emit_abs(opcodes::LDA_ABS, sid::VOICE2_CTRL);
+                self.emit_imm(opcodes::AND_IMM, !sid::CTRL_GATE);
+                self.emit_abs(opcodes::STA_ABS, sid::VOICE2_CTRL);
+                self.emit_abs(opcodes::LDA_ABS, sid::VOICE3_CTRL);
+                self.emit_imm(opcodes::AND_IMM, !sid::CTRL_GATE);
+                self.emit_abs(opcodes::STA_ABS, sid::VOICE3_CTRL);
+            }
+
+            "sound_off_voice" => {
+                // sound_off_voice(voice: byte) - silence specific voice
+                if !args.is_empty() {
+                    self.generate_sound_off_voice(&args[0])?;
+                }
+            }
+
             _ => {
                 // User-defined function
                 if let Some(func_info) = self.functions.get(name).cloned() {
@@ -1294,6 +1523,629 @@ impl CodeGenerator {
         self.define_label(&zero_label);
         self.emit_imm(opcodes::LDA_IMM, 0); // false
         self.define_label(&done_label);
+
+        Ok(())
+    }
+}
+
+/// Helper methods for SID sound generation.
+impl CodeGenerator {
+    /// Generate code for sid_frequency(voice, frequency).
+    fn generate_sid_frequency(
+        &mut self,
+        voice_expr: &Expr,
+        freq_expr: &Expr,
+    ) -> Result<(), CompileError> {
+        // Evaluate frequency first (16-bit: A=low, X=high)
+        self.generate_expression(freq_expr)?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1); // TMP1 = freq low
+        self.emit_byte(opcodes::STX_ZP);
+        self.emit_byte(zeropage::TMP1_HI); // TMP1_HI = freq high
+
+        // Evaluate voice number
+        self.generate_expression(voice_expr)?;
+
+        // Calculate base address: voice * 7
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2); // Save voice number
+        self.emit_byte(opcodes::ASL_ACC); // * 2
+        self.emit_byte(opcodes::ASL_ACC); // * 4
+        self.emit_byte(opcodes::CLC);
+        self.emit_byte(opcodes::ADC_ZP);
+        self.emit_byte(zeropage::TMP2); // * 4 + voice = * 5
+        self.emit_byte(opcodes::ASL_ACC); // * 10... wait, that's wrong
+
+        // Simpler: multiply by 7 = voice + voice*2 + voice*4
+        // Actually: voice*7 = (voice << 3) - voice
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::ASL_ACC); // * 2
+        self.emit_byte(opcodes::ASL_ACC); // * 4
+        self.emit_byte(opcodes::ASL_ACC); // * 8
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(zeropage::TMP2); // * 8 - voice = * 7
+        self.emit_byte(opcodes::TAY); // Y = offset
+
+        // Store freq low byte
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_aby(opcodes::STA_ABY, sid::BASE);
+
+        // Store freq high byte
+        self.emit_byte(opcodes::INY);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_aby(opcodes::STA_ABY, sid::BASE);
+
+        Ok(())
+    }
+
+    /// Generate code for sid_waveform(voice, waveform).
+    fn generate_sid_waveform(
+        &mut self,
+        voice_expr: &Expr,
+        waveform_expr: &Expr,
+    ) -> Result<(), CompileError> {
+        // Evaluate waveform
+        self.generate_expression(waveform_expr)?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1); // TMP1 = waveform
+
+        // Evaluate voice and calculate control register offset
+        self.generate_expression(voice_expr)?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        // voice * 7
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::CLC);
+        self.emit_imm(opcodes::ADC_IMM, sid::OFFSET_CTRL as u8);
+        self.emit_byte(opcodes::TAY); // Y = control register offset
+
+        // Read current control register (preserve gate bit)
+        self.emit_aby(opcodes::LDA_ABY, sid::BASE);
+        self.emit_imm(opcodes::AND_IMM, 0x0F); // Keep low nibble (gate, sync, ring, test)
+        self.emit_byte(opcodes::ORA_ZP);
+        self.emit_byte(zeropage::TMP1); // OR with waveform
+        self.emit_aby(opcodes::STA_ABY, sid::BASE);
+
+        Ok(())
+    }
+
+    /// Generate code for sid_gate(voice, on).
+    fn generate_sid_gate(
+        &mut self,
+        voice_expr: &Expr,
+        on_expr: &Expr,
+    ) -> Result<(), CompileError> {
+        // Evaluate on/off flag
+        self.generate_expression(on_expr)?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1); // TMP1 = on flag
+
+        // Evaluate voice and calculate control register offset
+        self.generate_expression(voice_expr)?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::CLC);
+        self.emit_imm(opcodes::ADC_IMM, sid::OFFSET_CTRL as u8);
+        self.emit_byte(opcodes::TAY); // Y = control register offset
+
+        // Check if gate on or off
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        let off_label = self.make_label("sg_off");
+        let done_label = self.make_label("sg_done");
+        self.emit_branch(opcodes::BEQ, &off_label);
+
+        // Gate ON: set bit 0
+        self.emit_aby(opcodes::LDA_ABY, sid::BASE);
+        self.emit_imm(opcodes::ORA_IMM, sid::CTRL_GATE);
+        self.emit_aby(opcodes::STA_ABY, sid::BASE);
+        self.emit_jmp(&done_label);
+
+        // Gate OFF: clear bit 0
+        self.define_label(&off_label);
+        self.emit_aby(opcodes::LDA_ABY, sid::BASE);
+        self.emit_imm(opcodes::AND_IMM, !sid::CTRL_GATE);
+        self.emit_aby(opcodes::STA_ABY, sid::BASE);
+
+        self.define_label(&done_label);
+        Ok(())
+    }
+
+    /// Generate code for sid_attack(voice, value).
+    fn generate_sid_attack(
+        &mut self,
+        voice_expr: &Expr,
+        value_expr: &Expr,
+    ) -> Result<(), CompileError> {
+        // Evaluate value and shift to high nibble
+        self.generate_expression(value_expr)?;
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1); // TMP1 = attack << 4
+
+        // Calculate AD register offset
+        self.generate_expression(voice_expr)?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::CLC);
+        self.emit_imm(opcodes::ADC_IMM, sid::OFFSET_ATTACK_DECAY as u8);
+        self.emit_byte(opcodes::TAY);
+
+        // Read, modify, write
+        self.emit_aby(opcodes::LDA_ABY, sid::BASE);
+        self.emit_imm(opcodes::AND_IMM, 0x0F); // Keep decay
+        self.emit_byte(opcodes::ORA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_aby(opcodes::STA_ABY, sid::BASE);
+
+        Ok(())
+    }
+
+    /// Generate code for sid_decay(voice, value).
+    fn generate_sid_decay(
+        &mut self,
+        voice_expr: &Expr,
+        value_expr: &Expr,
+    ) -> Result<(), CompileError> {
+        // Evaluate value (low nibble)
+        self.generate_expression(value_expr)?;
+        self.emit_imm(opcodes::AND_IMM, 0x0F);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+
+        // Calculate AD register offset
+        self.generate_expression(voice_expr)?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::CLC);
+        self.emit_imm(opcodes::ADC_IMM, sid::OFFSET_ATTACK_DECAY as u8);
+        self.emit_byte(opcodes::TAY);
+
+        // Read, modify, write
+        self.emit_aby(opcodes::LDA_ABY, sid::BASE);
+        self.emit_imm(opcodes::AND_IMM, 0xF0); // Keep attack
+        self.emit_byte(opcodes::ORA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_aby(opcodes::STA_ABY, sid::BASE);
+
+        Ok(())
+    }
+
+    /// Generate code for sid_sustain(voice, value).
+    fn generate_sid_sustain(
+        &mut self,
+        voice_expr: &Expr,
+        value_expr: &Expr,
+    ) -> Result<(), CompileError> {
+        // Evaluate value and shift to high nibble
+        self.generate_expression(value_expr)?;
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+
+        // Calculate SR register offset
+        self.generate_expression(voice_expr)?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::CLC);
+        self.emit_imm(opcodes::ADC_IMM, sid::OFFSET_SUSTAIN_RELEASE as u8);
+        self.emit_byte(opcodes::TAY);
+
+        // Read, modify, write
+        self.emit_aby(opcodes::LDA_ABY, sid::BASE);
+        self.emit_imm(opcodes::AND_IMM, 0x0F); // Keep release
+        self.emit_byte(opcodes::ORA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_aby(opcodes::STA_ABY, sid::BASE);
+
+        Ok(())
+    }
+
+    /// Generate code for sid_release(voice, value).
+    fn generate_sid_release(
+        &mut self,
+        voice_expr: &Expr,
+        value_expr: &Expr,
+    ) -> Result<(), CompileError> {
+        // Evaluate value (low nibble)
+        self.generate_expression(value_expr)?;
+        self.emit_imm(opcodes::AND_IMM, 0x0F);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+
+        // Calculate SR register offset
+        self.generate_expression(voice_expr)?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::CLC);
+        self.emit_imm(opcodes::ADC_IMM, sid::OFFSET_SUSTAIN_RELEASE as u8);
+        self.emit_byte(opcodes::TAY);
+
+        // Read, modify, write
+        self.emit_aby(opcodes::LDA_ABY, sid::BASE);
+        self.emit_imm(opcodes::AND_IMM, 0xF0); // Keep sustain
+        self.emit_byte(opcodes::ORA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_aby(opcodes::STA_ABY, sid::BASE);
+
+        Ok(())
+    }
+
+    /// Generate code for sid_envelope(voice, attack, decay, sustain, release).
+    fn generate_sid_envelope(
+        &mut self,
+        voice_expr: &Expr,
+        attack_expr: &Expr,
+        decay_expr: &Expr,
+        sustain_expr: &Expr,
+        release_expr: &Expr,
+    ) -> Result<(), CompileError> {
+        // Combine attack and decay
+        self.generate_expression(attack_expr)?;
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1); // TMP1 = attack << 4
+
+        self.generate_expression(decay_expr)?;
+        self.emit_imm(opcodes::AND_IMM, 0x0F);
+        self.emit_byte(opcodes::ORA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1); // TMP1 = AD byte
+
+        // Combine sustain and release
+        self.generate_expression(sustain_expr)?;
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1_HI); // TMP1_HI = sustain << 4
+
+        self.generate_expression(release_expr)?;
+        self.emit_imm(opcodes::AND_IMM, 0x0F);
+        self.emit_byte(opcodes::ORA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1_HI); // TMP1_HI = SR byte
+
+        // Calculate register offset
+        self.generate_expression(voice_expr)?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::TAY); // Y = voice * 7
+
+        // Write AD register
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_aby(opcodes::STA_ABY, sid::BASE + sid::OFFSET_ATTACK_DECAY);
+
+        // Write SR register
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_aby(opcodes::STA_ABY, sid::BASE + sid::OFFSET_SUSTAIN_RELEASE);
+
+        Ok(())
+    }
+
+    /// Generate code for sid_pulse_width(voice, width).
+    fn generate_sid_pulse_width(
+        &mut self,
+        voice_expr: &Expr,
+        width_expr: &Expr,
+    ) -> Result<(), CompileError> {
+        // Evaluate width (12-bit value, A=low, X=high)
+        self.generate_expression(width_expr)?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1); // low byte
+        self.emit_byte(opcodes::TXA);
+        self.emit_imm(opcodes::AND_IMM, 0x0F); // only low nibble of high byte
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+
+        // Calculate register offset
+        self.generate_expression(voice_expr)?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::TAY); // Y = voice * 7
+
+        // Write pulse low
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_aby(opcodes::STA_ABY, sid::BASE + sid::OFFSET_PULSE_LO);
+
+        // Write pulse high
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_aby(opcodes::STA_ABY, sid::BASE + sid::OFFSET_PULSE_HI);
+
+        Ok(())
+    }
+
+    /// Generate code for sid_ring_mod, sid_sync, sid_test.
+    fn generate_sid_control_bit(
+        &mut self,
+        voice_expr: &Expr,
+        enable_expr: &Expr,
+        bit: u8,
+    ) -> Result<(), CompileError> {
+        // Evaluate enable flag
+        self.generate_expression(enable_expr)?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+
+        // Calculate control register offset
+        self.generate_expression(voice_expr)?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::CLC);
+        self.emit_imm(opcodes::ADC_IMM, sid::OFFSET_CTRL as u8);
+        self.emit_byte(opcodes::TAY);
+
+        // Check enable/disable
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        let off_label = self.make_label("scb_off");
+        let done_label = self.make_label("scb_done");
+        self.emit_branch(opcodes::BEQ, &off_label);
+
+        // Enable: set bit
+        self.emit_aby(opcodes::LDA_ABY, sid::BASE);
+        self.emit_imm(opcodes::ORA_IMM, bit);
+        self.emit_aby(opcodes::STA_ABY, sid::BASE);
+        self.emit_jmp(&done_label);
+
+        // Disable: clear bit
+        self.define_label(&off_label);
+        self.emit_aby(opcodes::LDA_ABY, sid::BASE);
+        self.emit_imm(opcodes::AND_IMM, !bit);
+        self.emit_aby(opcodes::STA_ABY, sid::BASE);
+
+        self.define_label(&done_label);
+        Ok(())
+    }
+
+    /// Generate code for sound_off_voice(voice).
+    fn generate_sound_off_voice(&mut self, voice_expr: &Expr) -> Result<(), CompileError> {
+        // Calculate control register offset
+        self.generate_expression(voice_expr)?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::CLC);
+        self.emit_imm(opcodes::ADC_IMM, sid::OFFSET_CTRL as u8);
+        self.emit_byte(opcodes::TAY);
+
+        // Clear gate bit
+        self.emit_aby(opcodes::LDA_ABY, sid::BASE);
+        self.emit_imm(opcodes::AND_IMM, !sid::CTRL_GATE);
+        self.emit_aby(opcodes::STA_ABY, sid::BASE);
+
+        Ok(())
+    }
+
+    /// Generate code for play_note(voice, note, octave).
+    fn generate_play_note(
+        &mut self,
+        voice_expr: &Expr,
+        note_expr: &Expr,
+        octave_expr: &Expr,
+    ) -> Result<(), CompileError> {
+        // Save voice number
+        self.generate_expression(voice_expr)?;
+        self.emit_byte(opcodes::PHA);
+
+        // Calculate frequency from note and octave
+        // Use lookup table in runtime
+        self.generate_expression(octave_expr)?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2); // octave
+
+        self.generate_expression(note_expr)?;
+        // A = note (0-11)
+
+        // Call runtime routine to get frequency
+        self.emit_jsr_label("__note_to_freq");
+        // Returns frequency in A (low) and X (high)
+
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::STX_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+
+        // Restore voice and set frequency
+        self.emit_byte(opcodes::PLA);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::TAY);
+
+        // Store frequency
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_aby(opcodes::STA_ABY, sid::BASE);
+        self.emit_byte(opcodes::INY);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_aby(opcodes::STA_ABY, sid::BASE);
+
+        // Set gate on
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::CLC);
+        self.emit_imm(opcodes::ADC_IMM, sid::OFFSET_CTRL as u8);
+        self.emit_byte(opcodes::TAY);
+        self.emit_aby(opcodes::LDA_ABY, sid::BASE);
+        self.emit_imm(opcodes::ORA_IMM, sid::CTRL_GATE);
+        self.emit_aby(opcodes::STA_ABY, sid::BASE);
+
+        Ok(())
+    }
+
+    /// Generate code for play_tone(voice, frequency, waveform, duration).
+    fn generate_play_tone(
+        &mut self,
+        voice_expr: &Expr,
+        freq_expr: &Expr,
+        waveform_expr: &Expr,
+        duration_expr: &Expr,
+    ) -> Result<(), CompileError> {
+        // Set frequency
+        self.generate_sid_frequency(voice_expr, freq_expr)?;
+
+        // Set waveform and gate on
+        self.generate_expression(waveform_expr)?;
+        self.emit_imm(opcodes::ORA_IMM, sid::CTRL_GATE); // Include gate
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+
+        self.generate_expression(voice_expr)?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::ASL_ACC);
+        self.emit_byte(opcodes::SEC);
+        self.emit_byte(opcodes::SBC_ZP);
+        self.emit_byte(zeropage::TMP2);
+        self.emit_byte(opcodes::CLC);
+        self.emit_imm(opcodes::ADC_IMM, sid::OFFSET_CTRL as u8);
+        self.emit_byte(opcodes::TAY);
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_aby(opcodes::STA_ABY, sid::BASE);
+
+        // Save Y (control offset) for later
+        self.emit_byte(opcodes::TYA);
+        self.emit_byte(opcodes::PHA);
+
+        // Wait for duration (simple busy loop)
+        self.generate_expression(duration_expr)?;
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::STX_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+
+        let outer_label = self.make_label("pt_outer");
+        let inner_label = self.make_label("pt_inner");
+        let done_label = self.make_label("pt_done");
+
+        self.define_label(&outer_label);
+        // Check if duration is zero
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::ORA_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_branch(opcodes::BEQ, &done_label);
+
+        // Inner delay loop
+        self.emit_imm(opcodes::LDX_IMM, 0);
+        self.define_label(&inner_label);
+        self.emit_byte(opcodes::DEX);
+        self.emit_branch(opcodes::BNE, &inner_label);
+
+        // Decrement duration
+        self.emit_byte(opcodes::LDA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_byte(opcodes::SEC);
+        self.emit_imm(opcodes::SBC_IMM, 1);
+        self.emit_byte(opcodes::STA_ZP);
+        self.emit_byte(zeropage::TMP1);
+        self.emit_branch(opcodes::BCS, &outer_label);
+        self.emit_byte(opcodes::DEC_ZP);
+        self.emit_byte(zeropage::TMP1_HI);
+        self.emit_jmp(&outer_label);
+
+        self.define_label(&done_label);
+
+        // Restore Y and clear gate
+        self.emit_byte(opcodes::PLA);
+        self.emit_byte(opcodes::TAY);
+        self.emit_aby(opcodes::LDA_ABY, sid::BASE);
+        self.emit_imm(opcodes::AND_IMM, !sid::CTRL_GATE);
+        self.emit_aby(opcodes::STA_ABY, sid::BASE);
 
         Ok(())
     }
