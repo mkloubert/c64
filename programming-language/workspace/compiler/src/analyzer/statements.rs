@@ -103,6 +103,17 @@ impl StatementAnalyzer for Analyzer {
             StatementKind::Expression(expr) => {
                 self.analyze_expression(expr);
             }
+            StatementKind::DataBlock(data_block) => {
+                // Data blocks are only allowed at top level
+                self.error(CompileError::new(
+                    ErrorCode::DataBlockNotAllowedInFunction,
+                    format!(
+                        "Data block '{}' is not allowed inside a function",
+                        data_block.name
+                    ),
+                    stmt.span.clone(),
+                ));
+            }
         }
     }
 

@@ -574,17 +574,21 @@ impl BuiltinRegistry for Analyzer {
         );
 
         // get_cell_color(cx, cy) -> byte - get cell colors (fg in high nibble, bg in low)
-        self.define_builtin("get_cell_color", vec![Type::Byte, Type::Byte], Some(Type::Byte));
-
-        // color_ram(cx, cy, color) - set color RAM at cell position
         self.define_builtin(
-            "color_ram",
-            vec![Type::Byte, Type::Byte, Type::Byte],
-            None,
+            "get_cell_color",
+            vec![Type::Byte, Type::Byte],
+            Some(Type::Byte),
         );
 
+        // color_ram(cx, cy, color) - set color RAM at cell position
+        self.define_builtin("color_ram", vec![Type::Byte, Type::Byte, Type::Byte], None);
+
         // get_color_ram(cx, cy) -> byte - get color RAM value at cell position
-        self.define_builtin("get_color_ram", vec![Type::Byte, Type::Byte], Some(Type::Byte));
+        self.define_builtin(
+            "get_color_ram",
+            vec![Type::Byte, Type::Byte],
+            Some(Type::Byte),
+        );
 
         // fill_colors(fg, bg) - fill all screen RAM cells with same fg/bg colors
         self.define_builtin("fill_colors", vec![Type::Byte, Type::Byte], None);

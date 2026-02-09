@@ -1111,7 +1111,10 @@ impl RuntimeEmitter for CodeGenerator {
         // Done: return buffer address
         self.define_label("__str_concat_done");
         self.emit_imm(opcodes::LDA_IMM, (c64::STR_CONCAT_BUFFER & 0xFF) as u8);
-        self.emit_imm(opcodes::LDX_IMM, ((c64::STR_CONCAT_BUFFER >> 8) & 0xFF) as u8);
+        self.emit_imm(
+            opcodes::LDX_IMM,
+            ((c64::STR_CONCAT_BUFFER >> 8) & 0xFF) as u8,
+        );
 
         // Also store in TMP1/TMP1_HI for compatibility
         self.emit_byte(opcodes::STA_ZP);

@@ -3,16 +3,16 @@
 
 def main():
     # Byte array with initializer
-    data: byte[] = [10, 20, 30, 40, 50]
+    values: byte[] = [10, 20, 30, 40, 50]
 
     # Read array elements
-    x: byte = data[0]
-    y: byte = data[2]
-    z: byte = data[4]
+    x: byte = values[0]
+    y: byte = values[2]
+    z: byte = values[4]
 
     # Write array elements
-    data[1] = 25
-    data[3] = 45
+    values[1] = 25
+    values[3] = 45
 
     # Sized array without initializer
     buffer: byte[10]

@@ -60,8 +60,8 @@ use builtins::BuiltinRegistry;
 use functions::FunctionAnalyzer;
 use statements::StatementAnalyzer;
 
-use crate::ast::{Block, Program, TopLevelItem, Type};
-use crate::error::{CompileError, CompileWarning, ErrorCode, Span};
+use crate::ast::{Block, DataBlock, Program, TopLevelItem, Type};
+use crate::error::{CompileError, CompileWarning, ErrorCode, Span, WarningCode};
 
 /// The semantic analyzer.
 pub struct Analyzer {
@@ -162,6 +162,9 @@ impl Analyzer {
                 TopLevelItem::Variable(decl) => {
                     self.analyze_var_decl(decl);
                 }
+                TopLevelItem::DataBlock(data_block) => {
+                    self.analyze_data_block(data_block);
+                }
             }
         }
     }
@@ -175,7 +178,70 @@ impl Analyzer {
             TopLevelItem::Constant(_) | TopLevelItem::Variable(_) => {
                 // Already handled in first pass
             }
+            TopLevelItem::DataBlock(_) => {
+                // Already handled in first pass (collect_declarations)
+            }
         }
+    }
+
+    /// Analyze a data block definition.
+    fn analyze_data_block(&mut self, data_block: &DataBlock) {
+        // Calculate total size of the data block
+        let size = self.calculate_data_block_size(data_block);
+
+        // Check for reasonable size (C64 has ~38KB available for code+data)
+        const MAX_DATA_BLOCK_SIZE: usize = 38 * 1024;
+        if size > MAX_DATA_BLOCK_SIZE {
+            self.warning(CompileWarning::new(
+                WarningCode::DataBlockSizeTooLarge,
+                format!(
+                    "Data block '{}' is {} bytes, which may exceed available C64 memory",
+                    data_block.name, size
+                ),
+                data_block.span.clone(),
+            ));
+        }
+
+        // Register the data block as a symbol (word constant for the address)
+        let symbol = Symbol::data_block(data_block.name.clone(), size, data_block.span.clone());
+
+        if let Err(existing) = self.symbols.define(symbol) {
+            self.error(
+                CompileError::new(
+                    ErrorCode::VariableAlreadyDefined,
+                    format!("Data block '{}' is already defined", data_block.name),
+                    data_block.span.clone(),
+                )
+                .with_hint(format!(
+                    "Previously defined at position {}",
+                    existing.span.start
+                )),
+            );
+        }
+    }
+
+    /// Calculate the size of a data block in bytes.
+    fn calculate_data_block_size(&self, data_block: &DataBlock) -> usize {
+        use crate::ast::DataEntry;
+
+        let mut total_size = 0;
+
+        for entry in &data_block.entries {
+            match entry {
+                DataEntry::Bytes(bytes) => {
+                    total_size += bytes.len();
+                }
+                DataEntry::Include { length, .. } => {
+                    // If length is specified, use it; otherwise size is unknown
+                    if let Some(len) = length {
+                        total_size += *len as usize;
+                    }
+                    // Note: actual file size will be determined during code generation
+                }
+            }
+        }
+
+        total_size
     }
 
     /// Analyze a block of statements.

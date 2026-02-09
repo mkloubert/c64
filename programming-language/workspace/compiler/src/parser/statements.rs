@@ -198,10 +198,12 @@ impl<'a> StatementParser for Parser<'a> {
 
         // Type annotation is now required
         if !self.match_token(&Token::Colon) {
-            return Err(self.error(
-                ErrorCode::MissingTypeAnnotation,
-                "Variable declaration requires explicit type annotation",
-            ).with_hint("Add a type annotation, e.g.: x: byte = 10"));
+            return Err(self
+                .error(
+                    ErrorCode::MissingTypeAnnotation,
+                    "Variable declaration requires explicit type annotation",
+                )
+                .with_hint("Add a type annotation, e.g.: x: byte = 10"));
         }
 
         let var_type = self.parse_type()?;
@@ -247,10 +249,12 @@ impl<'a> StatementParser for Parser<'a> {
 
         // Type annotation is now required
         if !self.match_token(&Token::Colon) {
-            return Err(self.error(
-                ErrorCode::MissingTypeAnnotation,
-                "Constant declaration requires explicit type annotation",
-            ).with_hint("Add a type annotation, e.g.: MAX_VALUE: byte = 255"));
+            return Err(self
+                .error(
+                    ErrorCode::MissingTypeAnnotation,
+                    "Constant declaration requires explicit type annotation",
+                )
+                .with_hint("Add a type annotation, e.g.: MAX_VALUE: byte = 255"));
         }
 
         let const_type = self.parse_type()?;

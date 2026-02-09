@@ -1,0 +1,150 @@
+# Music Data Block Demo for Cobra64
+# Demonstrates using include directive for external binary data
+#
+# NOTE: This is a demonstration of the include syntax.
+# To actually use this, you would need a real SID music file.
+#
+# SID files typically have:
+# - Header at offset $00-$7D (126 bytes)
+# - Music data starting at offset $7E
+#
+# Example syntax for including SID music data:
+#
+# data MUSIC:
+#     include "music.sid", $7E      # Skip header, read to end
+# end
+#
+# Or with explicit length:
+#
+# data MUSIC:
+#     include "music.sid", $7E, $1000  # Skip header, read 4096 bytes
+# end
+
+# For this demo, we'll embed some simple sound data directly
+# This demonstrates the inline byte syntax
+
+# Simple frequency table for notes (approximate PAL values)
+data NOTE_FREQ_LO:
+    $17   # C-2
+    $27   # C#2
+    $39   # D-2
+    $4B   # D#2
+    $5F   # E-2
+    $74   # F-2
+    $8A   # F#2
+    $A1   # G-2
+    $BA   # G#2
+    $D4   # A-2
+    $F0   # A#2
+    $0E   # B-2
+end
+
+data NOTE_FREQ_HI:
+    $01   # C-2
+    $01   # C#2
+    $01   # D-2
+    $01   # D#2
+    $01   # E-2
+    $01   # F-2
+    $01   # F#2
+    $01   # G-2
+    $01   # G#2
+    $01   # A-2
+    $01   # A#2
+    $02   # B-2
+end
+
+# Simple melody pattern (note indices, 255 = rest)
+data MELODY:
+    0, 2, 4, 5, 7, 9, 11, 12   # C major scale up
+    11, 9, 7, 5, 4, 2, 0, 255  # C major scale down + rest
+end
+
+def main():
+    cls()
+    println("MUSIC DATA BLOCK DEMO")
+    println("")
+    println("THIS DEMO SHOWS HOW TO")
+    println("EMBED MUSIC DATA USING")
+    println("DATA BLOCKS.")
+    println("")
+
+    # Show the addresses of our data
+    print("FREQ_LO: $")
+    print_hex_word(NOTE_FREQ_LO)
+    println("")
+    print("FREQ_HI: $")
+    print_hex_word(NOTE_FREQ_HI)
+    println("")
+    print("MELODY:  $")
+    print_hex_word(MELODY)
+    println("")
+    println("")
+    println("PLAYING MELODY...")
+    println("PRESS ANY KEY TO STOP")
+    println("")
+
+    # Play the melody using SID
+    play_melody()
+
+    # Turn off sound
+    sid_volume(0)
+
+    println("DONE!")
+
+def play_melody():
+    # Initialize SID for voice 1
+    sid_volume(15)
+    sid_adsr(0, 0, 8, 15, 8)    # Attack=0, Decay=8, Sustain=15, Release=8
+    sid_waveform(0, 1)          # Triangle wave
+
+    # Loop through melody
+    while get_key() == 0:
+        i: byte = 0
+        while i < 16:
+            note: byte = peek(MELODY + word(i))
+
+            if note == 255:
+                # Rest - turn off gate
+                sid_gate(0, false)
+            else:
+                # Play note
+                lo: byte = peek(NOTE_FREQ_LO + word(note))
+                hi: byte = peek(NOTE_FREQ_HI + word(note))
+                sid_freq(0, word(hi) * 256 + word(lo))
+                sid_gate(0, true)
+
+            # Note duration
+            delay(10)
+
+            i = i + 1
+
+            # Check for keypress
+            if get_key() != 0:
+                return
+
+# Simple delay loop
+def delay(ticks: byte):
+    t: byte = 0
+    while t < ticks:
+        j: byte = 0
+        while j < 255:
+            j = j + 1
+        t = t + 1
+
+# Helper: Print a word as hex
+def print_hex_word(val: word):
+    print_hex_byte(byte(val >> 8))
+    print_hex_byte(byte(val))
+
+def print_hex_byte(val: byte):
+    hi: byte = val >> 4
+    lo: byte = val & $0F
+    print_hex_digit(hi)
+    print_hex_digit(lo)
+
+def print_hex_digit(val: byte):
+    if val < 10:
+        print_char(byte('0') + val)
+    else:
+        print_char(byte('A') + val - 10)

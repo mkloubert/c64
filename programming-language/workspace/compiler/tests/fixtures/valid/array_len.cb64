@@ -3,8 +3,8 @@
 
 def main():
     # len() on byte array
-    data: byte[] = [10, 20, 30, 40, 50]
-    size1: word = len(data)
+    values: byte[] = [10, 20, 30, 40, 50]
+    size1: word = len(values)
 
     # len() on word array
     scores: word[] = [1000, 2000, 3000]
@@ -33,4 +33,4 @@ def main():
         i = i + 1
 
     # len() with print
-    println(len(data))
+    println(len(values))

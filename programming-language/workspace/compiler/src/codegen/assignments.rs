@@ -243,17 +243,9 @@ impl CodeGenerator {
             _ => {
                 // Compound assignment - need to load current value first
                 if is_word_array {
-                    self.generate_word_array_compound_assignment(
-                        assign,
-                        index,
-                        var_address,
-                    )?;
+                    self.generate_word_array_compound_assignment(assign, index, var_address)?;
                 } else {
-                    self.generate_byte_array_compound_assignment(
-                        assign,
-                        index,
-                        var_address,
-                    )?;
+                    self.generate_byte_array_compound_assignment(assign, index, var_address)?;
                 }
             }
         }

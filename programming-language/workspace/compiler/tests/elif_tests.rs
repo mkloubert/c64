@@ -44,7 +44,11 @@ fn compile_elif_test(filename: &str) -> Result<Vec<u8>, String> {
 fn assert_compiles(filename: &str) {
     match compile_elif_test(filename) {
         Ok(code) => {
-            assert!(!code.is_empty(), "{} should generate non-empty code", filename);
+            assert!(
+                !code.is_empty(),
+                "{} should generate non-empty code",
+                filename
+            );
         }
         Err(e) => panic!("{} should compile but failed: {}", filename, e),
     }
@@ -54,7 +58,11 @@ fn assert_compiles(filename: &str) {
 fn assert_source_compiles(source: &str, description: &str) {
     match cobra64::compile(source) {
         Ok(code) => {
-            assert!(!code.is_empty(), "{} should generate non-empty code", description);
+            assert!(
+                !code.is_empty(),
+                "{} should generate non-empty code",
+                description
+            );
         }
         Err(e) => panic!("{} should compile but failed: {:?}", description, e),
     }

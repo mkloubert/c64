@@ -23,6 +23,7 @@
 //! - Statement blocks
 //! - Top-level items
 
+use super::data_blocks::DataBlockParser;
 use super::helpers::ParserHelpers;
 use super::statements::StatementParser;
 use super::types::TypeParser;
@@ -61,6 +62,11 @@ impl<'a> BlockParser for Parser<'a> {
                 let decl = self.parse_const_decl()?;
                 Ok(TopLevelItem::Constant(decl))
             }
+            Some(Token::Data) => {
+                // Data block: data NAME: ... end
+                let data_block = self.parse_data_block()?;
+                Ok(TopLevelItem::DataBlock(data_block))
+            }
             Some(Token::Identifier(_)) => {
                 // Variable: name: type = value
                 if matches!(self.peek_ahead(1), Some(Token::Colon))
@@ -71,7 +77,7 @@ impl<'a> BlockParser for Parser<'a> {
                 } else {
                     Err(self.error(
                         ErrorCode::UnexpectedToken,
-                        "Expected function definition, constant, or variable declaration at top level",
+                        "Expected function definition, constant, data block, or variable declaration at top level",
                     ))
                 }
             }
@@ -81,7 +87,7 @@ impl<'a> BlockParser for Parser<'a> {
             )),
             _ => Err(self.error(
                 ErrorCode::UnexpectedToken,
-                "Expected function definition, constant, or variable declaration",
+                "Expected function definition, constant, data block, or variable declaration",
             )),
         }
     }

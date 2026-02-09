@@ -181,7 +181,45 @@ fn test_missing_output_flag() {
 
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("--output") || stderr.contains("-o"));
+    // Error message should mention output is required unless --run is used
+    assert!(
+        stderr.contains("--output")
+            || stderr.contains("-o")
+            || stderr.contains("Output file is required")
+    );
+}
+
+/// Test that --run without -o compiles successfully (VICE will fail to launch in CI).
+#[test]
+fn test_run_without_output_compiles() {
+    let temp_dir = std::env::temp_dir();
+    let source_path = temp_dir.join("test_run_no_output.cb64");
+
+    std::fs::write(&source_path, "def main():\n    pass\n").unwrap();
+
+    let output = cargo_bin()
+        .arg(&source_path)
+        .arg("--run")
+        .output()
+        .expect("Failed to execute command");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // Compilation should succeed (indicated by "Compiled" message)
+    assert!(
+        stdout.contains("Compiled"),
+        "Expected compilation success, got stdout: {}, stderr: {}",
+        stdout,
+        stderr
+    );
+
+    // VICE will not be found in CI, so we expect exit code 4
+    assert_eq!(
+        output.status.code(),
+        Some(4),
+        "Expected exit code 4 (VICE not found)"
+    );
 }
 
 /// Test error on unknown output format.
@@ -540,6 +578,93 @@ fn test_exit_codes() {
         .output()
         .unwrap();
     assert_eq!(output.status.code(), Some(3));
+
+    std::fs::remove_file(&source_path).ok();
+    std::fs::remove_file(&output_path).ok();
+}
+
+/// Test --run flag shows in help.
+#[test]
+fn test_run_flag_in_help() {
+    let output = cargo_bin()
+        .arg("--help")
+        .output()
+        .expect("Failed to execute command");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("--run"));
+    assert!(stdout.contains("-r"));
+    assert!(stdout.contains("VICE"));
+}
+
+/// Test --watch flag shows in help.
+#[test]
+fn test_watch_flag_in_help() {
+    let output = cargo_bin()
+        .arg("--help")
+        .output()
+        .expect("Failed to execute command");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("--watch"));
+    assert!(stdout.contains("-w"));
+}
+
+/// Test --run with invalid --vice-path returns exit code 4.
+#[test]
+fn test_run_invalid_vice_path() {
+    let temp_dir = std::env::temp_dir();
+    let source_path = temp_dir.join("test_run_invalid.cb64");
+    let output_path = temp_dir.join("test_run_invalid.prg");
+
+    std::fs::write(&source_path, "def main():\n    pass\n").unwrap();
+
+    let output = cargo_bin()
+        .arg(&source_path)
+        .arg("-o")
+        .arg(&output_path)
+        .arg("--run")
+        .arg("--vice-path")
+        .arg("/nonexistent/path/to/vice")
+        .output()
+        .expect("Failed to execute command");
+
+    assert_eq!(output.status.code(), Some(4));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("does not exist"));
+
+    std::fs::remove_file(&source_path).ok();
+    std::fs::remove_file(&output_path).ok();
+}
+
+/// Test --run without VICE installed shows helpful error.
+#[test]
+fn test_run_vice_not_found_message() {
+    // Skip this test if VICE is actually installed
+    if which::which("x64sc").is_ok() || which::which("x64").is_ok() {
+        return;
+    }
+
+    let temp_dir = std::env::temp_dir();
+    let source_path = temp_dir.join("test_run_notfound.cb64");
+    let output_path = temp_dir.join("test_run_notfound.prg");
+
+    std::fs::write(&source_path, "def main():\n    pass\n").unwrap();
+
+    let output = cargo_bin()
+        .arg(&source_path)
+        .arg("-o")
+        .arg(&output_path)
+        .arg("--run")
+        .output()
+        .expect("Failed to execute command");
+
+    assert_eq!(output.status.code(), Some(4));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("VICE emulator not found"));
+    assert!(stderr.contains("brew install") || stderr.contains("apt install"));
 
     std::fs::remove_file(&source_path).ok();
     std::fs::remove_file(&output_path).ok();

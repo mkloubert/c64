@@ -58,6 +58,12 @@ pub enum Token {
     Def,
     /// `const` - constant declaration.
     Const,
+    /// `data` - data block definition.
+    Data,
+    /// `end` - end of data block.
+    End,
+    /// `include` - include binary file directive.
+    Include,
 
     // Control flow keywords
     /// `if` - conditional statement.
@@ -219,6 +225,9 @@ impl Token {
                 | Token::Float
                 | Token::Def
                 | Token::Const
+                | Token::Data
+                | Token::End
+                | Token::Include
                 | Token::If
                 | Token::Elif
                 | Token::Else
@@ -287,6 +296,9 @@ impl Token {
             // Definition keywords
             "def" => Token::Def,
             "const" => Token::Const,
+            "data" => Token::Data,
+            "end" => Token::End,
+            "include" => Token::Include,
 
             // Control flow keywords
             "if" => Token::If,
@@ -335,6 +347,9 @@ impl Token {
             Token::Float => "'float'",
             Token::Def => "'def'",
             Token::Const => "'const'",
+            Token::Data => "'data'",
+            Token::End => "'end'",
+            Token::Include => "'include'",
             Token::If => "'if'",
             Token::Elif => "'elif'",
             Token::Else => "'else'",
@@ -486,4 +501,33 @@ mod tests {
         assert_eq!(token.name(), "decimal");
     }
 
+    #[test]
+    fn test_data_keyword_recognition() {
+        assert!(matches!(
+            Token::from_keyword_or_identifier("data"),
+            Token::Data
+        ));
+        assert!(Token::Data.is_keyword());
+        assert_eq!(Token::Data.name(), "'data'");
+    }
+
+    #[test]
+    fn test_end_keyword_recognition() {
+        assert!(matches!(
+            Token::from_keyword_or_identifier("end"),
+            Token::End
+        ));
+        assert!(Token::End.is_keyword());
+        assert_eq!(Token::End.name(), "'end'");
+    }
+
+    #[test]
+    fn test_include_keyword_recognition() {
+        assert!(matches!(
+            Token::from_keyword_or_identifier("include"),
+            Token::Include
+        ));
+        assert!(Token::Include.is_keyword());
+        assert_eq!(Token::Include.name(), "'include'");
+    }
 }

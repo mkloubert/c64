@@ -484,10 +484,7 @@ impl ExpressionAnalyzer for Analyzer {
                     if !(-2048..=2047).contains(&val) {
                         self.warning(CompileWarning::new(
                             WarningCode::FixedPointOverflow,
-                            format!(
-                                "Value {} overflows fixed-point range (-2048 to 2047)",
-                                val
-                            ),
+                            format!("Value {} overflows fixed-point range (-2048 to 2047)", val),
                             span.clone(),
                         ));
                     }

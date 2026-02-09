@@ -225,6 +225,30 @@ impl CodeGenerator {
             }
         }
 
+        // Adjust pending string reference code offsets
+        for string_ref in &mut self.pending_string_refs {
+            for (insert_offset, bytes_inserted) in &insertions {
+                if string_ref.code_offset_lo > *insert_offset {
+                    string_ref.code_offset_lo += bytes_inserted;
+                }
+                if string_ref.code_offset_hi > *insert_offset {
+                    string_ref.code_offset_hi += bytes_inserted;
+                }
+            }
+        }
+
+        // Adjust pending data block reference code offsets
+        for data_block_ref in &mut self.pending_data_block_refs {
+            for (insert_offset, bytes_inserted) in &insertions {
+                if data_block_ref.code_offset_lo > *insert_offset {
+                    data_block_ref.code_offset_lo += bytes_inserted;
+                }
+                if data_block_ref.code_offset_hi > *insert_offset {
+                    data_block_ref.code_offset_hi += bytes_inserted;
+                }
+            }
+        }
+
         // Update current_address
         let total_inserted: usize = insertions.iter().map(|(_, b)| b).sum();
         self.current_address = self.current_address.wrapping_add(total_inserted as u16);

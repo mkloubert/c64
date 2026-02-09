@@ -28,6 +28,7 @@
 //! - [`analyzer`] - Semantic analysis and type checking
 //! - [`codegen`] - 6510 machine code generation
 //! - [`output`] - PRG and D64 file writing
+//! - [`runner`] - VICE emulator integration and file watching
 //!
 //! # Example
 //!
@@ -62,6 +63,7 @@ pub mod error;
 pub mod lexer;
 pub mod output;
 pub mod parser;
+pub mod runner;
 
 // Re-export commonly used types
 pub use ast::{Program, Type};
@@ -127,6 +129,67 @@ pub fn compile_with_warnings(
 
     // Generate code
     let code = codegen::generate(&ast)?;
+    Ok((code, warnings))
+}
+
+/// Compile source code from a file path.
+///
+/// This is similar to `compile()` but uses the source path to resolve
+/// relative paths in `include` directives within data blocks.
+///
+/// # Arguments
+///
+/// * `source` - The source code to compile
+/// * `source_path` - The path to the source file (used for resolving includes)
+///
+/// # Example
+///
+/// ```ignore
+/// use std::path::Path;
+///
+/// let source = r#"
+/// data SPRITE:
+///     include "sprite.bin"
+/// end
+///
+/// def main():
+///     pass
+/// "#;
+///
+/// // The include path will be resolved relative to /path/to/source.cb64
+/// match cobra64::compile_with_path(source, Path::new("/path/to/source.cb64")) {
+///     Ok(code) => println!("Generated {} bytes of code", code.len()),
+///     Err(e) => eprintln!("Compilation error: {}", e),
+/// }
+/// ```
+pub fn compile_with_path(
+    source: &str,
+    source_path: impl AsRef<std::path::Path>,
+) -> std::result::Result<Vec<u8>, CompileError> {
+    let (code, _warnings) = compile_with_path_and_warnings(source, source_path)?;
+    Ok(code)
+}
+
+/// Compile source code from a file path and return both machine code and warnings.
+///
+/// This is similar to `compile_with_path()` but also returns any warnings
+/// generated during compilation.
+pub fn compile_with_path_and_warnings(
+    source: &str,
+    source_path: impl AsRef<std::path::Path>,
+) -> std::result::Result<(Vec<u8>, Vec<CompileWarning>), CompileError> {
+    // Tokenize
+    let tokens = lexer::tokenize(source)?;
+
+    // Parse
+    let ast = parser::parse(&tokens)?;
+
+    // Analyze with warnings
+    let (result, warnings) = analyzer::analyze_with_warnings(&ast);
+    result.map_err(|errors| errors.into_iter().next().expect("At least one error"))?;
+
+    // Generate code with source path for include resolution
+    let code = codegen::generate_with_path(&ast, source_path)?;
     Ok((code, warnings))
 }
 

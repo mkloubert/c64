@@ -23,7 +23,7 @@ use std::ops::Range;
 use thiserror::Error;
 
 /// A source span representing a range in the source code.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Span {
     /// Start byte offset (inclusive)
     pub start: usize,
@@ -90,6 +90,10 @@ pub enum WarningCode {
     NegativeToUnsigned,
     /// Signed to unsigned conversion may change value
     SignedToUnsigned,
+
+    // Data block warnings (W011-W020)
+    /// Data block size exceeds typical C64 memory limits
+    DataBlockSizeTooLarge,
 }
 
 impl std::fmt::Display for WarningCode {
@@ -107,6 +111,7 @@ impl WarningCode {
             WarningCode::FixedPointOverflow => "W003",
             WarningCode::NegativeToUnsigned => "W004",
             WarningCode::SignedToUnsigned => "W005",
+            WarningCode::DataBlockSizeTooLarge => "W011",
         }
     }
 }
@@ -275,6 +280,10 @@ pub enum ErrorCode {
     ContinueOutsideLoop,
     ReturnOutsideFunction,
     MissingTypeAnnotation,
+    ExpectedString,
+    ExpectedInteger,
+    ValueOutOfRange,
+    DataBlockNotAllowedInFunction,
 
     // Semantic errors (E200-E242)
     UndefinedVariable,
@@ -304,6 +313,16 @@ pub enum ErrorCode {
     ArrayElementTypeMismatch,
     CannotInferArrayType,
     ArrayNegativeValueRequiresSignedType,
+
+    // File errors (E250-E259)
+    /// File not found for include directive.
+    FileNotFound,
+    /// Cannot read file (permission denied or other I/O error).
+    FileReadError,
+    /// Include offset exceeds file size.
+    IncludeOffsetOutOfBounds,
+    /// Include offset + length exceeds file size.
+    IncludeLengthOutOfBounds,
 }
 
 impl std::fmt::Display for ErrorCode {
@@ -371,6 +390,10 @@ impl ErrorCode {
             ErrorCode::ContinueOutsideLoop => "E145",
             ErrorCode::ReturnOutsideFunction => "E146",
             ErrorCode::MissingTypeAnnotation => "E147",
+            ErrorCode::ExpectedString => "E148",
+            ErrorCode::ExpectedInteger => "E149",
+            ErrorCode::ValueOutOfRange => "E150",
+            ErrorCode::DataBlockNotAllowedInFunction => "E151",
 
             // Semantic errors
             ErrorCode::UndefinedVariable => "E200",
@@ -400,6 +423,12 @@ impl ErrorCode {
             ErrorCode::ArrayElementTypeMismatch => "E244",
             ErrorCode::CannotInferArrayType => "E245",
             ErrorCode::ArrayNegativeValueRequiresSignedType => "E246",
+
+            // File errors
+            ErrorCode::FileNotFound => "E250",
+            ErrorCode::FileReadError => "E251",
+            ErrorCode::IncludeOffsetOutOfBounds => "E252",
+            ErrorCode::IncludeLengthOutOfBounds => "E253",
         }
     }
 }

@@ -801,7 +801,6 @@ impl FunctionCallEmitter for CodeGenerator {
             // =================================================================
             // SID Sound Functions
             // =================================================================
-
             "sid_reset" => {
                 // sid_reset() - clear all 25 SID registers
                 self.emit_imm(opcodes::LDA_IMM, 0);
@@ -923,7 +922,7 @@ impl FunctionCallEmitter for CodeGenerator {
                     self.emit_imm(opcodes::AND_IMM, 0x07); // Low 3 bits
                     self.emit_abs(opcodes::STA_ABS, sid::FILTER_CUTOFF_LO);
                     self.emit_byte(opcodes::PLA); // Restore low byte
-                    // Combine: (low >> 3) | (high << 5)
+                                                  // Combine: (low >> 3) | (high << 5)
                     self.emit_byte(opcodes::LSR_ACC);
                     self.emit_byte(opcodes::LSR_ACC);
                     self.emit_byte(opcodes::LSR_ACC);
@@ -1029,7 +1028,6 @@ impl FunctionCallEmitter for CodeGenerator {
             // =================================================================
             // VIC-II Graphics Functions
             // =================================================================
-
             "border_color" => {
                 // border_color(color: byte) - set border color
                 if !args.is_empty() {
@@ -1247,7 +1245,6 @@ impl FunctionCallEmitter for CodeGenerator {
             // =================================================================
             // Bitmap Graphics Functions
             // =================================================================
-
             "plot" => {
                 // plot(x: word, y: byte) - set pixel in hires mode
                 if args.len() >= 2 {
@@ -1355,7 +1352,6 @@ impl FunctionCallEmitter for CodeGenerator {
             // =================================================================
             // Drawing Primitives
             // =================================================================
-
             "line" => {
                 // line(x1: word, y1: byte, x2: word, y2: byte)
                 // Uses Bresenham's line algorithm
@@ -1369,7 +1365,7 @@ impl FunctionCallEmitter for CodeGenerator {
                     self.emit_byte(opcodes::PHA); // x2 low
                     self.emit_byte(opcodes::TXA);
                     self.emit_byte(opcodes::PHA); // x2 high
-                    // Store y1 in TMP3
+                                                  // Store y1 in TMP3
                     self.generate_expression(&args[1])?;
                     self.emit_byte(opcodes::STA_ZP);
                     self.emit_byte(zeropage::TMP3);
@@ -1463,7 +1459,7 @@ impl FunctionCallEmitter for CodeGenerator {
                     self.emit_byte(opcodes::PLA);
                     self.emit_byte(opcodes::STA_ZP);
                     self.emit_byte(zeropage::TMP2); // Use TMP2 for height
-                    // Call rect routine
+                                                    // Call rect routine
                     self.emit_jsr_label("__rect");
                 }
             }
@@ -1523,7 +1519,7 @@ impl FunctionCallEmitter for CodeGenerator {
                     self.emit_byte(zeropage::TMP4);
                     self.emit_byte(opcodes::STA_ZP);
                     self.emit_byte(zeropage::TMP4); // TMP4 = combined color
-                    // Store cy in TMP3
+                                                    // Store cy in TMP3
                     self.generate_expression(&args[1])?;
                     self.emit_byte(opcodes::STA_ZP);
                     self.emit_byte(zeropage::TMP3);
@@ -2326,11 +2322,7 @@ impl CodeGenerator {
     }
 
     /// Generate code for sid_gate(voice, on).
-    fn generate_sid_gate(
-        &mut self,
-        voice_expr: &Expr,
-        on_expr: &Expr,
-    ) -> Result<(), CompileError> {
+    fn generate_sid_gate(&mut self, voice_expr: &Expr, on_expr: &Expr) -> Result<(), CompileError> {
         // Evaluate on/off flag
         self.generate_expression(on_expr)?;
         self.emit_byte(opcodes::STA_ZP);

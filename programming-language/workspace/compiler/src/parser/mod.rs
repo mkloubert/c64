@@ -23,6 +23,7 @@
 //!
 //! - `blocks` - Block and function parsing (BlockParser trait)
 //! - `control_flow` - Control flow statement parsing (ControlFlowParser trait)
+//! - `data_blocks` - Data block parsing (DataBlockParser trait)
 //! - `expressions` - Expression parsing (ExpressionParser trait)
 //! - `helpers` - Token stream navigation and error handling (ParserHelpers trait)
 //! - `statements` - Statement parsing (StatementParser trait)
@@ -31,6 +32,7 @@
 // Submodules
 pub mod blocks;
 pub mod control_flow;
+pub mod data_blocks;
 pub mod expressions;
 pub mod helpers;
 pub mod statements;
@@ -971,8 +973,7 @@ mod tests {
 
     #[test]
     fn test_parse_const_negative_value() {
-        let program =
-            parse_source("const MIN_SBYTE: sbyte = -128\ndef main():\n    pass").unwrap();
+        let program = parse_source("const MIN_SBYTE: sbyte = -128\ndef main():\n    pass").unwrap();
         if let TopLevelItem::Constant(decl) = &program.items[0] {
             assert_eq!(decl.name, "MIN_SBYTE");
             assert_eq!(decl.const_type, Some(Type::Sbyte));

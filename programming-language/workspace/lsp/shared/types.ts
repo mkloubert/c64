@@ -103,6 +103,7 @@ export enum SymbolKind {
     Variable = 'variable',
     Constant = 'constant',
     Parameter = 'parameter',
+    DataBlock = 'dataBlock',
 }
 
 /**
@@ -138,10 +139,13 @@ export type Cobra64Type = typeof COBRA64_TYPES[number];
  */
 export const COBRA64_KEYWORDS = [
     'const',
+    'data',
     'def',
+    'end',
     'if',
     'elif',
     'else',
+    'include',
     'while',
     'for',
     'in',

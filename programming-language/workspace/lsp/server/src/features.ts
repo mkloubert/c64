@@ -131,6 +131,18 @@ const KEYWORD_DOCS: Record<string, { description: string; example: string }> = {
         description: 'Boolean literal representing false.',
         example: 'flag: bool = false',
     },
+    data: {
+        description: 'Defines a data block for embedding raw binary data.',
+        example: 'data SPRITE:\n    $00, $3C, $00\n    $00, $7E, $00\nend',
+    },
+    end: {
+        description: 'Terminates a data block definition.',
+        example: 'data SPRITE:\n    $FF, $FF\nend',
+    },
+    include: {
+        description: 'Includes an external binary file in a data block.',
+        example: 'data MUSIC:\n    include "music.sid", $7E  # skip header\nend',
+    },
 };
 
 /**
@@ -331,9 +343,19 @@ export function getHover(
             };
         }
 
-        // Check symbols (variables/constants)
+        // Check symbols (variables/constants/data blocks)
         const symbol = analysis.analyzerResult.symbols.find(s => s.name === word);
         if (symbol) {
+            if (symbol.kind === 'dataBlock') {
+                return {
+                    contents: {
+                        kind: MarkupKind.Markdown,
+                        value: `**${symbol.name}** (data block)\n\nType: \`word\` (address)\n\n*Data blocks embed raw binary data. Reference returns the address.*`,
+                    },
+                    range,
+                };
+            }
+
             const kindLabel = symbol.kind === 'constant' ? 'constant' :
                 symbol.kind === 'parameter' ? 'parameter' : 'variable';
 
@@ -495,6 +517,13 @@ export function getDocumentSymbols(analysis: DocumentAnalysis): {
             symbols.push({
                 name: item.name,
                 kind: 14, // Constant
+                range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+                selectionRange: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+            });
+        } else if (item.kind === 'DataBlockDef') {
+            symbols.push({
+                name: item.name,
+                kind: 14, // Constant (data blocks act as constants)
                 range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
                 selectionRange: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
             });

@@ -30,6 +30,12 @@ thiserror = "1.0"
 # Beautiful error reporting
 ariadne = "0.4"
 
+# Cross-platform file watching for hot-reload
+notify = "7"
+
+# Find executables in PATH
+which = "7"
+
 [dev-dependencies]
 # Snapshot testing
 insta = "1.34"
@@ -45,6 +51,9 @@ test-case = "3.3"
 
 # Benchmarking
 criterion = { version = "0.5", features = ["html_reports"] }
+
+# Temporary file and directory handling for tests
+tempfile = "3.10"
 
 [[bench]]
 name = "compiler_benchmarks"

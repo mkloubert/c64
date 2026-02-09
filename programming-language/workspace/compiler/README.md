@@ -11,7 +11,12 @@ A modern programming language and compiler for the Commodore 64.
 1. [Overview](#overview)
 2. [Installation](#installation)
 3. [Quick Start](#quick-start)
-4. [Language Reference](#language-reference)
+4. [Running Programs](#running-programs)
+   - [Run in VICE Emulator](#run-in-vice-emulator)
+   - [Watch Mode with Hot-Reload](#watch-mode-with-hot-reload)
+   - [VICE Configuration](#vice-configuration)
+   - [Troubleshooting](#troubleshooting)
+5. [Language Reference](#language-reference)
    - [Data Types](#data-types)
    - [Variables](#variables)
    - [Constants](#constants)
@@ -21,7 +26,8 @@ A modern programming language and compiler for the Commodore 64.
    - [Control Flow](#control-flow)
    - [Functions](#functions)
    - [Comments](#comments)
-5. [Built-in Functions](#built-in-functions)
+   - [Data Blocks](#data-blocks)
+6. [Built-in Functions](#built-in-functions)
    - [Screen Functions](#screen-functions)
    - [Output Functions](#output-functions)
    - [Input Functions](#input-functions)
@@ -30,9 +36,9 @@ A modern programming language and compiler for the Commodore 64.
    - [Random Number Functions](#random-number-functions)
    - [Sprite Functions](#sprite-functions)
    - [Sound Functions](#sound-functions)
-6. [Example Programs](#example-programs)
-7. [Error Messages](#error-messages)
-8. [Limitations](#limitations)
+7. [Example Programs](#example-programs)
+8. [Error Messages](#error-messages)
+9. [Limitations](#limitations)
 
 ---
 
@@ -137,6 +143,138 @@ def main():
         poke(1024 + i, byte(scores[i]))
         i = i + 1
 ```
+
+---
+
+## Running Programs
+
+The Cobra64 compiler includes built-in support for the VICE emulator, allowing you to compile and run programs directly, or use watch mode for rapid development with hot-reload.
+
+### Run in VICE Emulator
+
+Use the `--run` (or `-r`) flag to automatically launch your program in VICE after compilation:
+
+```bash
+# Compile and run in VICE (uses temporary file)
+cobra64 hello.cb64 --run
+
+# Short form
+cobra64 hello.cb64 -r
+
+# With explicit output file
+cobra64 hello.cb64 -o hello.prg --run
+
+# With verbose output
+cobra64 hello.cb64 -o hello.prg -r -v
+```
+
+When using `--run` without `-o`, the compiler creates a temporary PRG file automatically.
+
+The compiler will:
+
+1. Compile your source file
+2. Find VICE (x64sc or x64) in your PATH
+3. Launch VICE with your program
+
+### Watch Mode with Hot-Reload
+
+Use the `--watch` (or `-w`) flag for rapid development. The compiler watches your source files and automatically recompiles and reloads the program in VICE when you save changes:
+
+```bash
+# Start watch mode (uses temporary file)
+cobra64 game.cb64 --watch
+
+# Short form
+cobra64 game.cb64 -w
+
+# With explicit output file
+cobra64 game.cb64 -o game.prg --watch
+
+# Watch multiple files
+cobra64 main.cb64 utils.cb64 -o game.prg -w
+```
+
+In watch mode:
+
+- The program is compiled and launched in VICE
+- When you save changes, the compiler recompiles automatically
+- The new version is hot-reloaded into VICE without restarting the emulator
+- If compilation fails, error messages are shown and VICE keeps running the old version
+- Press `Ctrl+C` to stop watching
+
+**Example workflow:**
+
+```
+$ cobra64 game.cb64 -o game.prg -w
+Compiled game.cb64 -> game.prg
+Running in VICE...
+Watching for changes... (Press Ctrl+C to stop)
+
+Recompiling...
+Reloading...
+Compiled game.cb64 -> game.prg
+Watching for changes...
+```
+
+### VICE Configuration
+
+#### Custom VICE Path
+
+If VICE is not in your PATH, specify the location manually:
+
+```bash
+cobra64 hello.cb64 -o hello.prg --run --vice-path /path/to/x64sc
+```
+
+#### Binary Monitor Port
+
+The compiler uses VICE's binary monitor protocol for hot-reload. The default port is 6510, but you can change it:
+
+```bash
+cobra64 hello.cb64 -o hello.prg -w --vice-port 6502
+```
+
+#### Installing VICE
+
+**macOS (Homebrew):**
+
+```bash
+brew install vice
+```
+
+**Ubuntu/Debian:**
+
+```bash
+sudo apt install vice
+```
+
+**Windows:**
+Download from [vice-emu.sourceforge.io](https://vice-emu.sourceforge.io/)
+
+### Troubleshooting
+
+#### "VICE emulator not found"
+
+The compiler searches for `x64sc` or `x64` in your PATH. Solutions:
+
+- Install VICE (see above)
+- Use `--vice-path` to specify the location
+- Add VICE to your PATH
+
+#### Hot-reload not working
+
+Hot-reload requires VICE's binary monitor. If it fails:
+
+- Ensure VICE started successfully
+- Check that port 6510 (or your custom port) is not in use
+- Try restarting the watch mode
+
+#### D64 files and hot-reload
+
+Hot-reload works best with PRG files. For D64 disk images:
+
+- The reload may be slower
+- Consider using PRG during development, D64 for final distribution
 
 ---
 
@@ -933,6 +1071,109 @@ def main():
     # Comments anywhere in the code
     println(x)
 ```
+
+### Data Blocks
+
+Data blocks allow embedding raw binary data directly in your source code. This is useful for:
+
+- Sprite graphics
+- Custom character sets
+- Sound data
+- Lookup tables
+- Any binary data you want to include
+
+#### Basic Syntax
+
+```python
+data SPRITE_DATA:
+    $00, $3C, $00    # Hex bytes
+    $00, $7E, $00
+    255, 128, 64     # Decimal bytes
+    %11110000        # Binary bytes
+end
+```
+
+#### Including External Files
+
+You can include binary files from disk:
+
+```python
+# Include entire file
+data FONT:
+    include "font.bin"
+end
+
+# Include with offset (skip header)
+data MUSIC:
+    include "music.sid", $7E    # Start at offset $7E
+end
+
+# Include with offset and length
+data SAMPLE:
+    include "sounds.bin", $100, $400    # 1024 bytes starting at $100
+end
+```
+
+#### Using Data Block Addresses
+
+Data block names can be used as word values representing the address of the data:
+
+```python
+data MY_SPRITE:
+    $00, $3C, $00
+    $00, $7E, $00
+end
+
+def main():
+    # Get the address of the data block
+    addr: word = MY_SPRITE
+
+    # Read a byte from the data block
+    first_byte: byte = peek(MY_SPRITE)
+
+    # Use in calculations
+    offset_addr: word = MY_SPRITE + 3
+```
+
+#### Sprite Example
+
+```python
+data BALL_SPRITE:
+    # 24x21 pixel sprite (63 bytes)
+    $00, $3C, $00
+    $00, $7E, $00
+    $00, $FF, $00
+    $01, $FF, $80
+    $01, $FF, $80
+    $01, $FF, $80
+    $00, $FF, $00
+    $00, $7E, $00
+    $00, $3C, $00
+    # ... more rows ...
+end
+
+def main():
+    # Copy sprite data to VIC-accessible memory
+    i: byte = 0
+    while i < 63:
+        poke($3000 + word(i), peek(BALL_SPRITE + word(i)))
+        i = i + 1
+
+    # Set sprite pointer
+    poke($07F8, 192)  # $3000 / 64 = 192
+
+    # Enable and position sprite
+    sprite_enable(0, true)
+    sprite_pos(0, 160, 100)
+```
+
+#### Notes
+
+- Data blocks are placed after the code section in the compiled binary
+- Data block names are case-sensitive
+- Each data block name must be unique
+- The address of a data block is a word (16-bit) value
+- For sprites: VIC-II can only see memory in 16KB banks, so you may need to copy data to VIC-accessible locations
 
 ---
 
@@ -1856,46 +2097,46 @@ Cobra64 provides comprehensive VIC-II graphics mode support including bitmap gra
 
 #### VIC-II Register Constants
 
-| Constant         | Value   | Description                    |
-| ---------------- | ------- | ------------------------------ |
-| `VIC_CONTROL1`   | $D011   | Control register 1             |
-| `VIC_CONTROL2`   | $D016   | Control register 2             |
-| `VIC_MEMORY`     | $D018   | Memory control register        |
-| `VIC_RASTER`     | $D012   | Raster line register           |
-| `VIC_BORDER`     | $D020   | Border color register          |
-| `VIC_BACKGROUND` | $D021   | Background color register      |
-| `VIC_BACKGROUND1`| $D022   | Extra background 1             |
-| `VIC_BACKGROUND2`| $D023   | Extra background 2             |
-| `VIC_BACKGROUND3`| $D024   | Extra background 3             |
-| `COLOR_RAM`      | $D800   | Color RAM start address        |
+| Constant          | Value | Description               |
+| ----------------- | ----- | ------------------------- |
+| `VIC_CONTROL1`    | $D011 | Control register 1        |
+| `VIC_CONTROL2`    | $D016 | Control register 2        |
+| `VIC_MEMORY`      | $D018 | Memory control register   |
+| `VIC_RASTER`      | $D012 | Raster line register      |
+| `VIC_BORDER`      | $D020 | Border color register     |
+| `VIC_BACKGROUND`  | $D021 | Background color register |
+| `VIC_BACKGROUND1` | $D022 | Extra background 1        |
+| `VIC_BACKGROUND2` | $D023 | Extra background 2        |
+| `VIC_BACKGROUND3` | $D024 | Extra background 3        |
+| `COLOR_RAM`       | $D800 | Color RAM start address   |
 
 #### Graphics Mode Constants
 
-| Constant       | Value | Description                        |
-| -------------- | ----- | ---------------------------------- |
-| `GFX_TEXT`     | 0     | Standard character mode (40x25)    |
-| `GFX_TEXT_MC`  | 1     | Multicolor character mode          |
-| `GFX_BITMAP`   | 2     | Standard bitmap mode (320x200)     |
-| `GFX_BITMAP_MC`| 3     | Multicolor bitmap mode (160x200)   |
-| `GFX_TEXT_ECM` | 4     | Extended background color mode     |
+| Constant        | Value | Description                      |
+| --------------- | ----- | -------------------------------- |
+| `GFX_TEXT`      | 0     | Standard character mode (40x25)  |
+| `GFX_TEXT_MC`   | 1     | Multicolor character mode        |
+| `GFX_BITMAP`    | 2     | Standard bitmap mode (320x200)   |
+| `GFX_BITMAP_MC` | 3     | Multicolor bitmap mode (160x200) |
+| `GFX_TEXT_ECM`  | 4     | Extended background color mode   |
 
 #### VIC Bank Constants
 
-| Constant    | Value | Address Range     |
-| ----------- | ----- | ----------------- |
-| `VIC_BANK0` | 0     | $0000-$3FFF       |
-| `VIC_BANK1` | 1     | $4000-$7FFF       |
-| `VIC_BANK2` | 2     | $8000-$BFFF       |
-| `VIC_BANK3` | 3     | $C000-$FFFF       |
+| Constant    | Value | Address Range |
+| ----------- | ----- | ------------- |
+| `VIC_BANK0` | 0     | $0000-$3FFF   |
+| `VIC_BANK1` | 1     | $4000-$7FFF   |
+| `VIC_BANK2` | 2     | $8000-$BFFF   |
+| `VIC_BANK3` | 3     | $C000-$FFFF   |
 
 #### Raster Constants
 
-| Constant          | Value | Description                   |
-| ----------------- | ----- | ----------------------------- |
-| `RASTER_TOP`      | 50    | First visible raster line     |
-| `RASTER_BOTTOM`   | 250   | Last visible raster line      |
-| `RASTER_MAX_PAL`  | 311   | Maximum raster line (PAL)     |
-| `RASTER_MAX_NTSC` | 261   | Maximum raster line (NTSC)    |
+| Constant          | Value | Description                |
+| ----------------- | ----- | -------------------------- |
+| `RASTER_TOP`      | 50    | First visible raster line  |
+| `RASTER_BOTTOM`   | 250   | Last visible raster line   |
+| `RASTER_MAX_PAL`  | 311   | Maximum raster line (PAL)  |
+| `RASTER_MAX_NTSC` | 261   | Maximum raster line (NTSC) |
 
 #### Display Control Functions
 
@@ -1909,12 +2150,12 @@ c: byte = get_border_color()
 c: byte = get_background_color()
 ```
 
-| Function                  | Description                     |
-| ------------------------- | ------------------------------- |
-| `border_color(color)`     | Set border color (0-15)         |
-| `background_color(color)` | Set background color (0-15)     |
-| `get_border_color()`      | Get current border color        |
-| `get_background_color()`  | Get current background color    |
+| Function                  | Description                  |
+| ------------------------- | ---------------------------- |
+| `border_color(color)`     | Set border color (0-15)      |
+| `background_color(color)` | Set background color (0-15)  |
+| `get_border_color()`      | Get current border color     |
+| `get_background_color()`  | Get current background color |
 
 #### Mode Switching Functions
 
@@ -1932,15 +2173,15 @@ screen_columns(38)    # 38-column mode (with border)
 screen_rows(24)       # 24-row mode (with border)
 ```
 
-| Function                  | Description                        |
-| ------------------------- | ---------------------------------- |
-| `gfx_mode(mode)`          | Switch graphics mode (0-4)         |
-| `get_gfx_mode()`          | Get current graphics mode          |
-| `gfx_text()`              | Switch to standard text mode       |
-| `gfx_hires()`             | Switch to hires bitmap (320x200)   |
-| `gfx_multicolor()`        | Switch to multicolor bitmap        |
-| `screen_columns(cols)`    | Set 38 or 40 column mode           |
-| `screen_rows(rows)`       | Set 24 or 25 row mode              |
+| Function               | Description                      |
+| ---------------------- | -------------------------------- |
+| `gfx_mode(mode)`       | Switch graphics mode (0-4)       |
+| `get_gfx_mode()`       | Get current graphics mode        |
+| `gfx_text()`           | Switch to standard text mode     |
+| `gfx_hires()`          | Switch to hires bitmap (320x200) |
+| `gfx_multicolor()`     | Switch to multicolor bitmap      |
+| `screen_columns(cols)` | Set 38 or 40 column mode         |
+| `screen_rows(rows)`    | Set 24 or 25 row mode            |
 
 #### Memory Configuration Functions
 
@@ -1958,13 +2199,13 @@ bitmap_address($2000)
 charset_address($0800)
 ```
 
-| Function                  | Description                        |
-| ------------------------- | ---------------------------------- |
-| `vic_bank(bank)`          | Set VIC memory bank (0-3)          |
-| `get_vic_bank()`          | Get current VIC bank               |
-| `screen_address(addr)`    | Set screen RAM address             |
-| `bitmap_address(addr)`    | Set bitmap address                 |
-| `charset_address(addr)`   | Set character set address          |
+| Function                | Description               |
+| ----------------------- | ------------------------- |
+| `vic_bank(bank)`        | Set VIC memory bank (0-3) |
+| `get_vic_bank()`        | Get current VIC bank      |
+| `screen_address(addr)`  | Set screen RAM address    |
+| `bitmap_address(addr)`  | Set bitmap address        |
+| `charset_address(addr)` | Set character set address |
 
 #### Bitmap Pixel Operations
 
@@ -1987,15 +2228,15 @@ plot_mc(80, 100, 2)   # Set pixel with color 2
 c: byte = point_mc(80, 100)  # Get pixel color (0-3)
 ```
 
-| Function                      | Description                        |
-| ----------------------------- | ---------------------------------- |
-| `plot(x, y)`                  | Set pixel in hires mode            |
-| `unplot(x, y)`                | Clear pixel in hires mode          |
-| `point(x, y) -> bool`         | Test if pixel is set               |
-| `plot_mc(x, y, color)`        | Set multicolor pixel (0-3)         |
-| `point_mc(x, y) -> byte`      | Get multicolor pixel value         |
-| `bitmap_clear()`              | Clear entire bitmap                |
-| `bitmap_fill(pattern)`        | Fill bitmap with pattern           |
+| Function                 | Description                |
+| ------------------------ | -------------------------- |
+| `plot(x, y)`             | Set pixel in hires mode    |
+| `unplot(x, y)`           | Clear pixel in hires mode  |
+| `point(x, y) -> bool`    | Test if pixel is set       |
+| `plot_mc(x, y, color)`   | Set multicolor pixel (0-3) |
+| `point_mc(x, y) -> byte` | Get multicolor pixel value |
+| `bitmap_clear()`         | Clear entire bitmap        |
+| `bitmap_fill(pattern)`   | Fill bitmap with pattern   |
 
 #### Drawing Primitives
 
@@ -2010,13 +2251,13 @@ rect(10, 10, 100, 80)     # Rectangle outline
 rect_fill(120, 10, 100, 80)  # Filled rectangle
 ```
 
-| Function                           | Description                     |
-| ---------------------------------- | ------------------------------- |
-| `line(x1, y1, x2, y2)`             | Draw line (Bresenham)           |
-| `hline(x, y, length)`              | Fast horizontal line            |
-| `vline(x, y, length)`              | Fast vertical line              |
-| `rect(x, y, width, height)`        | Draw rectangle outline          |
-| `rect_fill(x, y, width, height)`   | Draw filled rectangle           |
+| Function                         | Description            |
+| -------------------------------- | ---------------------- |
+| `line(x1, y1, x2, y2)`           | Draw line (Bresenham)  |
+| `hline(x, y, length)`            | Fast horizontal line   |
+| `vline(x, y, length)`            | Fast vertical line     |
+| `rect(x, y, width, height)`      | Draw rectangle outline |
+| `rect_fill(x, y, width, height)` | Draw filled rectangle  |
 
 #### Cell Color Control
 
@@ -2038,14 +2279,14 @@ fill_colors(1, 0)           # All cells: white on black
 fill_color_ram(1)           # Fill color RAM with 1
 ```
 
-| Function                        | Description                        |
-| ------------------------------- | ---------------------------------- |
-| `cell_color(cx, cy, fg, bg)`    | Set cell foreground/background     |
-| `get_cell_color(cx, cy)`        | Get cell colors (fg<<4 | bg)       |
-| `color_ram(cx, cy, color)`      | Set color RAM at cell position     |
-| `get_color_ram(cx, cy)`         | Get color RAM value                |
-| `fill_colors(fg, bg)`           | Fill all cells with colors         |
-| `fill_color_ram(color)`         | Fill color RAM with value          |
+| Function                     | Description                    |
+| ---------------------------- | ------------------------------ | --- |
+| `cell_color(cx, cy, fg, bg)` | Set cell foreground/background |
+| `get_cell_color(cx, cy)`     | Get cell colors (fg<<4         | bg) |
+| `color_ram(cx, cy, color)`   | Set color RAM at cell position |
+| `get_color_ram(cx, cy)`      | Get color RAM value            |
+| `fill_colors(fg, bg)`        | Fill all cells with colors     |
+| `fill_color_ram(color)`      | Fill color RAM with value      |
 
 #### Hardware Scrolling
 
@@ -2067,12 +2308,12 @@ while true:
         i = i + 1
 ```
 
-| Function          | Description                        |
-| ----------------- | ---------------------------------- |
-| `scroll_x(offset)`| Set horizontal scroll (0-7)        |
-| `scroll_y(offset)`| Set vertical scroll (0-7)          |
-| `get_scroll_x()`  | Get current horizontal scroll      |
-| `get_scroll_y()`  | Get current vertical scroll        |
+| Function           | Description                   |
+| ------------------ | ----------------------------- |
+| `scroll_x(offset)` | Set horizontal scroll (0-7)   |
+| `scroll_y(offset)` | Set vertical scroll (0-7)     |
+| `get_scroll_x()`   | Get current horizontal scroll |
+| `get_scroll_y()`   | Get current vertical scroll   |
 
 #### Raster Functions
 
@@ -2091,10 +2332,10 @@ while true:
     border_color(0)
 ```
 
-| Function              | Description                       |
-| --------------------- | --------------------------------- |
-| `raster() -> word`    | Get current raster line (0-311)   |
-| `wait_raster(line)`   | Wait until raster reaches line    |
+| Function            | Description                     |
+| ------------------- | ------------------------------- |
+| `raster() -> word`  | Get current raster line (0-311) |
+| `wait_raster(line)` | Wait until raster reaches line  |
 
 #### Extended Background Color Mode (ECM)
 
@@ -2116,10 +2357,10 @@ gfx_mode(GFX_TEXT_ECM)
 
 Note: In ECM mode, only characters 0-63 are available. Bits 6-7 of the character code select which background color (0-3) to use.
 
-| Function                         | Description                      |
-| -------------------------------- | -------------------------------- |
-| `ecm_background(index, color)`   | Set ECM background (0-3)         |
-| `get_ecm_background(index)`      | Get ECM background color         |
+| Function                       | Description              |
+| ------------------------------ | ------------------------ |
+| `ecm_background(index, color)` | Set ECM background (0-3) |
+| `get_ecm_background(index)`    | Get ECM background color |
 
 #### Graphics Mode Bits Reference
 
@@ -2137,11 +2378,11 @@ Note: In ECM mode, only characters 0-63 are available. Bits 6-7 of the character
 
 #### Default Memory Layout
 
-| Address Range | Size   | Content                    |
-| ------------- | ------ | -------------------------- |
-| $0400-$07FF   | 1 KB   | Screen RAM (text/colors)   |
-| $2000-$3FFF   | 8 KB   | Bitmap data                |
-| $D800-$DBFF   | 1 KB   | Color RAM                  |
+| Address Range | Size | Content                  |
+| ------------- | ---- | ------------------------ |
+| $0400-$07FF   | 1 KB | Screen RAM (text/colors) |
+| $2000-$3FFF   | 8 KB | Bitmap data              |
+| $D800-$DBFF   | 1 KB | Color RAM                |
 
 ---
 
@@ -2545,6 +2786,18 @@ The generated PRG and D64 files should work with any C64 emulator that supports 
 ---
 
 ## Version History
+
+- **0.15.0** - Data Embedding (Binary Data Blocks)
+  - Added `data NAME: ... end` syntax for embedding raw binary data
+  - Data blocks support inline bytes in hex (`$FF`), decimal (`255`), and binary (`%11111111`)
+  - Added `include "filename"` directive for embedding external binary files
+  - Include supports optional offset and length: `include "file.sid", $7E, $1000`
+  - Data block names become word constants pointing to the data address
+  - File path resolution relative to source file
+  - File content caching for repeated includes
+  - Error handling: file not found, read errors, invalid offset/length
+  - LSP support: syntax highlighting, hover info, go-to-definition, autocomplete
+  - New example programs: `sprite_data_block.cb64`, `charset_data_block.cb64`, `music_data_block.cb64`
 
 - **0.13.0** - Sound & Music Functions
   - Added comprehensive SID chip support with 20 new built-in functions

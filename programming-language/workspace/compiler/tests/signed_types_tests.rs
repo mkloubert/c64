@@ -604,10 +604,7 @@ def main():
     println(y)
 "#;
     let result = cobra64::compile(source);
-    assert!(
-        result.is_ok(),
-        "sbyte multiple shift right should compile"
-    );
+    assert!(result.is_ok(), "sbyte multiple shift right should compile");
 }
 
 #[test]
@@ -621,10 +618,7 @@ def main():
     println(y)
 "#;
     let result = cobra64::compile(source);
-    assert!(
-        result.is_ok(),
-        "byte shift right should compile"
-    );
+    assert!(result.is_ok(), "byte shift right should compile");
 }
 
 #[test]
@@ -638,10 +632,7 @@ def main():
     println(y)
 "#;
     let result = cobra64::compile(source);
-    assert!(
-        result.is_ok(),
-        "positive sbyte shift right should compile"
-    );
+    assert!(result.is_ok(), "positive sbyte shift right should compile");
 }
 
 // ============================================================================

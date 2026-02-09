@@ -174,10 +174,13 @@ export function getCompletions(
  */
 function getKeywordCompletions(prefix: string): CompletionItem[] {
     const keywords = [
+        { label: 'data', snippet: 'data ${1:NAME}:\n    ${0}\nend', doc: 'Define a data block for binary data' },
         { label: 'def', snippet: 'def ${1:name}(${2:params}):\n    ${0:pass}', doc: 'Define a function' },
+        { label: 'end', snippet: 'end', doc: 'End a data block' },
         { label: 'if', snippet: 'if ${1:condition}:\n    ${0:pass}', doc: 'Conditional statement' },
         { label: 'elif', snippet: 'elif ${1:condition}:\n    ${0:pass}', doc: 'Else-if branch' },
         { label: 'else', snippet: 'else:\n    ${0:pass}', doc: 'Else branch' },
+        { label: 'include', snippet: 'include "${1:filename}"', doc: 'Include binary file in data block' },
         { label: 'while', snippet: 'while ${1:condition}:\n    ${0:pass}', doc: 'While loop' },
         { label: 'for', snippet: 'for ${1:i} in ${2:0} to ${3:9}:\n    ${0:pass}', doc: 'For loop' },
         { label: 'break', snippet: 'break', doc: 'Exit the loop' },
@@ -340,13 +343,14 @@ function getVariableCompletions(
     if (!analysis.analyzerResult) return [];
 
     return analysis.analyzerResult.symbols
-        .filter(s => s.kind === 'variable' || s.kind === 'constant' || s.kind === 'parameter')
+        .filter(s => s.kind === 'variable' || s.kind === 'constant' || s.kind === 'parameter' || s.kind === 'dataBlock')
         .map((symbol, index) => ({
             label: symbol.name,
             kind: symbol.kind === 'constant' ? CompletionItemKind.Constant :
+                symbol.kind === 'dataBlock' ? CompletionItemKind.Constant :
                 symbol.kind === 'parameter' ? CompletionItemKind.Variable :
                     CompletionItemKind.Variable,
-            detail: symbol.type,
+            detail: symbol.kind === 'dataBlock' ? 'data block (word address)' : symbol.type,
             sortText: `4${index.toString().padStart(2, '0')}`, // Variables last
         }));
 }

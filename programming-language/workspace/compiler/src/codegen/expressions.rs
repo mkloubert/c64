@@ -27,6 +27,7 @@
 
 use super::binary_ops::BinaryOpsEmitter;
 use super::conversions::TypeConversions;
+use super::data_blocks::DataBlockEmitter;
 use super::emit::EmitHelpers;
 use super::functions::FunctionCallEmitter;
 use super::mos6510::{c64, colors, opcodes, sid, sprite, vic, zeropage};
@@ -268,6 +269,10 @@ impl ExpressionEmitter for CodeGenerator {
                     if is_word {
                         self.emit_imm(opcodes::LDX_IMM, ((value >> 8) & 0xFF) as u8);
                     }
+                } else if self.is_data_block(name) {
+                    // Data block - emit reference to its address (word)
+                    // The actual address will be patched after data blocks are emitted
+                    self.emit_data_block_ref(name);
                 } else {
                     let var = self.get_variable(name).ok_or_else(|| {
                         CompileError::new(

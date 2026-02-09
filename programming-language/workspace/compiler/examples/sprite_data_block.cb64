@@ -1,0 +1,159 @@
+# Sprite Data Block Demo for Cobra64
+# Demonstrates embedding sprite data using the data block feature
+#
+# This is a much cleaner alternative to using poke() for sprite data.
+# The sprite data is embedded directly in the compiled binary.
+
+# Define sprite data as a data block
+# A C64 sprite is 24x21 pixels = 63 bytes (+ 1 padding = 64 bytes)
+data BALL_SPRITE:
+    # Row 0-2: empty top
+    $00, $00, $00
+    $00, $00, $00
+    $00, $00, $00
+    # Row 3-5: top of ball
+    $00, $3C, $00
+    $00, $7E, $00
+    $00, $FF, $00
+    # Row 6-11: middle of ball (widest part)
+    $01, $FF, $80
+    $01, $FF, $80
+    $01, $FF, $80
+    $01, $FF, $80
+    $01, $FF, $80
+    $01, $FF, $80
+    # Row 12-14: bottom of ball
+    $00, $FF, $00
+    $00, $7E, $00
+    $00, $3C, $00
+    # Row 15-20: empty bottom
+    $00, $00, $00
+    $00, $00, $00
+    $00, $00, $00
+    $00, $00, $00
+    $00, $00, $00
+    $00, $00, $00
+end
+
+# Second sprite: a simple arrow shape
+data ARROW_SPRITE:
+    $00, $00, $00
+    $00, $08, $00
+    $00, $1C, $00
+    $00, $3E, $00
+    $00, $7F, $00
+    $00, $FF, $80
+    $00, $7F, $00
+    $00, $3E, $00
+    $00, $1C, $00
+    $00, $08, $00
+    $00, $00, $00
+    $00, $00, $00
+    $00, $00, $00
+    $00, $00, $00
+    $00, $00, $00
+    $00, $00, $00
+    $00, $00, $00
+    $00, $00, $00
+    $00, $00, $00
+    $00, $00, $00
+    $00, $00, $00
+end
+
+def main():
+    cls()
+    println("SPRITE DATA BLOCK DEMO")
+    println("")
+    println("BALL SPRITE ADDRESS:")
+
+    # Get the address of the sprite data
+    ball_addr: word = BALL_SPRITE
+    arrow_addr: word = ARROW_SPRITE
+
+    # Print addresses (for debugging)
+    print("BALL: $")
+    print_hex_word(ball_addr)
+    println("")
+
+    print("ARROW: $")
+    print_hex_word(arrow_addr)
+    println("")
+
+    # Copy sprite data to VIC-II accessible memory at $3000
+    # (Data blocks are placed after code, may not be VIC-visible)
+    copy_sprite(BALL_SPRITE, $3000)
+    copy_sprite(ARROW_SPRITE, $3040)
+
+    # Set sprite pointers (screen at $0400, pointers at $07F8)
+    # Sprite 0 -> block 192 ($3000 / 64)
+    # Sprite 1 -> block 193 ($3040 / 64)
+    poke($07F8, 192)
+    poke($07F9, 193)
+
+    # Set sprite colors
+    poke($D027, 1)   # Sprite 0: white
+    poke($D028, 2)   # Sprite 1: red
+
+    # Enable sprites 0 and 1
+    sprite_enable(0, true)
+    sprite_enable(1, true)
+
+    # Animate sprites
+    x1: word = 100
+    x2: word = 200
+    y1: byte = 100
+    y2: byte = 150
+    dx1: sbyte = 1
+    dx2: sbyte = -1
+
+    println("")
+    println("PRESS ANY KEY TO EXIT")
+
+    while get_key() == 0:
+        sprite_pos(0, x1, y1)
+        sprite_pos(1, x2, y2)
+
+        x1 = x1 + word(dx1)
+        x2 = x2 + word(dx2)
+
+        if x1 > 320:
+            dx1 = -1
+        if x1 < 24:
+            dx1 = 1
+        if x2 > 320:
+            dx2 = -1
+        if x2 < 24:
+            dx2 = 1
+
+        # Simple delay
+        d: byte = 0
+        while d < 50:
+            d = d + 1
+
+    sprite_enable(0, false)
+    sprite_enable(1, false)
+    println("DONE!")
+
+# Helper: Copy 63 bytes of sprite data to destination
+def copy_sprite(src: word, dest: word):
+    i: byte = 0
+    while i < 63:
+        poke(dest + word(i), peek(src + word(i)))
+        i = i + 1
+
+# Helper: Print a word as hex
+def print_hex_word(val: word):
+    print_hex_byte(byte(val >> 8))
+    print_hex_byte(byte(val))
+
+def print_hex_byte(val: byte):
+    hi: byte = val >> 4
+    lo: byte = val & $0F
+    print_hex_digit(hi)
+    print_hex_digit(lo)
+
+def print_hex_digit(val: byte):
+    if val < 10:
+        print_char(byte('0') + val)
+    else:
+        print_char(byte('A') + val - 10)

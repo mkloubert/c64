@@ -71,6 +71,9 @@ pub enum StatementKind {
 
     /// An expression statement (function call as statement).
     Expression(Expr),
+
+    /// A data block definition.
+    DataBlock(DataBlock),
 }
 
 /// A variable declaration.
@@ -104,7 +107,10 @@ impl VarDecl {
     ///
     /// # Deprecated
     /// Type inference has been removed. Use `VarDecl::new()` with explicit type instead.
-    #[deprecated(since = "0.2.0", note = "Type inference removed. Use VarDecl::new() with explicit type.")]
+    #[deprecated(
+        since = "0.2.0",
+        note = "Type inference removed. Use VarDecl::new() with explicit type."
+    )]
     pub fn new_inferred(name: String, span: Span) -> Self {
         Self {
             name,
@@ -151,7 +157,10 @@ impl ConstDecl {
     ///
     /// # Deprecated
     /// Type inference has been removed. Use `ConstDecl::new_typed()` with explicit type instead.
-    #[deprecated(since = "0.2.0", note = "Type inference removed. Use ConstDecl::new_typed() with explicit type.")]
+    #[deprecated(
+        since = "0.2.0",
+        note = "Type inference removed. Use ConstDecl::new_typed() with explicit type."
+    )]
     pub fn new(name: String, value: Expr, span: Span) -> Self {
         Self {
             name,
@@ -325,6 +334,113 @@ impl Parameter {
     }
 }
 
+/// A data block definition for embedding binary data.
+#[derive(Debug, Clone)]
+pub struct DataBlock {
+    /// The data block name (becomes a word constant with the address).
+    pub name: String,
+    /// The data entries (bytes or included files).
+    pub entries: Vec<DataEntry>,
+    /// Optional alignment requirement in bytes.
+    pub alignment: Option<u16>,
+    /// The source span.
+    pub span: Span,
+}
+
+impl DataBlock {
+    /// Create a new data block.
+    pub fn new(name: String, span: Span) -> Self {
+        Self {
+            name,
+            entries: Vec::new(),
+            alignment: None,
+            span,
+        }
+    }
+
+    /// Add entries to this data block.
+    pub fn with_entries(mut self, entries: Vec<DataEntry>) -> Self {
+        self.entries = entries;
+        self
+    }
+
+    /// Set alignment requirement.
+    pub fn with_alignment(mut self, alignment: u16) -> Self {
+        self.alignment = Some(alignment);
+        self
+    }
+
+    /// Calculate the total size of this data block in bytes.
+    pub fn size(&self) -> usize {
+        self.entries.iter().map(|e| e.size()).sum()
+    }
+}
+
+/// An entry in a data block.
+#[derive(Debug, Clone)]
+pub enum DataEntry {
+    /// Inline byte values.
+    Bytes(Vec<u8>),
+    /// Include an external binary file.
+    Include {
+        /// Path to the binary file.
+        path: String,
+        /// Optional byte offset into the file.
+        offset: Option<u32>,
+        /// Optional number of bytes to include.
+        length: Option<u32>,
+        /// The source span.
+        span: Span,
+    },
+}
+
+impl DataEntry {
+    /// Create a new bytes entry.
+    pub fn bytes(data: Vec<u8>) -> Self {
+        DataEntry::Bytes(data)
+    }
+
+    /// Create a new include entry.
+    pub fn include(path: String, span: Span) -> Self {
+        DataEntry::Include {
+            path,
+            offset: None,
+            length: None,
+            span,
+        }
+    }
+
+    /// Create a new include entry with offset only (read from offset to end of file).
+    pub fn include_with_offset(path: String, offset: u32, span: Span) -> Self {
+        DataEntry::Include {
+            path,
+            offset: Some(offset),
+            length: None,
+            span,
+        }
+    }
+
+    /// Create a new include entry with offset and length.
+    pub fn include_with_range(path: String, offset: u32, length: u32, span: Span) -> Self {
+        DataEntry::Include {
+            path,
+            offset: Some(offset),
+            length: Some(length),
+            span,
+        }
+    }
+
+    /// Get the size of this entry in bytes.
+    /// Note: For Include entries, this returns 0 as the actual size
+    /// is only known after reading the file.
+    pub fn size(&self) -> usize {
+        match self {
+            DataEntry::Bytes(data) => data.len(),
+            DataEntry::Include { length, .. } => length.map(|l| l as usize).unwrap_or(0),
+        }
+    }
+}
+
 impl std::fmt::Display for Statement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.kind)
@@ -346,6 +462,7 @@ impl std::fmt::Display for StatementKind {
             StatementKind::Return(None) => write!(f, "return"),
             StatementKind::Pass => write!(f, "pass"),
             StatementKind::Expression(expr) => write!(f, "{}", expr),
+            StatementKind::DataBlock(data_block) => write!(f, "{}", data_block),
         }
     }
 }
@@ -461,6 +578,45 @@ impl std::fmt::Display for FunctionDef {
 impl std::fmt::Display for Parameter {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}: {}", self.name, self.param_type)
+    }
+}
+
+impl std::fmt::Display for DataBlock {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "data {}:", self.name)?;
+        if let Some(align) = self.alignment {
+            write!(f, " (align {})", align)?;
+        }
+        Ok(())
+    }
+}
+
+impl std::fmt::Display for DataEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DataEntry::Bytes(data) => {
+                write!(f, "[")?;
+                for (i, byte) in data.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "${:02X}", byte)?;
+                }
+                write!(f, "]")
+            }
+            DataEntry::Include {
+                path,
+                offset,
+                length,
+                ..
+            } => {
+                write!(f, "include \"{}\"", path)?;
+                if let (Some(off), Some(len)) = (offset, length) {
+                    write!(f, ", ${:X}, ${:X}", off, len)?;
+                }
+                Ok(())
+            }
+        }
     }
 }
 
@@ -739,5 +895,128 @@ mod tests {
         let expr = Expr::new(ExprKind::IntegerLiteral(42), Span::new(7, 9));
         let stmt = Statement::new(StatementKind::Return(Some(expr)), span);
         assert_eq!(format!("{}", stmt), "return 42");
+    }
+
+    #[test]
+    fn test_data_block_creation() {
+        let span = Span::new(0, 50);
+        let data_block = DataBlock::new("SPRITE_DATA".to_string(), span);
+        assert_eq!(data_block.name, "SPRITE_DATA");
+        assert!(data_block.entries.is_empty());
+        assert!(data_block.alignment.is_none());
+        assert_eq!(data_block.size(), 0);
+    }
+
+    #[test]
+    fn test_data_block_with_entries() {
+        let span = Span::new(0, 50);
+        let entries = vec![
+            DataEntry::bytes(vec![0x00, 0x3C, 0x00]),
+            DataEntry::bytes(vec![0x00, 0x7E, 0x00]),
+        ];
+        let data_block = DataBlock::new("SPRITE".to_string(), span).with_entries(entries);
+        assert_eq!(data_block.entries.len(), 2);
+        assert_eq!(data_block.size(), 6);
+    }
+
+    #[test]
+    fn test_data_block_with_alignment() {
+        let span = Span::new(0, 50);
+        let data_block = DataBlock::new("ALIGNED".to_string(), span).with_alignment(64);
+        assert_eq!(data_block.alignment, Some(64));
+    }
+
+    #[test]
+    fn test_data_entry_bytes() {
+        let entry = DataEntry::bytes(vec![0xFF, 0x00, 0xAB]);
+        assert_eq!(entry.size(), 3);
+        if let DataEntry::Bytes(data) = entry {
+            assert_eq!(data, vec![0xFF, 0x00, 0xAB]);
+        } else {
+            panic!("Expected Bytes variant");
+        }
+    }
+
+    #[test]
+    fn test_data_entry_include() {
+        let span = Span::new(10, 30);
+        let entry = DataEntry::include("font.bin".to_string(), span);
+        assert_eq!(entry.size(), 0); // Size unknown until file is read
+        if let DataEntry::Include {
+            path,
+            offset,
+            length,
+            ..
+        } = entry
+        {
+            assert_eq!(path, "font.bin");
+            assert!(offset.is_none());
+            assert!(length.is_none());
+        } else {
+            panic!("Expected Include variant");
+        }
+    }
+
+    #[test]
+    fn test_data_entry_include_with_range() {
+        let span = Span::new(10, 50);
+        let entry = DataEntry::include_with_range("music.sid".to_string(), 0x7E, 0x1000, span);
+        assert_eq!(entry.size(), 0x1000);
+        if let DataEntry::Include {
+            path,
+            offset,
+            length,
+            ..
+        } = entry
+        {
+            assert_eq!(path, "music.sid");
+            assert_eq!(offset, Some(0x7E));
+            assert_eq!(length, Some(0x1000));
+        } else {
+            panic!("Expected Include variant");
+        }
+    }
+
+    #[test]
+    fn test_display_data_block() {
+        let span = Span::new(0, 50);
+        let data_block = DataBlock::new("SPRITE_BALL".to_string(), span);
+        assert_eq!(format!("{}", data_block), "data SPRITE_BALL:");
+    }
+
+    #[test]
+    fn test_display_data_block_with_alignment() {
+        let span = Span::new(0, 50);
+        let data_block = DataBlock::new("ALIGNED_DATA".to_string(), span).with_alignment(64);
+        assert_eq!(format!("{}", data_block), "data ALIGNED_DATA: (align 64)");
+    }
+
+    #[test]
+    fn test_display_data_entry_bytes() {
+        let entry = DataEntry::bytes(vec![0x00, 0x3C, 0xFF]);
+        assert_eq!(format!("{}", entry), "[$00, $3C, $FF]");
+    }
+
+    #[test]
+    fn test_display_data_entry_include() {
+        let span = Span::new(0, 20);
+        let entry = DataEntry::include("font.bin".to_string(), span);
+        assert_eq!(format!("{}", entry), "include \"font.bin\"");
+    }
+
+    #[test]
+    fn test_display_data_entry_include_with_range() {
+        let span = Span::new(0, 40);
+        let entry = DataEntry::include_with_range("music.sid".to_string(), 0x7E, 0x1000, span);
+        assert_eq!(format!("{}", entry), "include \"music.sid\", $7E, $1000");
+    }
+
+    #[test]
+    fn test_data_block_statement() {
+        let span = Span::new(0, 100);
+        let data_block = DataBlock::new("TEST_DATA".to_string(), span.clone())
+            .with_entries(vec![DataEntry::bytes(vec![0x01, 0x02, 0x03])]);
+        let stmt = Statement::new(StatementKind::DataBlock(data_block), span);
+        assert_eq!(format!("{}", stmt), "data TEST_DATA:");
     }
 }

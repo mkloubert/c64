@@ -74,6 +74,8 @@ pub enum TopLevelItem {
     Variable(VarDecl),
     /// A function definition.
     Function(FunctionDef),
+    /// A data block definition.
+    DataBlock(DataBlock),
 }
 
 /// A block of statements.
@@ -123,6 +125,7 @@ impl std::fmt::Display for TopLevelItem {
             TopLevelItem::Constant(decl) => write!(f, "{}", decl),
             TopLevelItem::Variable(decl) => write!(f, "{}", decl),
             TopLevelItem::Function(func) => write!(f, "{}", func),
+            TopLevelItem::DataBlock(data_block) => write!(f, "{}", data_block),
         }
     }
 }
@@ -249,7 +252,8 @@ mod tests {
 
         // Add a constant
         let const_value = Expr::new(ExprKind::IntegerLiteral(255), Span::new(12, 15));
-        let const_decl = ConstDecl::new("MAX".to_string(), const_value, Span::new(0, 15));
+        let const_decl =
+            ConstDecl::new_typed("MAX".to_string(), Type::Byte, const_value, Span::new(0, 15));
         program.add_item(TopLevelItem::Constant(const_decl));
 
         // Add a function
@@ -258,7 +262,7 @@ mod tests {
         program.add_item(TopLevelItem::Function(func));
 
         let output = format!("{}", program);
-        assert!(output.contains("MAX = 255"));
+        assert!(output.contains("const MAX: byte = 255"));
         assert!(output.contains("def main():"));
     }
 }

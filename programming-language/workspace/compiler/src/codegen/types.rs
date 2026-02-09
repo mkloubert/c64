@@ -221,13 +221,16 @@ def main():
         let result = compile(source);
         assert!(result.is_ok(), "Compilation failed: {:?}", result.err());
         let bytes = result.unwrap();
-        
+
         // 0.5 in fixed 12.4 = 8
         // LDA #$08 = A9 08
         // LDX #$00 = A2 00
         // Check if the pattern A9 08 A2 00 exists in the output
         let pattern = [0xA9, 0x08, 0xA2, 0x00];
         let found = bytes.windows(4).any(|w| w == pattern);
-        assert!(found, "Expected pattern A9 08 A2 00 (LDA #8, LDX #0) not found in output");
+        assert!(
+            found,
+            "Expected pattern A9 08 A2 00 (LDA #8, LDX #0) not found in output"
+        );
     }
 }

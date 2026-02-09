@@ -235,4 +235,73 @@ describe('Parser', () => {
             assert.ok(result.program);
         });
     });
+
+    describe('Data Blocks', () => {
+        it('should parse simple data block', () => {
+            const result = parseCode('data SPRITE:\n    $00, $3C, $00\nend\ndef main():\n    pass');
+            assert.ok(result.program);
+            assert.strictEqual(result.program.items.length, 2);
+            assert.strictEqual(result.program.items[0].kind, 'DataBlockDef');
+            const dataBlock = result.program.items[0] as any;
+            assert.strictEqual(dataBlock.name, 'SPRITE');
+            assert.strictEqual(dataBlock.entries.length, 1);
+            assert.strictEqual(dataBlock.entries[0].kind, 'DataEntryBytes');
+            assert.strictEqual(dataBlock.entries[0].values.length, 3);
+        });
+
+        it('should parse data block with include', () => {
+            const result = parseCode('data MUSIC:\n    include "song.sid"\nend\ndef main():\n    pass');
+            assert.ok(result.program);
+            const dataBlock = result.program.items[0] as any;
+            assert.strictEqual(dataBlock.kind, 'DataBlockDef');
+            assert.strictEqual(dataBlock.entries.length, 1);
+            assert.strictEqual(dataBlock.entries[0].kind, 'DataEntryInclude');
+            assert.strictEqual(dataBlock.entries[0].path, 'song.sid');
+        });
+
+        it('should parse data block include with offset', () => {
+            const result = parseCode('data MUSIC:\n    include "song.sid", $7E\nend\ndef main():\n    pass');
+            assert.ok(result.program);
+            const dataBlock = result.program.items[0] as any;
+            const entry = dataBlock.entries[0];
+            assert.strictEqual(entry.kind, 'DataEntryInclude');
+            assert.strictEqual(entry.offset, 0x7E);
+            assert.strictEqual(entry.length, null);
+        });
+
+        it('should parse data block include with offset and length', () => {
+            const result = parseCode('data MUSIC:\n    include "song.sid", $7E, $1000\nend\ndef main():\n    pass');
+            assert.ok(result.program);
+            const dataBlock = result.program.items[0] as any;
+            const entry = dataBlock.entries[0];
+            assert.strictEqual(entry.kind, 'DataEntryInclude');
+            assert.strictEqual(entry.offset, 0x7E);
+            assert.strictEqual(entry.length, 0x1000);
+        });
+
+        it('should parse data block with multiple lines', () => {
+            const result = parseCode('data SPRITE:\n    $00, $3C, $00\n    $00, $7E, $00\nend\ndef main():\n    pass');
+            assert.ok(result.program);
+            const dataBlock = result.program.items[0] as any;
+            // Each line becomes a separate entry
+            assert.strictEqual(dataBlock.entries.length, 2);
+        });
+
+        it('should parse decimal values in data block', () => {
+            const result = parseCode('data DATA:\n    0, 60, 255\nend\ndef main():\n    pass');
+            assert.ok(result.program);
+            const dataBlock = result.program.items[0] as any;
+            assert.strictEqual(dataBlock.entries[0].values[0], 0);
+            assert.strictEqual(dataBlock.entries[0].values[1], 60);
+            assert.strictEqual(dataBlock.entries[0].values[2], 255);
+        });
+
+        it('should parse binary values in data block', () => {
+            const result = parseCode('data DATA:\n    %11111111, %00000000\nend\ndef main():\n    pass');
+            assert.ok(result.program);
+            const dataBlock = result.program.items[0] as any;
+            assert.strictEqual(dataBlock.entries[0].values[0], 255);
+            assert.strictEqual(dataBlock.entries[0].values[1], 0);
+        });
+    });
 });

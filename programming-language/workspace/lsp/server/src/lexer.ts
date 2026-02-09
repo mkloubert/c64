@@ -95,6 +95,7 @@ export enum TokenType {
 export const KEYWORDS = new Set([
     'def', 'if', 'elif', 'else', 'while', 'for', 'in', 'to', 'downto',
     'break', 'continue', 'return', 'pass', 'and', 'or', 'not',
+    'data', 'end', 'include',
 ]);
 
 /**

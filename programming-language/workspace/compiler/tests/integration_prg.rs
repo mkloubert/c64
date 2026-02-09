@@ -689,7 +689,10 @@ def main():
 "#;
 
     let code = cobra64::compile(source).expect("Compilation should succeed");
-    assert!(code.len() > 200, "Code should include byte array compound ops");
+    assert!(
+        code.len() > 200,
+        "Code should include byte array compound ops"
+    );
 }
 
 /// Test compound assignment on word array elements.
@@ -711,7 +714,10 @@ def main():
 "#;
 
     let code = cobra64::compile(source).expect("Compilation should succeed");
-    assert!(code.len() > 200, "Code should include word array compound ops");
+    assert!(
+        code.len() > 200,
+        "Code should include word array compound ops"
+    );
 }
 
 /// Test compound assignment with variable index.
@@ -728,7 +734,10 @@ def main():
 "#;
 
     let code = cobra64::compile(source).expect("Compilation should succeed");
-    assert!(!code.is_empty(), "Code should compile variable index compound ops");
+    assert!(
+        !code.is_empty(),
+        "Code should compile variable index compound ops"
+    );
 }
 
 /// Test compound assignment with expression index.
@@ -745,7 +754,10 @@ def main():
 "#;
 
     let code = cobra64::compile(source).expect("Compilation should succeed");
-    assert!(!code.is_empty(), "Code should compile expression index compound ops");
+    assert!(
+        !code.is_empty(),
+        "Code should compile expression index compound ops"
+    );
 }
 
 /// Test compound assignment in while loop.
@@ -761,7 +773,10 @@ def main():
 "#;
 
     let code = cobra64::compile(source).expect("Compilation should succeed");
-    assert!(code.len() > 50, "Code should include loop with compound ops");
+    assert!(
+        code.len() > 50,
+        "Code should include loop with compound ops"
+    );
 }
 
 /// Test compound assignment with expression on RHS.
@@ -777,7 +792,10 @@ def main():
 "#;
 
     let code = cobra64::compile(source).expect("Compilation should succeed");
-    assert!(!code.is_empty(), "Code should compile expression RHS compound ops");
+    assert!(
+        !code.is_empty(),
+        "Code should compile expression RHS compound ops"
+    );
 }
 
 /// Test compound assignment in conditional.
@@ -796,7 +814,10 @@ def main():
 "#;
 
     let code = cobra64::compile(source).expect("Compilation should succeed");
-    assert!(!code.is_empty(), "Code should compile conditional compound ops");
+    assert!(
+        !code.is_empty(),
+        "Code should compile conditional compound ops"
+    );
 }
 
 /// Test the compound_assignment.cb64 example compiles.

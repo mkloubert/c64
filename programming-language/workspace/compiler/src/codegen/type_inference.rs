@@ -28,6 +28,7 @@
 //! The `infer_type_from_expr` function is kept for determining types of
 //! sub-expressions during code generation (e.g., array literals, function calls).
 
+use super::data_blocks::DataBlockEmitter;
 use super::variables::VariableManager;
 use super::CodeGenerator;
 use crate::ast::{Expr, ExprKind, Type, UnaryOp};
@@ -81,6 +82,9 @@ impl TypeInference for CodeGenerator {
             ExprKind::Identifier(name) => {
                 if let Some(var) = self.get_variable(name) {
                     var.var_type
+                } else if self.is_data_block(name) {
+                    // Data blocks are always word addresses
+                    Type::Word
                 } else {
                     Type::Byte
                 }

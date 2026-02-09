@@ -96,11 +96,12 @@
     "@types/vscode": "^1.85.0",
     "@typescript-eslint/eslint-plugin": "^6.19.0",
     "@typescript-eslint/parser": "^6.19.0",
+    "@vscode/vsce": "^2.22.0",
     "eslint": "^8.56.0",
     "mocha": "^10.2.0",
     "rimraf": "^5.0.5",
-    "typescript": "^5.3.3",
-    "@vscode/vsce": "^2.22.0"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1",

@@ -45,7 +45,7 @@ export interface Program {
     span: Span;
 }
 
-export type TopLevelItem = FunctionDef | VarDecl | ConstDecl;
+export type TopLevelItem = FunctionDef | VarDecl | ConstDecl | DataBlockDef;
 
 export interface FunctionDef {
     kind: 'FunctionDef';
@@ -76,6 +76,31 @@ export interface ConstDecl {
     name: string;
     type: string | null;
     value: Expression;
+    span: Span;
+}
+
+export interface DataBlockDef {
+    kind: 'DataBlockDef';
+    name: string;
+    entries: DataEntry[];
+    span: Span;
+}
+
+export type DataEntry =
+    | DataEntryBytes
+    | DataEntryInclude;
+
+export interface DataEntryBytes {
+    kind: 'DataEntryBytes';
+    values: number[];
+    span: Span;
+}
+
+export interface DataEntryInclude {
+    kind: 'DataEntryInclude';
+    path: string;
+    offset: number | null;
+    length: number | null;
     span: Span;
 }
 
@@ -308,8 +333,13 @@ export class Parser {
     private parseTopLevelItem(): TopLevelItem | null {
         this.skipNewlines();
 
-        if (this.check(TokenType.Keyword) && this.current().value === 'def') {
-            return this.parseFunctionDef();
+        if (this.check(TokenType.Keyword)) {
+            if (this.current().value === 'def') {
+                return this.parseFunctionDef();
+            }
+            if (this.current().value === 'data') {
+                return this.parseDataBlock();
+            }
         }
 
         if (this.check(TokenType.Identifier)) {
@@ -372,6 +402,154 @@ export class Parser {
             params,
             returnType,
             body,
+            span: { start, end: this.previous().span.end },
+        };
+    }
+
+    private parseDataBlock(): DataBlockDef {
+        const start = this.current().span.start;
+        this.advance(); // 'data'
+
+        if (!this.check(TokenType.Identifier)) {
+            this.addError(this.current().span, 'E101', 'Expected data block name after data');
+            return this.createDummyDataBlock(start);
+        }
+
+        const name = this.current().value;
+        this.advance();
+
+        if (!this.match(TokenType.Colon)) {
+            this.addError(this.current().span, 'E102', "Expected ':' after data block name");
+        }
+
+        this.skipNewlinesAndIndent();
+
+        const entries: DataEntry[] = [];
+
+        // Parse data entries until we see 'end' or Dedent
+        while (!this.isAtEnd()) {
+            this.skipNewlinesAndIndent();
+
+            // Check for end of data block
+            if (this.check(TokenType.Keyword) && this.current().value === 'end') {
+                break;
+            }
+            if (this.check(TokenType.Dedent)) {
+                this.advance();
+                break;
+            }
+
+            const entry = this.parseDataEntry();
+            if (entry) {
+                entries.push(entry);
+            } else {
+                // If we couldn't parse an entry, skip to next line to avoid infinite loop
+                if (!this.isAtEnd() && !this.check(TokenType.Newline) &&
+                    !this.check(TokenType.Dedent) &&
+                    !(this.check(TokenType.Keyword) && this.current().value === 'end')) {
+                    this.advance();
+                }
+            }
+        }
+
+        // Skip any remaining dedent
+        this.match(TokenType.Dedent);
+
+        if (this.check(TokenType.Keyword) && this.current().value === 'end') {
+            this.advance(); // 'end'
+        }
+
+        return {
+            kind: 'DataBlockDef',
+            name,
+            entries,
+            span: { start, end: this.previous().span.end },
+        };
+    }
+
+    private skipNewlinesAndIndent(): void {
+        while (this.check(TokenType.Newline) || this.check(TokenType.Indent)) {
+            this.advance();
+        }
+    }
+
+    private parseDataEntry(): DataEntry | null {
+        const start = this.current().span.start;
+
+        // Check for include directive
+        if (this.check(TokenType.Keyword) && this.current().value === 'include') {
+            this.advance(); // 'include'
+
+            if (!this.check(TokenType.String)) {
+                this.addError(this.current().span, 'E101', 'Expected filename string after include');
+                return null;
+            }
+
+            // Extract path from string (remove quotes)
+            const raw = this.current().value;
+            const path = raw.slice(1, -1);
+            this.advance();
+
+            let offset: number | null = null;
+            let length: number | null = null;
+
+            // Check for offset
+            if (this.match(TokenType.Comma)) {
+                if (this.check(TokenType.Integer)) {
+                    offset = this.parseIntegerValue(this.current().value);
+                    this.advance();
+                }
+
+                // Check for length
+                if (this.match(TokenType.Comma)) {
+                    if (this.check(TokenType.Integer)) {
+                        length = this.parseIntegerValue(this.current().value);
+                        this.advance();
+                    }
+                }
+            }
+
+            return {
+                kind: 'DataEntryInclude',
+                path,
+                offset,
+                length,
+                span: { start, end: this.previous().span.end },
+            };
+        }
+
+        // Parse inline byte values
+        const values: number[] = [];
+
+        while (!this.isAtEnd() && !this.check(TokenType.Newline) &&
+               !(this.check(TokenType.Keyword) && this.current().value === 'end')) {
+            if (this.check(TokenType.Integer)) {
+                values.push(this.parseIntegerValue(this.current().value));
+                this.advance();
+            } else if (this.match(TokenType.Comma)) {
+                // Skip comma separator
+                continue;
+            } else {
+                break;
+            }
+        }
+
+        if (values.length === 0) {
+            return null;
+        }
+
+        return {
+            kind: 'DataEntryBytes',
+            values,
+            span: { start, end: this.previous().span.end },
+        };
+    }
+
+    private createDummyDataBlock(start: number): DataBlockDef {
+        return {
+            kind: 'DataBlockDef',
+            name: '__error__',
+            entries: [],
             span: { start, end: this.previous().span.end },
         };
     }

@@ -6,6 +6,7 @@
     { "include": "#comments" },
     { "include": "#strings" },
     { "include": "#characters" },
+    { "include": "#data-block-definition" },
     { "include": "#function-definition" },
     { "include": "#numbers" },
     { "include": "#keywords" },
@@ -77,6 +78,36 @@
         {
           "name": "constant.numeric.integer.decimal.cobra64",
           "match": "\\b\\d+\\b"
+        }
+      ]
+    },
+    "data-block-definition": {
+      "patterns": [
+        {
+          "begin": "\\b(data)\\s+([A-Z_][A-Z0-9_]*)\\s*:",
+          "beginCaptures": {
+            "1": { "name": "keyword.other.data.cobra64" },
+            "2": { "name": "entity.name.data-block.cobra64" }
+          },
+          "end": "\\b(end)\\b",
+          "endCaptures": {
+            "1": { "name": "keyword.other.end.cobra64" }
+          },
+          "patterns": [
+            { "include": "#comments" },
+            { "include": "#data-block-include" },
+            { "include": "#numbers" },
+            { "include": "#strings" },
+            { "include": "#operators" }
+          ]
+        }
+      ]
+    },
+    "data-block-include": {
+      "patterns": [
+        {
+          "match": "\\b(include)\\b",
+          "name": "keyword.other.include.cobra64"
         }
       ]
     },

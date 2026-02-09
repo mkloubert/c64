@@ -55,11 +55,13 @@ pub mod comparisons;
 pub mod constants;
 pub mod control_flow;
 pub mod conversions;
+pub mod data_blocks;
 pub mod declarations;
 pub mod emit;
 pub mod expressions;
 pub mod float_runtime;
 pub mod functions;
+pub mod include_resolver;
 pub mod labels;
 pub mod mos6510;
 pub mod runtime;
@@ -72,14 +74,18 @@ pub mod variables;
 
 // Re-exports for public API
 pub use constants::{BASIC_STUB_SIZE, CODE_START, PROGRAM_START};
-pub use types::{decimal_string_to_binary16, decimal_string_to_fixed, f64_to_binary16, f64_to_fixed};
+pub use types::{
+    decimal_string_to_binary16, decimal_string_to_fixed, f64_to_binary16, f64_to_fixed,
+};
 
 // Internal imports from submodules
 use assignments::AssignmentEmitter;
 use control_flow::ControlFlowEmitter;
+use data_blocks::{DataBlockEmitter, PendingDataBlock, PendingDataBlockRef};
 use declarations::DeclarationEmitter;
 use emit::EmitHelpers;
 use expressions::ExpressionEmitter;
+use include_resolver::IncludeResolver;
 use labels::{LabelManager, LoopContext, PendingBranch, PendingJump};
 use runtime::RuntimeEmitter;
 use strings::{PendingStringRef, StringManager};
@@ -120,6 +126,14 @@ pub struct CodeGenerator {
     pub(crate) runtime_included: bool,
     /// Runtime routine addresses.
     pub(crate) runtime_addresses: HashMap<String, u16>,
+    /// Pending data blocks to emit.
+    pub(crate) pending_data_blocks: Vec<PendingDataBlock>,
+    /// Data block addresses (resolved after emission).
+    pub(crate) data_block_addresses: HashMap<String, u16>,
+    /// Pending data block references to resolve.
+    pub(crate) pending_data_block_refs: Vec<PendingDataBlockRef>,
+    /// Include file resolver for data blocks.
+    pub(crate) include_resolver: IncludeResolver,
 }
 
 impl CodeGenerator {
@@ -140,6 +154,43 @@ impl CodeGenerator {
             loop_stack: Vec::new(),
             runtime_included: false,
             runtime_addresses: HashMap::new(),
+            pending_data_blocks: Vec::new(),
+            data_block_addresses: HashMap::new(),
+            pending_data_block_refs: Vec::new(),
+            include_resolver: IncludeResolver::new(),
+        }
+    }
+
+    /// Create a new code generator with a source path for resolving includes.
+    ///
+    /// The source path is used as the base directory for resolving relative
+    /// paths in `include` directives within data blocks.
+    pub fn with_source_path(source_path: impl AsRef<std::path::Path>) -> Self {
+        let source_dir = source_path
+            .as_ref()
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_default();
+
+        Self {
+            code: Vec::new(),
+            current_address: PROGRAM_START,
+            variables: HashMap::new(),
+            functions: HashMap::new(),
+            strings: Vec::new(),
+            pending_string_refs: Vec::new(),
+            labels: HashMap::new(),
+            pending_branches: Vec::new(),
+            pending_jumps: Vec::new(),
+            next_var_address: 0xC000, // Variables start at $C000
+            label_counter: 0,
+            loop_stack: Vec::new(),
+            runtime_included: false,
+            runtime_addresses: HashMap::new(),
+            pending_data_blocks: Vec::new(),
+            data_block_addresses: HashMap::new(),
+            pending_data_block_refs: Vec::new(),
+            include_resolver: IncludeResolver::with_base_dir(source_dir),
         }
     }
 
@@ -189,6 +240,10 @@ impl CodeGenerator {
                         .clone()
                         .expect("Constant declaration must have explicit type");
                     self.allocate_variable(&decl.name, &const_type, true);
+                }
+                TopLevelItem::DataBlock(data_block) => {
+                    // Register data block for later emission
+                    self.register_data_block(data_block);
                 }
             }
         }
@@ -247,6 +302,12 @@ impl CodeGenerator {
             }
         }
 
+        // Emit data blocks after strings
+        self.emit_data_blocks()?;
+
+        // Resolve data block references now that addresses are known
+        self.resolve_data_block_refs();
+
         Ok(self.code.clone())
     }
 
@@ -275,6 +336,10 @@ impl CodeGenerator {
                 self.generate_expression(expr)?;
                 Ok(())
             }
+            StatementKind::DataBlock(_data_block) => {
+                // TODO: Implement data block code generation in Phase 5
+                Ok(())
+            }
         }
     }
 
@@ -298,6 +363,18 @@ impl Default for CodeGenerator {
 /// Generate code for a program.
 pub fn generate(program: &Program) -> Result<Vec<u8>, CompileError> {
     let mut generator = CodeGenerator::new();
+    generator.generate(program)
+}
+
+/// Generate code for a program with a source path for resolving includes.
+///
+/// The source path is used as the base directory for resolving relative
+/// paths in `include` directives within data blocks.
+pub fn generate_with_path(
+    program: &Program,
+    source_path: impl AsRef<std::path::Path>,
+) -> Result<Vec<u8>, CompileError> {
+    let mut generator = CodeGenerator::with_source_path(source_path);
     generator.generate(program)
 }
 

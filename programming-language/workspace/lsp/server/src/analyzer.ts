@@ -22,6 +22,7 @@ import {
     FunctionDef,
     VarDecl,
     ConstDecl,
+    DataBlockDef,
     Statement,
     Expression,
     TopLevelItem,
@@ -46,6 +47,16 @@ interface SymbolInfo {
     definitionSpan: Span;
     isConstant: boolean;
     value?: unknown;
+}
+
+/**
+ * Data block information.
+ */
+interface DataBlockInfo {
+    name: string;
+    byteCount: number;
+    hasInclude: boolean;
+    span: Span;
 }
 
 /**
@@ -107,6 +118,7 @@ export class Analyzer {
     private globalScope: Scope = new Scope();
     private currentScope: Scope = this.globalScope;
     private functions: Map<string, FunctionInfo> = new Map();
+    private dataBlocks: Map<string, DataBlockInfo> = new Map();
     private allSymbols: Cobra64Symbol[] = [];
     private inLoop: number = 0;
     private currentFunction: FunctionInfo | null = null;
@@ -170,6 +182,8 @@ export class Analyzer {
                         this.hasMain = true;
                     }
                 }
+            } else if (item.kind === 'DataBlockDef') {
+                this.collectDataBlock(item);
             } else if (item.kind === 'VarDecl' || item.kind === 'ConstDecl') {
                 if (this.globalScope.lookupLocal(item.name)) {
                     this.addError(item.span, 'E203', `'${item.name}' is already defined`);
@@ -196,10 +210,63 @@ export class Analyzer {
         }
     }
 
+    private collectDataBlock(block: DataBlockDef): void {
+        // Check for duplicate names
+        if (this.dataBlocks.has(block.name)) {
+            this.addError(block.span, 'E203', `Data block '${block.name}' is already defined`);
+            return;
+        }
+        if (this.globalScope.lookupLocal(block.name)) {
+            this.addError(block.span, 'E203', `'${block.name}' is already defined as a variable or constant`);
+            return;
+        }
+
+        // Calculate byte count from entries
+        let byteCount = 0;
+        let hasInclude = false;
+
+        for (const entry of block.entries) {
+            if (entry.kind === 'DataEntryBytes') {
+                byteCount += entry.values.length;
+            } else if (entry.kind === 'DataEntryInclude') {
+                hasInclude = true;
+                // We can't know the size without reading the file
+            }
+        }
+
+        this.dataBlocks.set(block.name, {
+            name: block.name,
+            byteCount,
+            hasInclude,
+            span: block.span,
+        });
+
+        // Register as a constant (data blocks have word address type)
+        this.globalScope.define({
+            name: block.name,
+            kind: SymbolKind.DataBlock,
+            type: 'word',
+            span: block.span,
+            definitionSpan: block.span,
+            isConstant: true,
+        });
+
+        this.allSymbols.push({
+            name: block.name,
+            kind: SymbolKind.DataBlock,
+            type: 'word',
+            span: block.span,
+            definitionSpan: block.span,
+        });
+    }
+
     private analyzeTopLevelItem(item: TopLevelItem): void {
         switch (item.kind) {
             case 'FunctionDef':
                 this.analyzeFunction(item);
+                break;
+            case 'DataBlockDef':
+                // Data blocks are already collected, nothing more to analyze
                 break;
             case 'VarDecl':
                 if (item.initializer) {

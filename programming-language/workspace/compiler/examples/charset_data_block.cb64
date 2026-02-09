@@ -1,0 +1,95 @@
+# Custom Character Set Demo for Cobra64
+# Demonstrates embedding custom character data using data blocks
+#
+# C64 character sets: 256 characters x 8 bytes = 2048 bytes total
+# This example defines a few custom characters.
+
+# Define custom character data
+# Each character is 8 bytes (8x8 pixels)
+data CUSTOM_CHARS:
+    # Character 0: Smiley face
+    $3C, $42, $A5, $81, $A5, $99, $42, $3C
+
+    # Character 1: Heart
+    $00, $66, $FF, $FF, $7E, $3C, $18, $00
+
+    # Character 2: Diamond
+    $18, $3C, $7E, $FF, $7E, $3C, $18, $00
+
+    # Character 3: Club
+    $18, $18, $3C, $FF, $FF, $18, $3C, $00
+
+    # Character 4: Spade
+    $18, $3C, $7E, $FF, $FF, $18, $18, $3C
+
+    # Character 5: Star
+    $10, $10, $54, $38, $38, $54, $10, $10
+
+    # Character 6: Box (solid)
+    $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
+
+    # Character 7: Box (hollow)
+    $FF, $81, $81, $81, $81, $81, $81, $FF
+end
+
+def main():
+    cls()
+    println("CUSTOM CHARSET DEMO")
+    println("")
+    println("CUSTOM CHAR DATA AT:")
+
+    # Get the address of our custom characters
+    chars_addr: word = CUSTOM_CHARS
+
+    print("$")
+    print_hex_word(chars_addr)
+    println("")
+    println("")
+
+    # Copy custom characters to $3000 (VIC-accessible)
+    # In a real program, you would copy all 2048 bytes
+    # Here we just copy our 8 custom characters (64 bytes)
+    copy_chars(CUSTOM_CHARS, $3000, 64)
+
+    # For this demo, we'll just show that the data is accessible
+    # Setting up VIC-II for custom charset requires bank switching
+    # which is beyond this simple demo
+
+    println("CHAR BYTES (SMILEY):")
+    i: byte = 0
+    while i < 8:
+        print("$")
+        print_hex_byte(peek(chars_addr + word(i)))
+        print(" ")
+        i = i + 1
+    println("")
+    println("")
+    println("DATA BLOCK FEATURE WORKS!")
+    println("PRESS ANY KEY")
+
+    while get_key() == 0:
+        pass
+
+# Helper: Copy n bytes from src to dest
+def copy_chars(src: word, dest: word, count: byte):
+    i: byte = 0
+    while i < count:
+        poke(dest + word(i), peek(src + word(i)))
+        i = i + 1
+
+# Helper: Print a word as hex
+def print_hex_word(val: word):
+    print_hex_byte(byte(val >> 8))
+    print_hex_byte(byte(val))
+
+def print_hex_byte(val: byte):
+    hi: byte = val >> 4
+    lo: byte = val & $0F
+    print_hex_digit(hi)
+    print_hex_digit(lo)
+
+def print_hex_digit(val: byte):
+    if val < 10:
+        print_char(byte('0') + val)
+    else:
+        print_char(byte('A') + val - 10)

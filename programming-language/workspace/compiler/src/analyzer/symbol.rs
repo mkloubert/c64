@@ -69,11 +69,38 @@ impl Symbol {
         }
     }
 
+    /// Create a new data block symbol.
+    /// Data blocks are treated as word constants (their address).
+    pub fn data_block(name: String, size: usize, span: Span) -> Self {
+        Self {
+            name,
+            symbol_type: SymbolType::DataBlock { size },
+            is_constant: true, // Data blocks are always immutable
+            address: None,
+            span,
+        }
+    }
+
     /// Get the type of a variable symbol.
+    /// For data blocks, returns Word (the address type).
     pub fn get_type(&self) -> Option<&Type> {
         match &self.symbol_type {
             SymbolType::Variable(t) => Some(t),
             SymbolType::Function { .. } => None,
+            SymbolType::DataBlock { .. } => None, // Address is handled specially
+        }
+    }
+
+    /// Check if this is a data block symbol.
+    pub fn is_data_block(&self) -> bool {
+        matches!(self.symbol_type, SymbolType::DataBlock { .. })
+    }
+
+    /// Get the size of a data block symbol.
+    pub fn data_block_size(&self) -> Option<usize> {
+        match &self.symbol_type {
+            SymbolType::DataBlock { size } => Some(*size),
+            _ => None,
         }
     }
 }
@@ -87,5 +114,10 @@ pub enum SymbolType {
     Function {
         params: Vec<Type>,
         return_type: Option<Type>,
+    },
+    /// A data block (address is a word constant).
+    DataBlock {
+        /// The size of the data block in bytes.
+        size: usize,
     },
 }
