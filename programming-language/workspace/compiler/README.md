@@ -2871,7 +2871,7 @@ The generated PRG and D64 files should work with any C64 emulator that supports 
 
 ## Version History
 
-- **0.16.1** - Joystick Input Functions
+- **0.16.2** - Joystick Input Functions
   - Added `joystick(port: byte) -> byte` function to read joystick state
   - Port 1 reads from CIA1 $DC01, Port 2 reads from CIA1 $DC00
   - Returns byte with active-high bits (1 = pressed) for easy bit testing
