@@ -192,6 +192,12 @@ conformance_test!(
     "Built-in random number functions (rand, rand_byte, rand_sbyte, rand_word, rand_sword)"
 );
 
+conformance_test!(
+    test_51_joystick_input,
+    "51_joystick_input.cb64",
+    "Built-in joystick functions (joystick, JOY_UP, JOY_DOWN, JOY_LEFT, JOY_RIGHT, JOY_FIRE)"
+);
+
 // ============================================================================
 // Code Generation Verification Tests
 // ============================================================================

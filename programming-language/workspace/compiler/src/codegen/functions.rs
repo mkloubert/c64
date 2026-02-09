@@ -136,6 +136,40 @@ impl FunctionCallEmitter for CodeGenerator {
                 // Returns string address in TMP1/TMP1_HI (for print_str compatibility)
                 self.emit_jsr_label("__readln");
             }
+            "joystick" => {
+                // Read joystick state from port 1 or 2
+                // Port 1 = $DC01 (CIA1_PORTB), Port 2 = $DC00 (CIA1_PORTA)
+                // Bits are active-low on hardware, we invert for user-friendly API
+                if !args.is_empty() {
+                    // Generate port argument into A
+                    self.generate_expression(&args[0])?;
+
+                    // Check if port == 1
+                    let port2_label = self.make_label("joy_port2");
+                    let done_label = self.make_label("joy_done");
+
+                    self.emit_byte(opcodes::CMP_IMM);
+                    self.emit_byte(1);
+                    self.emit_branch(opcodes::BNE, &port2_label);
+
+                    // Port 1: read from $DC01
+                    self.emit_abs(opcodes::LDA_ABS, cia::CIA1_PORTB);
+                    self.emit_jmp(&done_label);
+
+                    // Port 2: read from $DC00
+                    self.define_label(&port2_label);
+                    self.emit_abs(opcodes::LDA_ABS, cia::CIA1_PORTA);
+
+                    // Done: invert and mask the result
+                    self.define_label(&done_label);
+                    // EOR #$1F inverts bits 0-4 (active-low -> active-high)
+                    self.emit_byte(opcodes::EOR_IMM);
+                    self.emit_byte(cia::JOY_MASK);
+                    // AND #$1F keeps only joystick bits
+                    self.emit_byte(opcodes::AND_IMM);
+                    self.emit_byte(cia::JOY_MASK);
+                }
+            }
             "poke" => {
                 if args.len() >= 2 {
                     // Value to poke

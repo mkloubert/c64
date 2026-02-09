@@ -30,7 +30,7 @@ use super::conversions::TypeConversions;
 use super::data_blocks::DataBlockEmitter;
 use super::emit::EmitHelpers;
 use super::functions::FunctionCallEmitter;
-use super::mos6510::{c64, colors, opcodes, sid, sprite, vic, zeropage};
+use super::mos6510::{c64, cia, colors, opcodes, sid, sprite, vic, zeropage};
 use super::strings::StringManager;
 use super::type_inference::TypeInference;
 use super::types::{decimal_string_to_binary16, decimal_string_to_fixed};
@@ -200,6 +200,17 @@ fn get_builtin_constant(name: &str) -> Option<(u16, bool)> {
         "RASTER_BOTTOM" => Some((vic::RASTER_BOTTOM, true)),
         "RASTER_MAX_PAL" => Some((vic::RASTER_MAX_PAL, true)),
         "RASTER_MAX_NTSC" => Some((vic::RASTER_MAX_NTSC, true)),
+
+        // Joystick direction and button bit masks (byte values, active-high)
+        "JOY_UP" => Some((0x01, false)),    // Bit 0
+        "JOY_DOWN" => Some((0x02, false)),  // Bit 1
+        "JOY_LEFT" => Some((0x04, false)),  // Bit 2
+        "JOY_RIGHT" => Some((0x08, false)), // Bit 3
+        "JOY_FIRE" => Some((0x10, false)),  // Bit 4
+
+        // CIA1 joystick port addresses (word values)
+        "CIA1_PORTA" => Some((cia::CIA1_PORTA, true)), // $DC00 - Joystick Port 2
+        "CIA1_PORTB" => Some((cia::CIA1_PORTB, true)), // $DC01 - Joystick Port 1
 
         _ => None,
     }

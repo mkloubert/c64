@@ -1,0 +1,44 @@
+# Conformance Test: Joystick Input Functions
+# Tests: joystick(), JOY_UP, JOY_DOWN, JOY_LEFT, JOY_RIGHT, JOY_FIRE
+# Tests: CIA1_PORTA, CIA1_PORTB constants
+# Expected: Compiles without errors, reads joystick when run
+
+def main():
+    println("JOYSTICK TEST")
+    println("")
+    println("USE JOYSTICK PORT 2")
+    println("PRESS FIRE TO QUIT")
+    println("")
+
+    # Test constants exist and have correct values
+    up: byte = JOY_UP
+    down: byte = JOY_DOWN
+    left: byte = JOY_LEFT
+    right: byte = JOY_RIGHT
+    fire: byte = JOY_FIRE
+
+    # Test CIA address constants
+    porta: word = CIA1_PORTA
+    portb: word = CIA1_PORTB
+
+    # Main loop - read joystick port 2
+    done: bool = false
+    while not done:
+        joy: byte = joystick(2)
+
+        # Check each direction
+        if (joy & JOY_UP) != 0:
+            println("UP")
+        if (joy & JOY_DOWN) != 0:
+            println("DOWN")
+        if (joy & JOY_LEFT) != 0:
+            println("LEFT")
+        if (joy & JOY_RIGHT) != 0:
+            println("RIGHT")
+
+        # Fire button exits
+        if (joy & JOY_FIRE) != 0:
+            done = true
+
+    println("")
+    println("GOODBYE")

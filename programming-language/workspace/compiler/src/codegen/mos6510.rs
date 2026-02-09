@@ -818,6 +818,27 @@ pub mod cia {
     /// CIA1 Timer B high byte.
     pub const CIA1_TIMER_B_HI: u16 = 0xDC07;
 
+    /// CIA1 Port A - Joystick Port 2 and keyboard matrix columns.
+    /// Reading this register returns joystick 2 state in bits 0-4:
+    /// - Bit 0: Up (active low, 0 = pressed)
+    /// - Bit 1: Down (active low)
+    /// - Bit 2: Left (active low)
+    /// - Bit 3: Right (active low)
+    /// - Bit 4: Fire button (active low)
+    pub const CIA1_PORTA: u16 = 0xDC00;
+
+    /// CIA1 Port B - Joystick Port 1 and keyboard matrix rows.
+    /// Reading this register returns joystick 1 state in bits 0-4:
+    /// - Bit 0: Up (active low, 0 = pressed)
+    /// - Bit 1: Down (active low)
+    /// - Bit 2: Left (active low)
+    /// - Bit 3: Right (active low)
+    /// - Bit 4: Fire button (active low)
+    pub const CIA1_PORTB: u16 = 0xDC01;
+
+    /// Joystick bit mask for direction and fire bits (bits 0-4).
+    pub const JOY_MASK: u8 = 0x1F;
+
     /// CIA2 Port A Data Direction Register.
     pub const CIA2_DDRA: u16 = 0xDD02;
     /// CIA2 Port A - VIC bank selection (bits 0-1).

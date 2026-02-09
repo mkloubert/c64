@@ -146,7 +146,7 @@ impl TypeInference for CodeGenerator {
                 // Return type for built-in functions
                 match name.as_str() {
                     "rand" | "rand_fixed" => Type::Fixed,
-                    "rand_byte" | "peek" | "get_key" => Type::Byte,
+                    "rand_byte" | "peek" | "get_key" | "joystick" => Type::Byte,
                     "rand_sbyte" => Type::Sbyte,
                     "rand_word" | "peek_word" | "len" => Type::Word,
                     "rand_sword" => Type::Sword,

@@ -1,0 +1,134 @@
+# Joystick Demo for Cobra64
+# Control a sprite with joystick in port 2
+# Press FIRE to exit
+
+# Sprite data pointer (points to $3000 / 64 = 192)
+const SPRITE_PTR: byte = 192
+
+# Movement speed
+const SPEED: byte = 2
+
+def main():
+    cls()
+    println("JOYSTICK DEMO")
+    println("")
+    println("USE JOYSTICK PORT 2")
+    println("MOVE: UP/DOWN/LEFT/RIGHT")
+    println("FIRE: EXIT")
+    println("")
+    println("PRESS FIRE TO START...")
+
+    # Wait for fire button
+    wait_for_fire()
+
+    cls()
+
+    # Setup sprite
+    setup_sprite_data()
+    poke(2040, SPRITE_PTR)
+    sprite_color(0, COLOR_WHITE)
+    sprite_enable(0, true)
+
+    # Initial position (center of screen)
+    x: word = 172
+    y: byte = 140
+
+    # Main game loop
+    done: bool = false
+    while not done:
+        # Read joystick port 2
+        joy: byte = joystick(2)
+
+        # Move based on direction
+        if (joy & JOY_UP) != 0:
+            if y > 50:
+                y = y - SPEED
+        if (joy & JOY_DOWN) != 0:
+            if y < 229:
+                y = y + SPEED
+        if (joy & JOY_LEFT) != 0:
+            if x > 24:
+                x = x - word(SPEED)
+        if (joy & JOY_RIGHT) != 0:
+            if x < 320:
+                x = x + word(SPEED)
+
+        # Fire button exits
+        if (joy & JOY_FIRE) != 0:
+            done = true
+
+        # Update sprite position
+        sprite_pos(0, x, y)
+
+        # Small delay for smooth movement
+        delay(500)
+
+    # Cleanup
+    sprite_enable(0, false)
+    cls()
+    println("GOODBYE!")
+
+def wait_for_fire():
+    # Wait until fire is pressed
+    waiting: bool = true
+    while waiting:
+        joy: byte = joystick(2)
+        if (joy & JOY_FIRE) != 0:
+            waiting = false
+
+    # Wait until fire is released
+    while (joystick(2) & JOY_FIRE) != 0:
+        pass
+
+def delay(count: word):
+    # Simple delay loop
+    i: word = 0
+    while i < count:
+        i = i + 1
+
+def setup_sprite_data():
+    # Create a simple ball sprite at $3000
+    # 24x21 pixels, 63 bytes of data
+
+    # Top rows (rounded top)
+    poke($3000, %00000011)
+    poke($3001, %11111100)
+    poke($3002, %00000000)
+
+    poke($3003, %00001111)
+    poke($3004, %11111111)
+    poke($3005, %00000000)
+
+    poke($3006, %00111111)
+    poke($3007, %11111111)
+    poke($3008, %11000000)
+
+    poke($3009, %01111111)
+    poke($300A, %11111111)
+    poke($300B, %11100000)
+
+    # Middle rows (full width)
+    i: byte = 0
+    while i < 13:
+        addr: word = $300C + word(i) * 3
+        poke(addr, %11111111)
+        poke(addr + 1, %11111111)
+        poke(addr + 2, %11111111)
+        i = i + 1
+
+    # Bottom rows (rounded bottom)
+    poke($3039, %01111111)
+    poke($303A, %11111111)
+    poke($303B, %11100000)
+
+    poke($303C, %00111111)
+    poke($303D, %11111111)
+    poke($303E, %11000000)
+
+    poke($303F, %00001111)
+    poke($3040, %11111111)
+    poke($3041, %00000000)
+
+    poke($3042, %00000011)
+    poke($3043, %11111100)
+    poke($3044, %00000000)

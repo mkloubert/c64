@@ -31,6 +31,7 @@ A modern programming language and compiler for the Commodore 64.
    - [Screen Functions](#screen-functions)
    - [Output Functions](#output-functions)
    - [Input Functions](#input-functions)
+   - [Joystick Functions](#joystick-functions)
    - [Memory Functions](#memory-functions)
    - [Array and String Functions](#array-and-string-functions)
    - [Random Number Functions](#random-number-functions)
@@ -1271,6 +1272,89 @@ def main():
     print("HELLO ")
     println(name)
 ```
+
+### Joystick Functions
+
+#### `joystick(port: byte) -> byte`
+
+Reads the state of a joystick from the specified port.
+
+**Parameters:**
+
+- `port`: Joystick port number (1 or 2)
+
+**Returns:**
+
+A byte with bits set for each pressed direction or button:
+
+| Constant    | Value | Bit | Description           |
+| ----------- | ----- | --- | --------------------- |
+| `JOY_UP`    | 1     | 0   | Joystick pushed up    |
+| `JOY_DOWN`  | 2     | 1   | Joystick pushed down  |
+| `JOY_LEFT`  | 4     | 2   | Joystick pushed left  |
+| `JOY_RIGHT` | 8     | 3   | Joystick pushed right |
+| `JOY_FIRE`  | 16    | 4   | Fire button pressed   |
+
+**Note:** Port 2 is more commonly used in C64 games as Port 1 can interfere with keyboard input.
+
+```python
+def main():
+    println("USE JOYSTICK PORT 2")
+
+    done: bool = false
+    while not done:
+        joy: byte = joystick(2)
+
+        if (joy & JOY_UP) != 0:
+            println("UP")
+        if (joy & JOY_DOWN) != 0:
+            println("DOWN")
+        if (joy & JOY_LEFT) != 0:
+            println("LEFT")
+        if (joy & JOY_RIGHT) != 0:
+            println("RIGHT")
+        if (joy & JOY_FIRE) != 0:
+            done = true
+
+    println("GOODBYE")
+```
+
+**Diagonal movement example:**
+
+```python
+def main():
+    x: word = 160
+    y: byte = 100
+
+    while (joystick(2) & JOY_FIRE) == 0:
+        joy: byte = joystick(2)
+
+        # Diagonal movement works naturally with bit testing
+        if (joy & JOY_UP) != 0:
+            y = y - 1
+        if (joy & JOY_DOWN) != 0:
+            y = y + 1
+        if (joy & JOY_LEFT) != 0:
+            x = x - 1
+        if (joy & JOY_RIGHT) != 0:
+            x = x + 1
+
+        sprite_pos(0, x, y)
+```
+
+#### Joystick Constants
+
+The following constants are available for joystick input:
+
+| Constant     | Type   | Value | Description                   |
+| ------------ | ------ | ----- | ----------------------------- |
+| `JOY_UP`     | `byte` | 1     | Up direction bit mask         |
+| `JOY_DOWN`   | `byte` | 2     | Down direction bit mask       |
+| `JOY_LEFT`   | `byte` | 4     | Left direction bit mask       |
+| `JOY_RIGHT`  | `byte` | 8     | Right direction bit mask      |
+| `JOY_FIRE`   | `byte` | 16    | Fire button bit mask          |
+| `CIA1_PORTA` | `word` | $DC00 | CIA1 Port A (Joystick Port 2) |
+| `CIA1_PORTB` | `word` | $DC01 | CIA1 Port B (Joystick Port 1) |
 
 ### Memory Functions
 
@@ -2786,6 +2870,17 @@ The generated PRG and D64 files should work with any C64 emulator that supports 
 ---
 
 ## Version History
+
+- **0.16.1** - Joystick Input Functions
+  - Added `joystick(port: byte) -> byte` function to read joystick state
+  - Port 1 reads from CIA1 $DC01, Port 2 reads from CIA1 $DC00
+  - Returns byte with active-high bits (1 = pressed) for easy bit testing
+  - Added joystick direction constants: `JOY_UP` (1), `JOY_DOWN` (2), `JOY_LEFT` (4), `JOY_RIGHT` (8)
+  - Added fire button constant: `JOY_FIRE` (16)
+  - Added CIA address constants: `CIA1_PORTA` ($DC00), `CIA1_PORTB` ($DC01)
+  - New example program: `examples/joystick_demo.cb64` (sprite control with joystick)
+  - New conformance test: `tests/conformance/51_joystick_input.cb64`
+  - Full LSP support: auto-completion, hover documentation, code examples
 
 - **0.15.0** - Data Embedding (Binary Data Blocks)
   - Added `data NAME: ... end` syntax for embedding raw binary data

@@ -63,6 +63,11 @@ impl BuiltinRegistry for Analyzer {
         // readln() -> string - read a line of input
         self.define_builtin("readln", vec![], Some(Type::String));
 
+        // joystick(port) -> byte - read joystick state from port 1 or 2
+        // Returns byte with direction/fire bits set (active-high):
+        // Bit 0: Up, Bit 1: Down, Bit 2: Left, Bit 3: Right, Bit 4: Fire
+        self.define_builtin("joystick", vec![Type::Byte], Some(Type::Byte));
+
         // Memory access
         // poke(addr, value) - write to memory
         self.define_builtin("poke", vec![Type::Word, Type::Byte], None);
@@ -638,6 +643,22 @@ impl BuiltinRegistry for Analyzer {
 
         // get_ecm_background(index) -> byte - get ECM background color
         self.define_builtin("get_ecm_background", vec![Type::Byte], Some(Type::Byte));
+
+        // =====================================================================
+        // Joystick Constants
+        // =====================================================================
+
+        // Joystick direction and button bit masks
+        // These are active-high values (1 = pressed) for use with joystick() return value
+        self.define_builtin_constant("JOY_UP", Type::Byte); // Bit 0, value 1
+        self.define_builtin_constant("JOY_DOWN", Type::Byte); // Bit 1, value 2
+        self.define_builtin_constant("JOY_LEFT", Type::Byte); // Bit 2, value 4
+        self.define_builtin_constant("JOY_RIGHT", Type::Byte); // Bit 3, value 8
+        self.define_builtin_constant("JOY_FIRE", Type::Byte); // Bit 4, value 16
+
+        // CIA1 joystick port addresses (for direct hardware access)
+        self.define_builtin_constant("CIA1_PORTA", Type::Word); // $DC00 - Joystick Port 2
+        self.define_builtin_constant("CIA1_PORTB", Type::Word); // $DC01 - Joystick Port 1
     }
 
     fn define_builtin(&mut self, name: &str, params: Vec<Type>, return_type: Option<Type>) {

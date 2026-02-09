@@ -553,6 +553,35 @@ export const COBRA64_CONSTANTS: BuiltinConstant[] = [
     { name: 'RASTER_BOTTOM', type: 'word', value: '250', description: 'Last visible raster line', examples: ['wait_raster(RASTER_BOTTOM)'] },
     { name: 'RASTER_MAX_PAL', type: 'word', value: '311', description: 'Maximum raster line (PAL)', examples: ['# PAL has 312 lines (0-311)'] },
     { name: 'RASTER_MAX_NTSC', type: 'word', value: '261', description: 'Maximum raster line (NTSC)', examples: ['# NTSC has 262 lines (0-261)'] },
+    // Joystick Constants
+    {
+        name: 'JOY_UP', type: 'byte', value: '1', description: 'Joystick up direction (bit 0)', examples: [
+            '# test if joystick is pushed up\njoy: byte = joystick(2)\nif (joy & JOY_UP) != 0:\n    y = y - 1',
+        ]
+    },
+    {
+        name: 'JOY_DOWN', type: 'byte', value: '2', description: 'Joystick down direction (bit 1)', examples: [
+            '# test if joystick is pushed down\nif (joystick(2) & JOY_DOWN) != 0:\n    y = y + 1',
+        ]
+    },
+    {
+        name: 'JOY_LEFT', type: 'byte', value: '4', description: 'Joystick left direction (bit 2)', examples: [
+            '# test if joystick is pushed left\nif (joystick(2) & JOY_LEFT) != 0:\n    x = x - 1',
+        ]
+    },
+    {
+        name: 'JOY_RIGHT', type: 'byte', value: '8', description: 'Joystick right direction (bit 3)', examples: [
+            '# test if joystick is pushed right\nif (joystick(2) & JOY_RIGHT) != 0:\n    x = x + 1',
+        ]
+    },
+    {
+        name: 'JOY_FIRE', type: 'byte', value: '16', description: 'Joystick fire button (bit 4)', examples: [
+            '# wait for fire button\nwhile (joystick(2) & JOY_FIRE) == 0:\n    pass\nprintln("FIRE!")',
+            '# exit loop on fire\nwhile (joystick(2) & JOY_FIRE) == 0:\n    # game logic here\n    pass',
+        ]
+    },
+    { name: 'CIA1_PORTA', type: 'word', value: '$DC00', description: 'CIA1 Port A - Joystick Port 2 (56320)', examples: ['# direct hardware access\njoy: byte = peek(CIA1_PORTA)'] },
+    { name: 'CIA1_PORTB', type: 'word', value: '$DC01', description: 'CIA1 Port B - Joystick Port 1 (56321)', examples: ['# direct hardware access (may conflict with keyboard)\njoy: byte = peek(CIA1_PORTB)'] },
 ];
 
 /**
@@ -659,6 +688,19 @@ export const COBRA64_BUILTINS: BuiltinFunction[] = [
         returnType: 'string',
         examples: [
             '# read text until RETURN is pressed\nprint("Enter your name: ")\nname: string = readln()\nprintln("Hello, " + name + "!")',
+        ],
+    },
+    {
+        name: 'joystick',
+        signature: 'joystick(port: byte) -> byte',
+        description: 'Reads the state of a joystick from the specified port. Returns a byte with bits set for pressed directions/button. Use JOY_UP, JOY_DOWN, JOY_LEFT, JOY_RIGHT, JOY_FIRE constants to test bits.',
+        parameters: [
+            { name: 'port', type: 'byte', description: 'Joystick port number (1 or 2). Port 2 is recommended.' },
+        ],
+        returnType: 'byte',
+        examples: [
+            '# read joystick port 2\njoy: byte = joystick(2)\nif (joy & JOY_UP) != 0:\n    println("UP")\nif (joy & JOY_FIRE) != 0:\n    println("FIRE")',
+            '# control a sprite with joystick\nwhile (joystick(2) & JOY_FIRE) == 0:\n    joy: byte = joystick(2)\n    if (joy & JOY_UP) != 0:\n        y = y - 1\n    if (joy & JOY_DOWN) != 0:\n        y = y + 1\n    sprite_pos(0, x, y)',
         ],
     },
     // Memory functions
